@@ -38,12 +38,16 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToOrganization(String organizationId) {
-        // ... (rest of file is unchanged and now much faster) ...
         User user = getCurrentUser();
 
         // Super admins have access to all organizations
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
+        }
+
+        // FIX: Add null check to prevent NullPointerException
+        if (user.getOrganizationId() == null) {
+            return false;
         }
 
         // Users can only access their own organization
@@ -122,7 +126,6 @@ public class AuthorizationService {
 
     public boolean canManageUsers() {
         User user = getCurrentUser();
-        // <<< FIX: Added SUPER_ADMIN as it should also be able to manage users
         return user.getRole() == Role.SERVER_ADMIN || user.getRole() == Role.SUPER_ADMIN;
     }
 
