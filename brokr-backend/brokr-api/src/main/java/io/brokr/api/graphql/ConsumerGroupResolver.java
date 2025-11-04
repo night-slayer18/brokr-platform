@@ -61,9 +61,8 @@ public class ConsumerGroupResolver {
     public boolean resetConsumerGroupOffset(@Argument String clusterId, @Argument String groupId,
                                             @Argument String topic, @Argument int partition, @Argument long offset) {
         KafkaCluster cluster = getCluster(clusterId);
-        // Implementation for resetting consumer group offset would go here
-        // For simplicity, we'll just return true
-        return true;
+
+        return kafkaAdminService.resetConsumerGroupOffset(cluster, groupId, topic, partition, offset);
     }
 
     private KafkaCluster getCluster(String clusterId) {

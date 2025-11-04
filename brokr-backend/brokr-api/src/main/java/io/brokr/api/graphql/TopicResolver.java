@@ -5,6 +5,7 @@ import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Topic;
 import io.brokr.kafka.service.KafkaAdminService;
 import io.brokr.security.service.AuthorizationService;
+import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -55,8 +56,10 @@ public class TopicResolver {
     @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public Topic updateTopic(@Argument String clusterId, @Argument String name, @Argument Map<String, String> configs) {
         KafkaCluster cluster = getCluster(clusterId);
-        // Implementation for updating topic configs would go here
-        // For simplicity, we'll just return the existing topic
+
+        kafkaAdminService.updateTopicConfig(cluster, name, configs);
+
+        // Return the updated topic
         return kafkaAdminService.getTopic(cluster, name);
     }
 
@@ -70,7 +73,7 @@ public class TopicResolver {
 
     private KafkaCluster getCluster(String clusterId) {
         return clusterRepository.findById(clusterId)
-                .map(entity -> entity.toDomain())
+                .map(KafkaClusterEntity::toDomain)
                 .orElseThrow(() -> new RuntimeException("Cluster not found"));
     }
 }
