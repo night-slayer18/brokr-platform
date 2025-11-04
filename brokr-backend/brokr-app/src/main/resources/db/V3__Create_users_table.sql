@@ -2,7 +2,8 @@
 CREATE TYPE user_role AS ENUM (
     'VIEWER',
     'ADMIN',
-    'SUPER_ADMIN'
+    'SUPER_ADMIN',
+    'SERVER_ADMIN'
 );
 
 CREATE TABLE users (

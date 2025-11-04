@@ -28,7 +28,7 @@ public class SchemaRegistryResolver {
     private final AuthorizationService authorizationService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<SchemaRegistry> schemaRegistries(@Argument String clusterId) {
         return schemaRegistryRepository.findByClusterId(clusterId).stream()
                 .map(entity -> entity.toDomain())
@@ -36,7 +36,7 @@ public class SchemaRegistryResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#schemaRegistry.cluster.environmentId)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#id)")
     public SchemaRegistry schemaRegistry(@Argument String id) {
         return schemaRegistryRepository.findById(id)
                 .map(entity -> entity.toDomain())
@@ -44,7 +44,7 @@ public class SchemaRegistryResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#schemaRegistry.cluster.environmentId)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#schemaRegistryId)")
     public List<String> schemaRegistrySubjects(@Argument String schemaRegistryId) {
         SchemaRegistry schemaRegistry = schemaRegistryRepository.findById(schemaRegistryId)
                 .map(entity -> entity.toDomain())
@@ -54,7 +54,7 @@ public class SchemaRegistryResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#schemaRegistry.cluster.environmentId)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#schemaRegistryId)")
     public String schemaRegistryLatestSchema(@Argument String schemaRegistryId, @Argument String subject) {
         SchemaRegistry schemaRegistry = schemaRegistryRepository.findById(schemaRegistryId)
                 .map(entity -> entity.toDomain())
@@ -64,7 +64,7 @@ public class SchemaRegistryResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#schemaRegistry.cluster.environmentId)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#schemaRegistryId)")
     public List<Integer> schemaRegistrySchemaVersions(@Argument String schemaRegistryId, @Argument String subject) {
         SchemaRegistry schemaRegistry = schemaRegistryRepository.findById(schemaRegistryId)
                 .map(entity -> entity.toDomain())
@@ -74,7 +74,7 @@ public class SchemaRegistryResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#input.clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
     public SchemaRegistry createSchemaRegistry(@Argument SchemaRegistryInput input) {
         if (schemaRegistryRepository.existsByNameAndClusterId(input.getName(), input.getClusterId())) {
             throw new RuntimeException("Schema Registry with this name already exists in the cluster");
@@ -113,7 +113,7 @@ public class SchemaRegistryResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#id)")
     public SchemaRegistry updateSchemaRegistry(@Argument String id, @Argument SchemaRegistryInput input) {
         return schemaRegistryRepository.findById(id)
                 .map(entity -> {
@@ -137,7 +137,7 @@ public class SchemaRegistryResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#id)")
     public boolean deleteSchemaRegistry(@Argument String id) {
         if (schemaRegistryRepository.existsById(id)) {
             schemaRegistryRepository.deleteById(id);
@@ -147,7 +147,7 @@ public class SchemaRegistryResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToSchemaRegistry(#id)")
     public boolean testSchemaRegistryConnection(@Argument String id) {
         return schemaRegistryRepository.findById(id)
                 .map(entity -> {

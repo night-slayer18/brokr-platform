@@ -23,7 +23,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class KafkaStreamApplicationEntity {
+public class KafkaStreamsApplicationEntity {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,26 +55,17 @@ public class KafkaStreamApplicationEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     private Object threads;
 
-    @Column(name = "created_at", updatable = false)
+    // <<< FIX: Made columns read-only to let the database trigger manage them >>>
+    @Column(name = "created_at", updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", updatable = false, insertable = false)
     private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cluster_id", insertable = false, updatable = false)
     private KafkaClusterEntity cluster;
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     public KafkaStreamsApplication toDomain() {
         List<ThreadMetadata> threadList = List.of();
@@ -100,8 +91,8 @@ public class KafkaStreamApplicationEntity {
                 .build();
     }
 
-    public static KafkaStreamApplicationEntity fromDomain(KafkaStreamsApplication app) {
-        return KafkaStreamApplicationEntity.builder()
+    public static KafkaStreamsApplicationEntity fromDomain(KafkaStreamsApplication app) {
+        return KafkaStreamsApplicationEntity.builder()
                 .id(app.getId())
                 .name(app.getName())
                 .applicationId(app.getApplicationId())

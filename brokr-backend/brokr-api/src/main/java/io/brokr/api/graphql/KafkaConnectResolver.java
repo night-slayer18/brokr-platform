@@ -27,7 +27,7 @@ public class KafkaConnectResolver {
     private final AuthorizationService authorizationService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<KafkaConnect> kafkaConnects(@Argument String clusterId) {
         return kafkaConnectRepository.findByClusterId(clusterId).stream()
                 .map(entity -> entity.toDomain())
@@ -35,7 +35,7 @@ public class KafkaConnectResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#kafkaConnect.cluster.environmentId)")
+    @PreAuthorize("@authorizationService.hasAccessToKafkaConnect(#id)")
     public KafkaConnect kafkaConnect(@Argument String id) {
         return kafkaConnectRepository.findById(id)
                 .map(entity -> entity.toDomain())
@@ -43,7 +43,7 @@ public class KafkaConnectResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#input.clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
     public KafkaConnect createKafkaConnect(@Argument KafkaConnectInput input) {
         if (kafkaConnectRepository.existsByNameAndClusterId(input.getName(), input.getClusterId())) {
             throw new RuntimeException("Kafka Connect with this name already exists in the cluster");
@@ -82,7 +82,7 @@ public class KafkaConnectResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToKafkaConnect(#id)")
     public KafkaConnect updateKafkaConnect(@Argument String id, @Argument KafkaConnectInput input) {
         return kafkaConnectRepository.findById(id)
                 .map(entity -> {
@@ -106,7 +106,7 @@ public class KafkaConnectResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToKafkaConnect(#id)")
     public boolean deleteKafkaConnect(@Argument String id) {
         if (kafkaConnectRepository.existsById(id)) {
             kafkaConnectRepository.deleteById(id);
@@ -116,7 +116,7 @@ public class KafkaConnectResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToKafkaConnect(#id)")
     public boolean testKafkaConnectConnection(@Argument String id) {
         return kafkaConnectRepository.findById(id)
                 .map(entity -> {

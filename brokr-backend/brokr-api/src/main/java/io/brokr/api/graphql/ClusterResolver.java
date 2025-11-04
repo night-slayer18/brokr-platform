@@ -3,7 +3,6 @@ package io.brokr.api.graphql;
 import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.User;
-import io.brokr.kafka.service.KafkaAdminService;
 import io.brokr.kafka.service.KafkaConnectionService;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.storage.entity.KafkaClusterEntity;
@@ -23,7 +22,6 @@ import java.util.UUID;
 public class ClusterResolver {
 
     private final KafkaClusterRepository clusterRepository;
-    private final KafkaAdminService kafkaAdminService;
     private final KafkaConnectionService kafkaConnectionService;
     private final AuthorizationService authorizationService;
 
@@ -72,7 +70,8 @@ public class ClusterResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#cluster.environmentId)")
+    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public KafkaCluster cluster(@Argument String id) {
         return clusterRepository.findById(id)
                 .map(KafkaClusterEntity::toDomain)
@@ -119,7 +118,8 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public KafkaCluster updateCluster(@Argument String id, @Argument KafkaClusterInput input) {
         return clusterRepository.findById(id)
                 .map(entity -> {
@@ -153,7 +153,8 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public boolean deleteCluster(@Argument String id) {
         if (clusterRepository.existsById(id)) {
             clusterRepository.deleteById(id);
@@ -163,7 +164,8 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public boolean testClusterConnection(@Argument String id) {
         return clusterRepository.findById(id)
                 .map(entity -> {

@@ -25,7 +25,7 @@ public class ConsumerGroupResolver {
     private final AuthorizationService authorizationService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<ConsumerGroup> consumerGroups(@Argument String clusterId) {
         KafkaCluster cluster = getCluster(clusterId);
         List<ConsumerGroup> groups = kafkaAdminService.listConsumerGroups(cluster);
@@ -40,7 +40,7 @@ public class ConsumerGroupResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public ConsumerGroup consumerGroup(@Argument String clusterId, @Argument String groupId) {
         KafkaCluster cluster = getCluster(clusterId);
         List<ConsumerGroup> groups = kafkaAdminService.listConsumerGroups(cluster);
@@ -57,7 +57,7 @@ public class ConsumerGroupResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public boolean resetConsumerGroupOffset(@Argument String clusterId, @Argument String groupId,
                                             @Argument String topic, @Argument int partition, @Argument long offset) {
         KafkaCluster cluster = getCluster(clusterId);

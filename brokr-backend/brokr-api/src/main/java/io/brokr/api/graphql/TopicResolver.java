@@ -25,21 +25,21 @@ public class TopicResolver {
     private final AuthorizationService authorizationService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<Topic> topics(@Argument String clusterId) {
         KafkaCluster cluster = getCluster(clusterId);
         return kafkaAdminService.listTopics(cluster);
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public Topic topic(@Argument String clusterId, @Argument String name) {
         KafkaCluster cluster = getCluster(clusterId);
         return kafkaAdminService.getTopic(cluster, name);
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public Topic createTopic(@Argument String clusterId, @Argument TopicInput input) {
         KafkaCluster cluster = getCluster(clusterId);
         return kafkaAdminService.createTopic(
@@ -52,7 +52,7 @@ public class TopicResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public Topic updateTopic(@Argument String clusterId, @Argument String name, @Argument Map<String, String> configs) {
         KafkaCluster cluster = getCluster(clusterId);
         // Implementation for updating topic configs would go here
@@ -61,7 +61,7 @@ public class TopicResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToEnvironment(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public boolean deleteTopic(@Argument String clusterId, @Argument String name) {
         KafkaCluster cluster = getCluster(clusterId);
         kafkaAdminService.deleteTopic(cluster, name);
