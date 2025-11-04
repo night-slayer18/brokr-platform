@@ -1,7 +1,7 @@
 package io.brokr.security.service;
 
-import io.brokr.api.exception.ValidationException;
 import io.brokr.core.dto.UserDto;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.User;
 import io.brokr.security.utils.PasswordValidator;
 import io.brokr.storage.entity.UserEntity;

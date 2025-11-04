@@ -1,8 +1,8 @@
 package io.brokr.api.graphql;
 
-import io.brokr.api.exception.ValidationException;
 import io.brokr.api.input.UserInput;
 import io.brokr.core.dto.UserDto;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.utils.PasswordValidator;
@@ -35,10 +35,10 @@ public class UserResolver {
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId) or @authorizationService.canManageUsers()")
-    public List<UserDto> users(@Argument String organizationId) { // FIX: Return Dto
+    public List<UserDto> users(@Argument String organizationId) {
         if (organizationId != null) {
             return userRepository.findByOrganizationId(organizationId).stream()
-                    .map(entity -> entity.toDomain())
+                    .map(UserEntity::toDomain)
                     .map(UserDto::fromDomain)
                     .toList();
         }
@@ -46,7 +46,7 @@ public class UserResolver {
         // Only super admins can list all users
         if (authorizationService.getCurrentUser().getRole() == io.brokr.core.model.Role.SUPER_ADMIN) {
             return userRepository.findAll().stream()
-                    .map(entity -> entity.toDomain())
+                    .map(UserEntity::toDomain)
                     .map(UserDto::fromDomain)
                     .toList();
         }
@@ -56,7 +56,7 @@ public class UserResolver {
 
     @QueryMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
-    public UserDto user(@Argument String id) { // FIX: Return Dto
+    public UserDto user(@Argument String id) {
         return userRepository.findById(id)
                 .map(UserEntity::toDomain)
                 .map(UserDto::fromDomain)
@@ -100,7 +100,7 @@ public class UserResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
-    public UserDto updateUser(@Argument String id, @Argument UserInput input) { // FIX: Return Dto
+    public UserDto updateUser(@Argument String id, @Argument UserInput input) {
         return userRepository.findById(id)
                 .map(entity -> {
                     entity.setUsername(input.getUsername());

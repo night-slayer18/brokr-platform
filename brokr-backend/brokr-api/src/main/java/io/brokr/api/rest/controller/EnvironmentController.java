@@ -1,8 +1,8 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
 import io.brokr.api.input.EnvironmentInput;
 import io.brokr.core.dto.EnvironmentDto;
+import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.model.Environment;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthorizationService;

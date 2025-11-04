@@ -1,4 +1,4 @@
-package io.brokr.api.exception;
+package io.brokr.core.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

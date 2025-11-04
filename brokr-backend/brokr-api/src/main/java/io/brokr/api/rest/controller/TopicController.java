@@ -1,8 +1,8 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
 import io.brokr.api.input.TopicInput;
 import io.brokr.core.dto.TopicDto;
+import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Topic;
 import io.brokr.kafka.service.KafkaAdminService;

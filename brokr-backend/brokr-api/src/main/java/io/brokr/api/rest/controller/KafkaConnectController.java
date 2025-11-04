@@ -1,9 +1,9 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
-import io.brokr.api.exception.ValidationException;
 import io.brokr.api.input.KafkaConnectInput;
 import io.brokr.core.dto.KafkaConnectDto;
+import io.brokr.core.exception.ResourceNotFoundException;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.KafkaConnect;
 import io.brokr.kafka.service.KafkaConnectService;
 import io.brokr.storage.entity.KafkaConnectEntity;

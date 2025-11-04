@@ -1,9 +1,9 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
-import io.brokr.api.exception.ValidationException;
 import io.brokr.api.input.KafkaStreamApplicationInput;
 import io.brokr.core.dto.KafkaStreamsApplicationDto;
+import io.brokr.core.exception.ResourceNotFoundException;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.KafkaStreamsApplication;
 import io.brokr.core.model.StreamsState;

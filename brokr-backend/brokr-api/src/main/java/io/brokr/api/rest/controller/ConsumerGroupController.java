@@ -1,8 +1,8 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
-import io.brokr.api.exception.ValidationException;
 import io.brokr.core.dto.ConsumerGroupDto;
+import io.brokr.core.exception.ResourceNotFoundException;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.ConsumerGroup;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.kafka.service.KafkaAdminService;

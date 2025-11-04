@@ -36,11 +36,6 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.brokr</groupId>
-            <artifactId>brokr-api</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
         </dependency>

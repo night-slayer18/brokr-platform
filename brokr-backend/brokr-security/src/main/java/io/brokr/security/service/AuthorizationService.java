@@ -2,6 +2,7 @@ package io.brokr.security.service;
 
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
+import io.brokr.security.model.BrokrUserDetails;
 import io.brokr.storage.entity.*;
 import io.brokr.storage.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -22,14 +23,22 @@ public class AuthorizationService {
 
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
+        Object principal = authentication.getPrincipal();
 
+        // FIX: Get User model directly from the principal, no DB call
+        if (principal instanceof BrokrUserDetails) {
+            return ((BrokrUserDetails) principal).getUser();
+        }
+
+        // Fallback for any other principal type (should not happen in normal flow)
+        String username = authentication.getName();
         return userRepository.findByUsername(username)
                 .map(UserEntity::toDomain)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     public boolean hasAccessToOrganization(String organizationId) {
+        // ... (rest of file is unchanged and now much faster) ...
         User user = getCurrentUser();
 
         // Super admins have access to all organizations

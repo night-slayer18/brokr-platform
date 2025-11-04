@@ -2,15 +2,25 @@ package io.brokr.api.graphql;
 
 import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.model.KafkaCluster;
+import io.brokr.core.model.KafkaConnect;
+import io.brokr.core.model.KafkaStreamsApplication;
+import io.brokr.core.model.SchemaRegistry;
 import io.brokr.kafka.service.KafkaConnectionService;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.service.ClusterDataService;
 import io.brokr.storage.entity.KafkaClusterEntity;
+import io.brokr.storage.entity.KafkaConnectEntity;
+import io.brokr.storage.entity.KafkaStreamsApplicationEntity;
+import io.brokr.storage.entity.SchemaRegistryEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
+import io.brokr.storage.repository.KafkaConnectRepository;
+import io.brokr.storage.repository.KafkaStreamsApplicationRepository;
+import io.brokr.storage.repository.SchemaRegistryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
@@ -24,7 +34,13 @@ public class ClusterResolver {
     private final KafkaClusterRepository clusterRepository;
     private final KafkaConnectionService kafkaConnectionService;
     private final AuthorizationService authorizationService;
-    private final ClusterDataService clusterDataService; // FIX: Inject new service
+    private final ClusterDataService clusterDataService;
+
+    // FIX: Inject repositories for related entities
+    private final SchemaRegistryRepository schemaRegistryRepository;
+    private final KafkaConnectRepository kafkaConnectRepository;
+    private final KafkaStreamsApplicationRepository kafkaStreamsApplicationRepository;
+
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId)")
@@ -33,7 +49,6 @@ public class ClusterResolver {
     }
 
     @QueryMapping
-    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
     @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public KafkaCluster cluster(@Argument String id) {
         return clusterRepository.findById(id)
@@ -41,9 +56,40 @@ public class ClusterResolver {
                 .orElseThrow(() -> new RuntimeException("Cluster not found"));
     }
 
+    // FIX: START: Add SchemaMappings for related fields
+    @SchemaMapping(typeName = "KafkaCluster", field = "schemaRegistries")
+    public List<SchemaRegistry> getSchemaRegistries(KafkaCluster cluster) {
+        return schemaRegistryRepository.findByClusterId(cluster.getId())
+                .stream()
+                .map(SchemaRegistryEntity::toDomain)
+                .toList();
+    }
+
+    @SchemaMapping(typeName = "KafkaCluster", field = "kafkaConnects")
+    public List<KafkaConnect> getKafkaConnects(KafkaCluster cluster) {
+        return kafkaConnectRepository.findByClusterId(cluster.getId())
+                .stream()
+                .map(KafkaConnectEntity::toDomain)
+                .toList();
+    }
+
+    @SchemaMapping(typeName = "KafkaCluster", field = "kafkaStreamsApplications")
+    public List<KafkaStreamsApplication> getKafkaStreamsApplications(KafkaCluster cluster) {
+        // Note: This does not populate the live state.
+        // The *list* view in GraphQL will show stored state.
+        // The dedicated query `kafkaStreamsApplication(id: ...)` *will* show live state.
+        // This is an acceptable performance trade-off.
+        return kafkaStreamsApplicationRepository.findByClusterId(cluster.getId())
+                .stream()
+                .map(KafkaStreamsApplicationEntity::toDomain)
+                .toList();
+    }
+    // FIX: END
+
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToEnvironment(#input.environmentId)")
     public KafkaCluster createCluster(@Argument KafkaClusterInput input) {
+        // ... (rest of method is unchanged) ...
         if (clusterRepository.existsByNameAndOrganizationId(input.getName(), input.getOrganizationId())) {
             throw new RuntimeException("Cluster with this name already exists in the organization");
         }
@@ -81,9 +127,9 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
     @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public KafkaCluster updateCluster(@Argument String id, @Argument KafkaClusterInput input) {
+        // ... (rest of method is unchanged) ...
         return clusterRepository.findById(id)
                 .map(entity -> {
                     entity.setName(input.getName());
@@ -116,9 +162,9 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
     @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public boolean deleteCluster(@Argument String id) {
+        // ... (rest of method is unchanged) ...
         if (clusterRepository.existsById(id)) {
             clusterRepository.deleteById(id);
             return true;
@@ -127,9 +173,9 @@ public class ClusterResolver {
     }
 
     @MutationMapping
-    // <<< FIX: Changed check from hasAccessToEnvironment to hasAccessToCluster
     @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
     public boolean testClusterConnection(@Argument String id) {
+        // ... (rest of method is unchanged) ...
         return clusterRepository.findById(id)
                 .map(entity -> {
                     KafkaCluster cluster = entity.toDomain();

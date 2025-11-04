@@ -1,6 +1,9 @@
 package io.brokr.api.exception;
 
 import io.brokr.api.rest.dto.ErrorResponse;
+import io.brokr.core.exception.ResourceNotFoundException;
+import io.brokr.core.exception.UnauthorizedException;
+import io.brokr.core.exception.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;

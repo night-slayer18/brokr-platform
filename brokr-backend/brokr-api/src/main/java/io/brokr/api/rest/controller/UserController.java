@@ -1,9 +1,9 @@
 package io.brokr.api.rest.controller;
 
-import io.brokr.api.exception.ResourceNotFoundException;
-import io.brokr.api.exception.ValidationException;
 import io.brokr.api.input.UserInput;
 import io.brokr.core.dto.UserDto;
+import io.brokr.core.exception.ResourceNotFoundException;
+import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.utils.PasswordValidator;
