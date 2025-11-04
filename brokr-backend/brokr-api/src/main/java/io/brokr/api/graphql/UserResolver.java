@@ -1,8 +1,12 @@
 package io.brokr.api.graphql;
 
+import io.brokr.api.exception.ValidationException;
 import io.brokr.api.input.UserInput;
+import io.brokr.core.dto.UserDto;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthorizationService;
+import io.brokr.security.utils.PasswordValidator;
+import io.brokr.storage.entity.UserEntity;
 import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -22,18 +26,20 @@ public class UserResolver {
     private final UserRepository userRepository;
     private final AuthorizationService authorizationService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordValidator passwordValidator;
 
     @QueryMapping
-    public User me() {
-        return authorizationService.getCurrentUser();
+    public UserDto me() {
+        return UserDto.fromDomain(authorizationService.getCurrentUser());
     }
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId) or @authorizationService.canManageUsers()")
-    public List<User> users(@Argument String organizationId) {
+    public List<UserDto> users(@Argument String organizationId) { // FIX: Return Dto
         if (organizationId != null) {
             return userRepository.findByOrganizationId(organizationId).stream()
                     .map(entity -> entity.toDomain())
+                    .map(UserDto::fromDomain)
                     .toList();
         }
 
@@ -41,6 +47,7 @@ public class UserResolver {
         if (authorizationService.getCurrentUser().getRole() == io.brokr.core.model.Role.SUPER_ADMIN) {
             return userRepository.findAll().stream()
                     .map(entity -> entity.toDomain())
+                    .map(UserDto::fromDomain)
                     .toList();
         }
 
@@ -49,21 +56,28 @@ public class UserResolver {
 
     @QueryMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
-    public User user(@Argument String id) {
+    public UserDto user(@Argument String id) { // FIX: Return Dto
         return userRepository.findById(id)
-                .map(entity -> entity.toDomain())
+                .map(UserEntity::toDomain)
+                .map(UserDto::fromDomain)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public User createUser(@Argument UserInput input) {
+    public UserDto createUser(@Argument UserInput input) {
         if (userRepository.existsByUsername(input.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new ValidationException("Username already exists");
         }
 
         if (userRepository.existsByEmail(input.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new ValidationException("Email already exists");
+        }
+
+        // FIX: Validate Password
+        List<String> passwordErrors = passwordValidator.validatePassword(input.getPassword());
+        if (!passwordErrors.isEmpty()) {
+            throw new ValidationException("Invalid password: " + String.join(", ", passwordErrors));
         }
 
         User user = User.builder()
@@ -79,18 +93,25 @@ public class UserResolver {
                 .isActive(input.isActive())
                 .build();
 
-        return userRepository.save(io.brokr.storage.entity.UserEntity.fromDomain(user))
+        User savedUser = userRepository.save(io.brokr.storage.entity.UserEntity.fromDomain(user))
                 .toDomain();
+        return UserDto.fromDomain(savedUser);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
-    public User updateUser(@Argument String id, @Argument UserInput input) {
+    public UserDto updateUser(@Argument String id, @Argument UserInput input) { // FIX: Return Dto
         return userRepository.findById(id)
                 .map(entity -> {
                     entity.setUsername(input.getUsername());
                     entity.setEmail(input.getEmail());
                     if (input.getPassword() != null && !input.getPassword().isEmpty()) {
+
+                        // FIX: Validate new password
+                        List<String> passwordErrors = passwordValidator.validatePassword(input.getPassword());
+                        if (!passwordErrors.isEmpty()) {
+                            throw new ValidationException("Invalid password: " + String.join(", ", passwordErrors));
+                        }
                         entity.setPassword(passwordEncoder.encode(input.getPassword()));
                     }
                     entity.setFirstName(input.getFirstName());
@@ -99,7 +120,9 @@ public class UserResolver {
                     entity.setOrganizationId(input.getOrganizationId());
                     entity.setAccessibleEnvironmentIds(input.getAccessibleEnvironmentIds());
                     entity.setActive(input.isActive());
-                    return userRepository.save(entity).toDomain();
+
+                    User updatedUser = userRepository.save(entity).toDomain();
+                    return UserDto.fromDomain(updatedUser);
                 })
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }

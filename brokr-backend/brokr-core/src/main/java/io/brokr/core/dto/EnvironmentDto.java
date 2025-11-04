@@ -16,6 +16,7 @@ public class EnvironmentDto {
     private String type;
     private String description;
     private boolean isActive;
+    private String organizationId;
 
     public static EnvironmentDto fromDomain(Environment environment) {
         return EnvironmentDto.builder()
@@ -24,6 +25,7 @@ public class EnvironmentDto {
                 .type(environment.getType())
                 .description(environment.getDescription())
                 .isActive(environment.isActive())
+                .organizationId(environment.getOrganizationId())
                 .build();
     }
 }

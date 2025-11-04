@@ -11,6 +11,10 @@ import java.util.Optional;
 @Repository
 public interface EnvironmentRepository extends JpaRepository<EnvironmentEntity, String> {
     List<EnvironmentEntity> findByOrganizationId(String organizationId);
+
+    List<EnvironmentEntity> findByOrganizationIdIn(List<String> organizationIds);
+
     List<EnvironmentEntity> findByOrganizationIdAndType(String organizationId, EnvironmentType type);
+
     Optional<EnvironmentEntity> findByOrganizationIdAndName(String organizationId, String name);
 }

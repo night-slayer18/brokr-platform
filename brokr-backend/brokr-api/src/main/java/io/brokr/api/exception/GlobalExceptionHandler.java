@@ -63,21 +63,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleGlobalRuntimeException(RuntimeException ex, WebRequest request) {
-        // Handle generic runtime exceptions (like those from .orElseThrow())
-        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
-        String message = ex.getMessage();
 
-        if (message.contains("not found")) {
-            status = HttpStatus.NOT_FOUND;
-        } else if (message.contains("exists")) {
-            status = HttpStatus.BAD_REQUEST;
-        }
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        String message = "An unexpected error occurred. Please contact support.";
 
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
                 status.getReasonPhrase(),
-                message,
+                message, // Don't leak internal exception messages to the client
                 request.getDescription(false).replace("uri=", "")
         );
         return new ResponseEntity<>(errorResponse, status);

@@ -2,9 +2,9 @@ package io.brokr.api.graphql;
 
 import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.model.KafkaCluster;
-import io.brokr.core.model.User;
 import io.brokr.kafka.service.KafkaConnectionService;
 import io.brokr.security.service.AuthorizationService;
+import io.brokr.security.service.ClusterDataService;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,49 +24,12 @@ public class ClusterResolver {
     private final KafkaClusterRepository clusterRepository;
     private final KafkaConnectionService kafkaConnectionService;
     private final AuthorizationService authorizationService;
+    private final ClusterDataService clusterDataService; // FIX: Inject new service
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId)")
     public List<KafkaCluster> clusters(@Argument String organizationId, @Argument String environmentId) {
-        User currentUser = authorizationService.getCurrentUser();
-
-        // If organizationId is not provided, use the current user's organization
-        if (organizationId == null) {
-            organizationId = currentUser.getOrganizationId();
-        }
-
-        // Verify the user has access to this organization
-        if (!authorizationService.hasAccessToOrganization(organizationId)) {
-            throw new RuntimeException("Access denied to this organization");
-        }
-
-        // Super admins can see all clusters in the organization
-        if (currentUser.getRole() == io.brokr.core.model.Role.SUPER_ADMIN) {
-            if (environmentId != null) {
-                return clusterRepository.findByOrganizationIdAndEnvironmentId(organizationId, environmentId).stream()
-                        .map(entity -> entity.toDomain())
-                        .toList();
-            } else {
-                return clusterRepository.findByOrganizationId(organizationId).stream()
-                        .map(entity -> entity.toDomain())
-                        .toList();
-            }
-        }
-
-        // Other users can only see clusters in environments they have access to
-        if (environmentId != null) {
-            if (!currentUser.getAccessibleEnvironmentIds().contains(environmentId)) {
-                throw new RuntimeException("Access denied to this environment");
-            }
-            return clusterRepository.findByOrganizationIdAndEnvironmentId(organizationId, environmentId).stream()
-                    .map(entity -> entity.toDomain())
-                    .toList();
-        } else {
-            return clusterRepository.findByOrganizationId(organizationId).stream()
-                    .filter(entity -> currentUser.getAccessibleEnvironmentIds().contains(entity.getEnvironmentId()))
-                    .map(entity -> entity.toDomain())
-                    .toList();
-        }
+        return clusterDataService.getAuthorizedClusters(organizationId, environmentId);
     }
 
     @QueryMapping

@@ -1,9 +1,9 @@
 package io.brokr.storage.entity;
 
-import io.brokr.core.model.KafkaConnect;
-import io.brokr.core.model.SecurityProtocol;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.brokr.core.model.KafkaConnect;
+import io.brokr.core.model.SecurityProtocol;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +11,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,14 +60,20 @@ public class KafkaConnectEntity {
     private String connectors;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    // FIX: Add logger
+    private static final Logger log = LoggerFactory.getLogger(KafkaConnectEntity.class);
+
 
     public KafkaConnect toDomain() {
-        List<io.brokr.core.model.Connector> connectorList = null;
+        // FIX: Initialize to empty list
+        List<io.brokr.core.model.Connector> connectorList = new ArrayList<>();
         if (connectors != null) {
             try {
-                connectorList = objectMapper.readValue(connectors, new TypeReference<List<io.brokr.core.model.Connector>>() {});
+                connectorList = objectMapper.readValue(connectors, new TypeReference<List<io.brokr.core.model.Connector>>() {
+                });
             } catch (IOException e) {
-                // Handle error
+                // FIX: Log the swallowed exception
+                log.error("Failed to deserialize connectors JSON for entity {}: {}", id, e.getMessage());
             }
         }
 
@@ -91,7 +99,7 @@ public class KafkaConnectEntity {
             try {
                 connectorsJson = objectMapper.writeValueAsString(kafkaConnect.getConnectors());
             } catch (IOException e) {
-                // Handle error
+                log.error("Failed to serialize connectors JSON for entity {}: {}", kafkaConnect.getId(), e.getMessage());
             }
         }
 

@@ -43,11 +43,8 @@ public class ConsumerGroupResolver {
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public ConsumerGroup consumerGroup(@Argument String clusterId, @Argument String groupId) {
         KafkaCluster cluster = getCluster(clusterId);
-        List<ConsumerGroup> groups = kafkaAdminService.listConsumerGroups(cluster);
 
-        return groups.stream()
-                .filter(group -> group.getGroupId().equals(groupId))
-                .findFirst()
+        return kafkaAdminService.getConsumerGroup(cluster, groupId)
                 .map(group -> {
                     Map<String, Long> topicOffsets = kafkaAdminService.getConsumerGroupOffsets(cluster, groupId);
                     group.setTopicOffsets(topicOffsets);

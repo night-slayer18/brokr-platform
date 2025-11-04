@@ -15,4 +15,5 @@ public class Environment {
     private String type; // NON_PROD_HOTFIX, NON_PROD_MINOR, NON_PROD_MAJOR, PROD
     private String description;
     private boolean isActive;
+    private String organizationId;
 }

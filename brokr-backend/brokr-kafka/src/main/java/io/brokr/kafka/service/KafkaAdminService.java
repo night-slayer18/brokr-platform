@@ -7,6 +7,8 @@ import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.stereotype.Service;
 
@@ -151,7 +153,6 @@ public class KafkaAdminService {
                     .map(GroupListing::groupId) // Use GroupListing here
                     .collect(Collectors.toList());
 
-            // The rest of your method remains the same
             DescribeConsumerGroupsResult describeResult = adminClient.describeConsumerGroups(groupIds);
             Map<String, ConsumerGroupDescription> groupDescriptions = describeResult.all().get();
 
@@ -188,21 +189,98 @@ public class KafkaAdminService {
         }
     }
 
+    public Optional<ConsumerGroup> getConsumerGroup(KafkaCluster cluster, String groupId) {
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+
+            DescribeConsumerGroupsResult describeResult = adminClient.describeConsumerGroups(Collections.singleton(groupId));
+            Map<String, ConsumerGroupDescription> groupDescriptions = describeResult.all().get();
+
+            if (!groupDescriptions.containsKey(groupId)) {
+                return Optional.empty();
+            }
+
+            ConsumerGroupDescription description = groupDescriptions.get(groupId);
+
+            List<MemberInfo> members = description.members().stream()
+                    .map(member -> MemberInfo.builder()
+                            .memberId(member.consumerId())
+                            .clientId(member.clientId())
+                            .host(member.host())
+                            .assignment(member.assignment().topicPartitions().stream()
+                                    .map(tp -> TopicPartition.builder()
+                                            .topic(tp.topic())
+                                            .partition(tp.partition())
+                                            .build())
+                                    .collect(Collectors.toList()))
+                            .build())
+                    .collect(Collectors.toList());
+
+            ConsumerGroup group = ConsumerGroup.builder()
+                    .groupId(groupId)
+                    .state(description.state().toString())
+                    .members(members)
+                    .coordinator(description.coordinator().host())
+                    .build();
+
+            return Optional.of(group);
+
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get consumer group [{}]: {}", groupId, e.getMessage());
+            // If group doesn't exist, Kafka throws an error. We treat this as "not found".
+            return Optional.empty();
+        }
+    }
+
     public Map<String, Long> getConsumerGroupOffsets(KafkaCluster cluster, String groupId) {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());
+
+        if (cluster.getSecurityProtocol() != null) {
+            props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, cluster.getSecurityProtocol().name());
+
+            // Configure SASL if needed
+            if (cluster.getSecurityProtocol() != SecurityProtocol.PLAINTEXT &&
+                    cluster.getSecurityProtocol() != SecurityProtocol.SSL &&
+                    cluster.getSaslMechanism() != null) {
+
+                props.put(SaslConfigs.SASL_MECHANISM, cluster.getSaslMechanism());
+
+                if (cluster.getSaslUsername() != null && cluster.getSaslPassword() != null) {
+                    props.put(SaslConfigs.SASL_JAAS_CONFIG,
+                            String.format("org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                                    cluster.getSaslUsername(), cluster.getSaslPassword()));
+                }
+            }
+
+            // Configure SSL if needed
+            if (cluster.getSecurityProtocol() == SecurityProtocol.SSL ||
+                    cluster.getSecurityProtocol() == SecurityProtocol.SASL_SSL) {
+
+                if (cluster.getSslTruststoreLocation() != null) {
+                    props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, cluster.getSslTruststoreLocation());
+                }
+                if (cluster.getSslTruststorePassword() != null) {
+                    props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, cluster.getSslTruststorePassword());
+                }
+                if (cluster.getSslKeystoreLocation() != null) {
+                    props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, cluster.getSslKeystoreLocation());
+                }
+                if (cluster.getSslKeystorePassword() != null) {
+                    props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, cluster.getSslKeystorePassword());
+                }
+                if (cluster.getSslKeyPassword() != null) {
+                    props.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, cluster.getSslKeyPassword());
+                }
+            }
+        }
+
+        // Add any additional properties
         if (cluster.getProperties() != null) {
             props.putAll(cluster.getProperties());
         }
 
-        // Add security properties for the consumer
-        if (cluster.getSecurityProtocol() != null) {
-            props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, cluster.getSecurityProtocol().name());
-        }
-        // ... (add SASL/SSL properties from createAdminClient if needed for consumer) ...
 
-
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster); // Use service to create client with auth
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster);
              KafkaConsumer<String, String> consumer = new KafkaConsumer<>(
                      props,
                      new StringDeserializer(),
@@ -234,7 +312,6 @@ public class KafkaAdminService {
         }
     }
 
-    // <<< FIX: Implemented resetConsumerGroupOffset >>>
     public boolean resetConsumerGroupOffset(KafkaCluster cluster, String groupId, String topic, int partition, long offset) {
         try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
 

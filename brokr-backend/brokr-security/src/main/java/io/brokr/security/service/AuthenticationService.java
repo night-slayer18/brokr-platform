@@ -1,16 +1,19 @@
 package io.brokr.security.service;
 
+import io.brokr.api.exception.ValidationException;
+import io.brokr.core.dto.UserDto;
 import io.brokr.core.model.User;
+import io.brokr.security.utils.PasswordValidator;
 import io.brokr.storage.entity.UserEntity;
 import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,14 +27,20 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final PasswordValidator passwordValidator;
 
     public Map<String, Object> register(User request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new ValidationException("Username already exists");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new ValidationException("Email already exists");
+        }
+
+        List<String> passwordErrors = passwordValidator.validatePassword(request.getPassword());
+        if (!passwordErrors.isEmpty()) {
+            throw new ValidationException("Invalid password: " + String.join(", ", passwordErrors));
         }
 
         User user = User.builder()
@@ -53,7 +62,7 @@ public class AuthenticationService {
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwtToken);
-        response.put("user", user);
+        response.put("user", UserDto.fromDomain(user));
 
         return response;
     }
@@ -71,7 +80,7 @@ public class AuthenticationService {
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwtToken);
-        response.put("user", user);
+        response.put("user", UserDto.fromDomain(user));
 
         return response;
     }

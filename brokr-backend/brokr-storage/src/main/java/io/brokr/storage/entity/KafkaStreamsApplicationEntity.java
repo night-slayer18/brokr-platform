@@ -12,6 +12,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +28,9 @@ import java.util.Map;
 public class KafkaStreamsApplicationEntity {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    // FIX: Add logger
+    private static final Logger log = LoggerFactory.getLogger(KafkaStreamsApplicationEntity.class);
+
 
     @Id
     private String id;
@@ -55,7 +60,6 @@ public class KafkaStreamsApplicationEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     private Object threads;
 
-    // <<< FIX: Made columns read-only to let the database trigger manage them >>>
     @Column(name = "created_at", updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
@@ -74,7 +78,7 @@ public class KafkaStreamsApplicationEntity {
                 threadList = objectMapper.convertValue(threads, new TypeReference<>() {
                 });
             } catch (Exception e) {
-                // Handle conversion error
+                log.error("Failed to deserialize threads JSON for entity {}: {}", id, e.getMessage());
             }
         }
 

@@ -33,6 +33,11 @@ public class EnvironmentEntity {
     @JoinColumn(name = "organization_id")
     private OrganizationEntity organization;
 
+    // FIX: Add the organizationId field directly for efficient queries
+    // This maps to the *same* column as the object above
+    @Column(name = "organization_id", insertable = false, updatable = false)
+    private String organizationId;
+
     public Environment toDomain() {
         return Environment.builder()
                 .id(id)
@@ -40,6 +45,7 @@ public class EnvironmentEntity {
                 .type(type.name())
                 .description(description)
                 .isActive(isActive)
+                .organizationId(organizationId) // FIX: Pass the ID to the domain model
                 .build();
     }
 
@@ -50,6 +56,8 @@ public class EnvironmentEntity {
                 .type(EnvironmentType.valueOf(environment.getType()))
                 .description(environment.getDescription())
                 .isActive(environment.isActive())
+                // We only need to set the organization object when creating/updating
+                // The organizationId field is managed by the database
                 .build();
     }
 }

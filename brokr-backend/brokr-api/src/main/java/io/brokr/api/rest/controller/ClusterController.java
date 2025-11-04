@@ -7,6 +7,7 @@ import io.brokr.core.dto.KafkaClusterDto;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.kafka.service.KafkaConnectionService;
 import io.brokr.security.service.AuthorizationService;
+import io.brokr.security.service.ClusterDataService;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,17 +28,21 @@ public class ClusterController {
     private final KafkaClusterRepository clusterRepository;
     private final KafkaConnectionService kafkaConnectionService;
     private final AuthorizationService authorizationService;
+    private final ClusterDataService clusterDataService; // FIX: Inject new service
 
     // Note: GET /api/v1/organizations/{orgId}/clusters is also a
     // valid REST pattern, but we follow the resolver's simpler logic.
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()") // FIX: Use simpler auth, service handles the rest
     public List<KafkaClusterDto> getClusters(
-            @RequestParam String organizationId,
+            @RequestParam(required = false) String organizationId, // FIX: Make optional
             @RequestParam(required = false) String environmentId) {
 
-        // This logic is identical to ClusterResolver
-        return authorizationService.clusters(organizationId, environmentId).stream()
+        // FIX: All logic is now in the service.
+        List<KafkaCluster> clusters = clusterDataService.getAuthorizedClusters(organizationId, environmentId);
+
+        // FIX: Convert models to DTOs for the REST response
+        return clusters.stream()
                 .map(KafkaClusterDto::fromDomain)
                 .collect(Collectors.toList());
     }

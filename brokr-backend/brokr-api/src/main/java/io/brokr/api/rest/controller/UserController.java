@@ -6,6 +6,7 @@ import io.brokr.api.input.UserInput;
 import io.brokr.core.dto.UserDto;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthorizationService;
+import io.brokr.security.utils.PasswordValidator;
 import io.brokr.storage.entity.UserEntity;
 import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final AuthorizationService authorizationService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordValidator passwordValidator;
 
     @GetMapping("/me")
     public UserDto me() {
@@ -61,6 +63,11 @@ public class UserController {
             throw new ValidationException("Email already exists");
         }
 
+        List<String> passwordErrors = passwordValidator.validatePassword(input.getPassword());
+        if (!passwordErrors.isEmpty()) {
+            throw new ValidationException("Invalid password: " + String.join(", ", passwordErrors));
+        }
+
         User user = User.builder()
                 .id(UUID.randomUUID().toString())
                 .username(input.getUsername())
@@ -87,6 +94,11 @@ public class UserController {
         entity.setUsername(input.getUsername());
         entity.setEmail(input.getEmail());
         if (input.getPassword() != null && !input.getPassword().isEmpty()) {
+
+            List<String> passwordErrors = passwordValidator.validatePassword(input.getPassword());
+            if (!passwordErrors.isEmpty()) {
+                throw new ValidationException("Invalid password: " + String.join(", ", passwordErrors));
+            }
             entity.setPassword(passwordEncoder.encode(input.getPassword()));
         }
         entity.setFirstName(input.getFirstName());

@@ -25,9 +25,6 @@ public class OrganizationDto {
                 .name(organization.getName())
                 .description(organization.getDescription())
                 .isActive(organization.isActive())
-                .environments(organization.getEnvironments().stream()
-                        .map(EnvironmentDto::fromDomain)
-                        .toList())
                 .build();
     }
 }

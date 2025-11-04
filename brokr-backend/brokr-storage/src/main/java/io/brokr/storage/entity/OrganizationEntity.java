@@ -1,7 +1,6 @@
 package io.brokr.storage.entity;
 
 import io.brokr.core.model.Organization;
-import io.brokr.core.model.Environment;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,19 +37,26 @@ public class OrganizationEntity {
                 .name(name)
                 .description(description)
                 .isActive(isActive)
-                .environments(environments.stream().map(EnvironmentEntity::toDomain).toList())
+                // FIX: REMOVED this line. This was causing the N+1 query.
+                // .environments(environments.stream().map(EnvironmentEntity::toDomain).toList())
                 .build();
     }
 
     public static OrganizationEntity fromDomain(Organization organization) {
+        // FIX: Check for null before streaming.
+        List<EnvironmentEntity> envEntities = new ArrayList<>();
+        if (organization.getEnvironments() != null) {
+            envEntities = organization.getEnvironments().stream()
+                    .map(EnvironmentEntity::fromDomain)
+                    .toList();
+        }
+
         return OrganizationEntity.builder()
                 .id(organization.getId())
                 .name(organization.getName())
                 .description(organization.getDescription())
                 .isActive(organization.isActive())
-                .environments(organization.getEnvironments().stream()
-                        .map(EnvironmentEntity::fromDomain)
-                        .toList())
+                .environments(envEntities)
                 .build();
     }
 }

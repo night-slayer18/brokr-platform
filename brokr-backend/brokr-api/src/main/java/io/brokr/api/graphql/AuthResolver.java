@@ -7,6 +7,7 @@ import io.brokr.security.service.AuthenticationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
 import java.util.Map;
@@ -23,6 +24,7 @@ public class AuthResolver {
     }
 
     @MutationMapping
+    @PreAuthorize("@authorizationService.canManageUsers()")
     public Map<String, Object> register(@Argument UserInput input) {
         User user = User.builder()
                 .username(input.getUsername())
