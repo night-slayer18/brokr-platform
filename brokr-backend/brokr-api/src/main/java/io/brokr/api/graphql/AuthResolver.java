@@ -1,0 +1,41 @@
+package io.brokr.api.graphql;
+
+import io.brokr.api.input.LoginInput;
+import io.brokr.api.input.UserInput;
+import io.brokr.core.model.User;
+import io.brokr.security.service.AuthenticationService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.stereotype.Controller;
+
+import java.util.Map;
+
+@Controller
+@RequiredArgsConstructor
+public class AuthResolver {
+
+    private final AuthenticationService authenticationService;
+
+    @MutationMapping
+    public Map<String, Object> login(@Argument LoginInput input) {
+        return authenticationService.authenticate(input.getUsername(), input.getPassword());
+    }
+
+    @MutationMapping
+    public Map<String, Object> register(@Argument UserInput input) {
+        User user = User.builder()
+                .username(input.getUsername())
+                .email(input.getEmail())
+                .password(input.getPassword())
+                .firstName(input.getFirstName())
+                .lastName(input.getLastName())
+                .role(input.getRole())
+                .organizationId(input.getOrganizationId())
+                .accessibleEnvironmentIds(input.getAccessibleEnvironmentIds())
+                .isActive(input.isActive())
+                .build();
+
+        return authenticationService.register(user);
+    }
+}

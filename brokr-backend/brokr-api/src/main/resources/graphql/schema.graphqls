@@ -1,0 +1,403 @@
+scalar Map
+
+enum Role {
+    VIEWER
+    ADMIN
+    SUPER_ADMIN
+}
+
+enum EnvironmentType {
+    NON_PROD_HOTFIX
+    NON_PROD_MINOR
+    NON_PROD_MAJOR
+    PROD
+}
+
+enum SecurityProtocol {
+    PLAINTEXT
+    SSL
+    SASL_PLAINTEXT
+    SASL_SSL
+}
+
+enum ConnectorState {
+    RUNNING
+    FAILED
+    PAUSED
+    UNASSIGNED
+    RESTARTING
+}
+
+enum StreamsState {
+    RUNNING
+    REBALANCING
+    PENDING_SHUTDOWN
+    NOT_RUNNING
+    ERROR
+}
+
+type User {
+    id: ID!
+    username: String!
+    email: String!
+    firstName: String
+    lastName: String
+    role: Role!
+    organizationId: String
+    organization: Organization
+    accessibleEnvironmentIds: [String!]
+    accessibleEnvironments: [Environment!]
+    isActive: Boolean!
+}
+
+type Organization {
+    id: ID!
+    name: String!
+    description: String
+    environments: [Environment!]
+    clusters: [KafkaCluster!]
+    users: [User!]
+    isActive: Boolean!
+}
+
+type Environment {
+    id: ID!
+    name: String!
+    type: EnvironmentType!
+    description: String
+    organization: Organization!
+    clusters: [KafkaCluster!]
+    isActive: Boolean!
+}
+
+type KafkaCluster {
+    id: ID!
+    name: String!
+    bootstrapServers: String!
+    properties: Map
+    isActive: Boolean!
+    description: String
+    organization: Organization!
+    environment: Environment!
+    topics: [Topic!]
+    consumerGroups: [ConsumerGroup!]
+    schemaRegistries: [SchemaRegistry!]
+    kafkaConnects: [KafkaConnect!]
+    kafkaStreamsApplications: [KafkaStreamsApplication!]
+
+    # Connection settings
+    securityProtocol: SecurityProtocol
+    saslMechanism: String
+    saslUsername: String
+    # Note: Passwords are not returned in queries for security
+
+    # Connection status
+    isReachable: Boolean!
+    lastConnectionError: String
+    lastConnectionCheck: Long!
+}
+
+type Topic {
+    name: String!
+    partitions: Int!
+    replicationFactor: Int!
+    partitionsInfo: [PartitionInfo!]
+    configs: Map
+    isInternal: Boolean!
+    cluster: KafkaCluster!
+}
+
+type PartitionInfo {
+    id: Int!
+    leader: Int!
+    replicas: [Int!]
+    isr: [Int!]
+    size: Long!
+    earliestOffset: Long!
+    latestOffset: Long!
+}
+
+type ConsumerGroup {
+    groupId: String!
+    state: String!
+    members: [MemberInfo!]
+    topicOffsets: Map
+    coordinator: String
+    cluster: KafkaCluster!
+}
+
+type MemberInfo {
+    memberId: String!
+    clientId: String!
+    host: String!
+    assignment: [TopicPartition!]
+}
+
+type TopicPartition {
+    topic: String!
+    partition: Int!
+}
+
+type SchemaRegistry {
+    id: ID!
+    name: String!
+    url: String!
+    cluster: KafkaCluster!
+    securityProtocol: SecurityProtocol
+    username: String
+    # Note: Passwords are not returned in queries for security
+    isActive: Boolean!
+    isReachable: Boolean!
+    lastConnectionError: String
+    lastConnectionCheck: Long!
+}
+
+type KafkaConnect {
+    id: ID!
+    name: String!
+    url: String!
+    cluster: KafkaCluster!
+    securityProtocol: SecurityProtocol
+    username: String
+    # Note: Passwords are not returned in queries for security
+    isActive: Boolean!
+    isReachable: Boolean!
+    lastConnectionError: String
+    lastConnectionCheck: Long!
+    connectors: [Connector!]
+}
+
+type Connector {
+    name: String!
+    type: String!
+    state: ConnectorState!
+    config: String!
+    tasks: [Task!]
+}
+
+type Task {
+    id: Int!
+    state: String!
+    workerId: String!
+    trace: String
+}
+
+type KafkaStreamsApplication {
+    id: ID!
+    name: String!
+    applicationId: String!
+    cluster: KafkaCluster!
+    topics: [String!]
+    configuration: Map
+    isActive: Boolean!
+    state: StreamsState!
+    threads: [ThreadMetadata!]
+}
+
+type ThreadMetadata {
+    threadName: String!
+    threadState: String!
+    consumerClientId: [String!]
+    tasks: [TaskMetadata!]
+}
+
+type TaskMetadata {
+    taskId: Int!
+    taskIdString: String!
+    topicPartitions: [String!]
+    taskState: String!
+}
+
+type AuthResponse {
+    token: String!
+    user: User!
+}
+
+input UserInput {
+    id: ID
+    username: String!
+    email: String!
+    password: String
+    firstName: String
+    lastName: String
+    role: Role!
+    organizationId: String
+    accessibleEnvironmentIds: [String!]
+    isActive: Boolean!
+}
+
+input OrganizationInput {
+    id: ID
+    name: String!
+    description: String
+    isActive: Boolean!
+}
+
+input EnvironmentInput {
+    id: ID
+    name: String!
+    type: EnvironmentType!
+    description: String
+    organizationId: String!
+    isActive: Boolean!
+}
+
+input KafkaClusterInput {
+    id: ID
+    name: String!
+    bootstrapServers: String!
+    properties: Map
+    isActive: Boolean!
+    description: String
+    organizationId: String!
+    environmentId: String!
+
+    # Connection settings
+    securityProtocol: SecurityProtocol
+    saslMechanism: String
+    saslUsername: String
+    saslPassword: String
+    sslTruststoreLocation: String
+    sslTruststorePassword: String
+    sslKeystoreLocation: String
+    sslKeystorePassword: String
+    sslKeyPassword: String
+}
+
+input TopicInput {
+    name: String!
+    partitions: Int!
+    replicationFactor: Int!
+    configs: Map
+}
+
+input SchemaRegistryInput {
+    id: ID
+    name: String!
+    url: String!
+    clusterId: String!
+    securityProtocol: SecurityProtocol
+    username: String
+    password: String
+    isActive: Boolean!
+}
+
+input KafkaConnectInput {
+    id: ID
+    name: String!
+    url: String!
+    clusterId: String!
+    securityProtocol: SecurityProtocol
+    username: String
+    password: String
+    isActive: Boolean!
+}
+
+input KafkaStreamsApplicationInput {
+    id: ID
+    name: String!
+    applicationId: String!
+    clusterId: String!
+    topics: [String!]
+    configuration: Map
+    isActive: Boolean!
+}
+
+input LoginInput {
+    username: String!
+    password: String!
+}
+
+type Query {
+    # User queries
+    me: User
+    users(organizationId: String): [User!]!
+    user(id: ID!): User
+
+    # Organization queries
+    organizations: [Organization!]!
+    organization(id: ID!): Organization
+
+    # Environment queries
+    environments(organizationId: String): [Environment!]!
+    environment(id: ID!): Environment
+
+    # Cluster queries
+    clusters(organizationId: String, environmentId: String): [KafkaCluster!]!
+    cluster(id: ID!): KafkaCluster
+
+    # Topic queries
+    topics(clusterId: ID!): [Topic!]!
+    topic(clusterId: ID!, name: String!): Topic
+
+    # Consumer group queries
+    consumerGroups(clusterId: ID!): [ConsumerGroup!]!
+    consumerGroup(clusterId: ID!, groupId: String!): ConsumerGroup
+
+    # Schema Registry queries
+    schemaRegistries(clusterId: ID!): [SchemaRegistry!]!
+    schemaRegistry(id: ID!): SchemaRegistry
+    schemaRegistrySubjects(schemaRegistryId: ID!): [String!]
+    schemaRegistryLatestSchema(schemaRegistryId: ID!, subject: String!): String
+    schemaRegistrySchemaVersions(schemaRegistryId: ID!, subject: String!): [Int!]
+
+    # Kafka Connect queries
+    kafkaConnects(clusterId: ID!): [KafkaConnect!]!
+    kafkaConnect(id: ID!): KafkaConnect
+
+    # Kafka Streams queries
+    kafkaStreamsApplications(clusterId: ID!): [KafkaStreamsApplication!]!
+    kafkaStreamsApplication(id: ID!): KafkaStreamsApplication
+}
+
+type Mutation {
+    # Authentication mutations
+    login(input: LoginInput!): AuthResponse!
+    register(input: UserInput!): AuthResponse!
+
+    # User mutations
+    createUser(input: UserInput!): User!
+    updateUser(id: ID!, input: UserInput!): User!
+    deleteUser(id: ID!): Boolean!
+
+    # Organization mutations
+    createOrganization(input: OrganizationInput!): Organization!
+    updateOrganization(id: ID!, input: OrganizationInput!): Organization!
+    deleteOrganization(id: ID!): Boolean!
+
+    # Environment mutations
+    createEnvironment(input: EnvironmentInput!): Environment!
+    updateEnvironment(id: ID!, input: EnvironmentInput!): Environment!
+    deleteEnvironment(id: ID!): Boolean!
+
+    # Cluster mutations
+    createCluster(input: KafkaClusterInput!): KafkaCluster!
+    updateCluster(id: ID!, input: KafkaClusterInput!): KafkaCluster!
+    deleteCluster(id: ID!): Boolean!
+    testClusterConnection(id: ID!): Boolean!
+
+    # Topic mutations
+    createTopic(clusterId: ID!, input: TopicInput!): Topic!
+    updateTopic(clusterId: ID!, name: String!, configs: Map!): Topic!
+    deleteTopic(clusterId: ID!, name: String!): Boolean!
+
+    # Consumer group mutations
+    resetConsumerGroupOffset(clusterId: ID!, groupId: String!, topic: String!, partition: Int!, offset: Long!): Boolean!
+
+    # Schema Registry mutations
+    createSchemaRegistry(input: SchemaRegistryInput!): SchemaRegistry!
+    updateSchemaRegistry(id: ID!, input: SchemaRegistryInput!): SchemaRegistry!
+    deleteSchemaRegistry(id: ID!): Boolean!
+    testSchemaRegistryConnection(id: ID!): Boolean!
+
+    # Kafka Connect mutations
+    createKafkaConnect(input: KafkaConnectInput!): KafkaConnect!
+    updateKafkaConnect(id: ID!, input: KafkaConnectInput!): KafkaConnect!
+    deleteKafkaConnect(id: ID!): Boolean!
+    testKafkaConnectConnection(id: ID!): Boolean!
+
+    # Kafka Streams mutations
+    createKafkaStreamsApplication(input: KafkaStreamsApplicationInput!): KafkaStreamsApplication!
+    updateKafkaStreamsApplication(id: ID!, input: KafkaStreamsApplicationInput!): KafkaStreamsApplication!
+    deleteKafkaStreamsApplication(id: ID!): Boolean!
+}
