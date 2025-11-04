@@ -4,6 +4,7 @@ enum Role {
     VIEWER
     ADMIN
     SUPER_ADMIN
+    SERVER_ADMIN
 }
 
 enum EnvironmentType {
@@ -37,6 +38,7 @@ enum StreamsState {
 }
 
 type User {
+
     id: ID!
     username: String!
     email: String!
@@ -251,7 +253,6 @@ input KafkaClusterInput {
     description: String
     organizationId: String!
     environmentId: String!
-
     # Connection settings
     securityProtocol: SecurityProtocol
     saslMechanism: String
@@ -354,28 +355,23 @@ type Mutation {
     # Authentication mutations
     login(input: LoginInput!): AuthResponse!
     register(input: UserInput!): AuthResponse!
-
     # User mutations
     createUser(input: UserInput!): User!
     updateUser(id: ID!, input: UserInput!): User!
     deleteUser(id: ID!): Boolean!
-
     # Organization mutations
     createOrganization(input: OrganizationInput!): Organization!
     updateOrganization(id: ID!, input: OrganizationInput!): Organization!
     deleteOrganization(id: ID!): Boolean!
-
     # Environment mutations
     createEnvironment(input: EnvironmentInput!): Environment!
     updateEnvironment(id: ID!, input: EnvironmentInput!): Environment!
     deleteEnvironment(id: ID!): Boolean!
-
     # Cluster mutations
     createCluster(input: KafkaClusterInput!): KafkaCluster!
     updateCluster(id: ID!, input: KafkaClusterInput!): KafkaCluster!
     deleteCluster(id: ID!): Boolean!
     testClusterConnection(id: ID!): Boolean!
-
     # Topic mutations
     createTopic(clusterId: ID!, input: TopicInput!): Topic!
     updateTopic(clusterId: ID!, name: String!, configs: Map!): Topic!
@@ -383,7 +379,6 @@ type Mutation {
 
     # Consumer group mutations
     resetConsumerGroupOffset(clusterId: ID!, groupId: String!, topic: String!, partition: Int!, offset: Long!): Boolean!
-
     # Schema Registry mutations
     createSchemaRegistry(input: SchemaRegistryInput!): SchemaRegistry!
     updateSchemaRegistry(id: ID!, input: SchemaRegistryInput!): SchemaRegistry!

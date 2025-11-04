@@ -111,6 +111,26 @@ public class KafkaAdminService {
         }
     }
 
+    // <<< FIX: Implemented updateTopicConfig >>>
+    public void updateTopicConfig(KafkaCluster cluster, String topicName, Map<String, String> configs) {
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+            ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+
+            // Create a list of config entries to alter
+            List<AlterConfigOp> ops = configs.entrySet().stream()
+                    .map(entry -> new AlterConfigOp(new ConfigEntry(entry.getKey(), entry.getValue()), AlterConfigOp.OpType.SET))
+                    .toList();
+
+            // Alter the configs
+            AlterConfigsResult result = adminClient.incrementalAlterConfigs(Collections.singletonMap(resource, ops));
+            result.all().get();
+
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to update topic config: {} for cluster: {}", topicName, cluster.getName(), e);
+            throw new RuntimeException("Failed to update topic config", e);
+        }
+    }
+
     public void deleteTopic(KafkaCluster cluster, String topicName) {
         try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
             DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(topicName));
@@ -175,7 +195,14 @@ public class KafkaAdminService {
             props.putAll(cluster.getProperties());
         }
 
-        try (AdminClient adminClient = AdminClient.create(props);
+        // Add security properties for the consumer
+        if (cluster.getSecurityProtocol() != null) {
+            props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, cluster.getSecurityProtocol().name());
+        }
+        // ... (add SASL/SSL properties from createAdminClient if needed for consumer) ...
+
+
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster); // Use service to create client with auth
              KafkaConsumer<String, String> consumer = new KafkaConsumer<>(
                      props,
                      new StringDeserializer(),
@@ -204,6 +231,26 @@ public class KafkaAdminService {
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get consumer group offsets: {} for cluster: {}", groupId, cluster.getName(), e);
             throw new RuntimeException("Failed to get consumer group offsets", e);
+        }
+    }
+
+    // <<< FIX: Implemented resetConsumerGroupOffset >>>
+    public boolean resetConsumerGroupOffset(KafkaCluster cluster, String groupId, String topic, int partition, long offset) {
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+
+            org.apache.kafka.common.TopicPartition topicPartition = new org.apache.kafka.common.TopicPartition(topic, partition);
+            OffsetAndMetadata offsetAndMetadata = new OffsetAndMetadata(offset);
+
+            Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsetsToReset = new HashMap<>();
+            offsetsToReset.put(topicPartition, offsetAndMetadata);
+
+            AlterConsumerGroupOffsetsResult result = adminClient.alterConsumerGroupOffsets(groupId, offsetsToReset);
+            result.all().get();
+            return true;
+
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to reset offset for group [{}], topic [{}], partition [{}]: {}", groupId, topic, partition, e.getMessage(), e);
+            throw new RuntimeException("Failed to reset consumer group offset", e);
         }
     }
 }
