@@ -21,6 +21,8 @@ CREATE TABLE users (
                        FOREIGN KEY (organization_id) REFERENCES organizations(id)
 );
 
+CREATE INDEX idx_users_organization_id ON users(organization_id);
+
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW

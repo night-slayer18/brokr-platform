@@ -17,6 +17,8 @@ CREATE TABLE schema_registries (
                                    FOREIGN KEY (cluster_id) REFERENCES kafka_clusters(id)
 );
 
+CREATE INDEX idx_schema_registries_cluster_id ON schema_registries(cluster_id);
+
 CREATE TRIGGER update_schema_registries_updated_at
     BEFORE UPDATE ON schema_registries
     FOR EACH ROW

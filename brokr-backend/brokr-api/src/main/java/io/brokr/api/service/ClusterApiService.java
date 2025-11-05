@@ -70,6 +70,11 @@ public class ClusterApiService {
         KafkaClusterEntity entity = clusterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
 
+        if (!entity.getName().equals(input.getName()) &&
+                clusterRepository.existsByNameAndOrganizationId(input.getName(), entity.getOrganizationId())) {
+            throw new ValidationException("Cluster with this name already exists in the organization");
+        }
+        
         entity.setName(input.getName());
         entity.setBootstrapServers(input.getBootstrapServers());
         entity.setProperties(input.getProperties());

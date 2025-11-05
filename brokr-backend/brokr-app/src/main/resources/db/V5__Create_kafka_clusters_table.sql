@@ -27,6 +27,9 @@ CREATE TABLE kafka_clusters (
                                 FOREIGN KEY (environment_id) REFERENCES environments(id)
 );
 
+CREATE INDEX idx_kafka_clusters_organization_id ON kafka_clusters(organization_id);
+CREATE INDEX idx_kafka_clusters_environment_id ON kafka_clusters(environment_id);
+
 CREATE TRIGGER update_kafka_clusters_updated_at
     BEFORE UPDATE ON kafka_clusters
     FOR EACH ROW

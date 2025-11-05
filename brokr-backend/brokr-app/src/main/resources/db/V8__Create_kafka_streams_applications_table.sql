@@ -4,7 +4,7 @@ CREATE TABLE kafka_streams_applications (
                                             name VARCHAR(255) NOT NULL,
                                             application_id VARCHAR(255) NOT NULL,
                                             cluster_id VARCHAR(255) NOT NULL,
-                                            topics TEXT[],
+                                            topics TEXT,
                                             configuration JSONB,
                                             is_active BOOLEAN NOT NULL DEFAULT true,
                                             state VARCHAR(20),
@@ -14,6 +14,8 @@ CREATE TABLE kafka_streams_applications (
                                             UNIQUE (name, cluster_id),
                                             FOREIGN KEY (cluster_id) REFERENCES kafka_clusters(id)
 );
+
+CREATE INDEX idx_kafka_streams_applications_cluster_id ON kafka_streams_applications(cluster_id);
 
 CREATE TRIGGER update_kafka_streams_applications_updated_at
     BEFORE UPDATE ON kafka_streams_applications
