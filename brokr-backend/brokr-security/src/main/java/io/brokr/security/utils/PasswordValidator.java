@@ -1,11 +1,8 @@
 package io.brokr.security.utils;
 
-import lombok.extern.slf4j.Slf4j;
-import org.passay.*;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 

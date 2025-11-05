@@ -1,5 +1,6 @@
 package io.brokr.core.model;
 
+import io.brokr.core.dto.OrganizationDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,4 +18,9 @@ public class Organization {
     private String description;
     private List<Environment> environments;
     private boolean isActive;
+
+    // Convenience method for DTO conversion
+    public OrganizationDto toDto() {
+        return OrganizationDto.fromDomain(this);
+    }
 }

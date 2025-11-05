@@ -28,6 +28,7 @@ public class AuthController {
     @PostMapping("/register")
     @PreAuthorize("@authorizationService.canManageUsers()")
     public Map<String, Object> register(@RequestBody UserInput input) {
+        // Convert API Input DTO to Core Model
         User user = User.builder()
                 .username(input.getUsername())
                 .email(input.getEmail())
@@ -37,8 +38,9 @@ public class AuthController {
                 .role(input.getRole())
                 .organizationId(input.getOrganizationId())
                 .accessibleEnvironmentIds(input.getAccessibleEnvironmentIds())
-                .isActive(input.isActive())
+                .isActive(input.isActive()) // UserManagementService will handle default
                 .build();
+
         return authenticationService.register(user);
     }
 }

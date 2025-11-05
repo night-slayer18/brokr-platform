@@ -1,20 +1,15 @@
 package io.brokr.api.rest.controller;
 
+import io.brokr.api.input.ResetOffsetInput;
+import io.brokr.api.service.ConsumerGroupApiService;
 import io.brokr.core.dto.ConsumerGroupDto;
-import io.brokr.core.exception.ResourceNotFoundException;
-import io.brokr.core.exception.ValidationException;
-import io.brokr.core.model.ConsumerGroup;
-import io.brokr.core.model.KafkaCluster;
-import io.brokr.kafka.service.KafkaAdminService;
-import io.brokr.storage.entity.KafkaClusterEntity;
-import io.brokr.storage.repository.KafkaClusterRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -22,27 +17,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ConsumerGroupController {
 
-    private final KafkaClusterRepository clusterRepository;
-    private final KafkaAdminService kafkaAdminService;
-
-    private KafkaCluster getCluster(String clusterId) {
-        return clusterRepository.findById(clusterId)
-                .map(KafkaClusterEntity::toDomain)
-                .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + clusterId));
-    }
+    private final ConsumerGroupApiService consumerGroupApiService;
 
     @GetMapping
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<ConsumerGroupDto> getConsumerGroups(@PathVariable String clusterId) {
-        KafkaCluster cluster = getCluster(clusterId);
-        List<ConsumerGroup> groups = kafkaAdminService.listConsumerGroups(cluster);
-
-        // Logic from ConsumerGroupResolver
-        return groups.stream()
-                .peek(group -> {
-                    Map<String, Long> offsets = kafkaAdminService.getConsumerGroupOffsets(cluster, group.getGroupId());
-                    group.setTopicOffsets(offsets);
-                })
+        return consumerGroupApiService.listConsumerGroups(clusterId).stream()
                 .map(ConsumerGroupDto::fromDomain)
                 .collect(Collectors.toList());
     }
@@ -50,15 +30,7 @@ public class ConsumerGroupController {
     @GetMapping("/{groupId}")
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public ConsumerGroupDto getConsumerGroup(@PathVariable String clusterId, @PathVariable String groupId) {
-        KafkaCluster cluster = getCluster(clusterId);
-
-        return kafkaAdminService.getConsumerGroup(cluster, groupId)
-                .map(group -> {
-                    Map<String, Long> offsets = kafkaAdminService.getConsumerGroupOffsets(cluster, groupId);
-                    group.setTopicOffsets(offsets);
-                    return ConsumerGroupDto.fromDomain(group);
-                })
-                .orElseThrow(() -> new ResourceNotFoundException("Consumer group not found: " + groupId));
+        return ConsumerGroupDto.fromDomain(consumerGroupApiService.getConsumerGroup(clusterId, groupId));
     }
 
     @PostMapping("/{groupId}/reset-offset")
@@ -66,23 +38,10 @@ public class ConsumerGroupController {
     public ResponseEntity<Boolean> resetOffset(
             @PathVariable String clusterId,
             @PathVariable String groupId,
-            @RequestBody Map<String, Object> payload) {
+            @RequestBody @Valid ResetOffsetInput input) { // Use the new DTO
 
-        // <<< FIX: Implemented TODO >>>
-        try {
-            String topic = (String) payload.get("topic");
-            int partition = (Integer) payload.get("partition");
-            long offset = ((Number) payload.get("offset")).longValue();
-
-            if (topic == null || topic.isBlank()) {
-                throw new ValidationException("Field 'topic' is required");
-            }
-
-            boolean success = kafkaAdminService.resetConsumerGroupOffset(getCluster(clusterId), groupId, topic, partition, offset);
-            return ResponseEntity.ok(success);
-
-        } catch (ClassCastException | NullPointerException e) {
-            throw new ValidationException("Invalid payload. Required fields: 'topic' (String), 'partition' (int), 'offset' (long)");
-        }
+        // All logic is now in the service
+        boolean success = consumerGroupApiService.resetConsumerGroupOffset(clusterId, groupId, input);
+        return ResponseEntity.ok(success);
     }
 }

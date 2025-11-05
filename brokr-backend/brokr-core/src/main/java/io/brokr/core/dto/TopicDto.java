@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -28,6 +29,13 @@ public class TopicDto {
                 .replicationFactor(topic.getReplicationFactor())
                 .isInternal(topic.isInternal())
                 .configs(topic.getConfigs())
+                .partitionsInfo(
+                        topic.getPartitionsInfo() != null ?
+                                topic.getPartitionsInfo().stream()
+                                        .map(PartitionInfoDto::fromDomain)
+                                        .collect(Collectors.toList())
+                                : List.of()
+                )
                 .build();
     }
 }

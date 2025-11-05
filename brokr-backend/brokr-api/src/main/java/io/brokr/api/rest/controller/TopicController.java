@@ -1,13 +1,9 @@
 package io.brokr.api.rest.controller;
 
 import io.brokr.api.input.TopicInput;
+import io.brokr.api.service.TopicApiService;
 import io.brokr.core.dto.TopicDto;
-import io.brokr.core.exception.ResourceNotFoundException;
-import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Topic;
-import io.brokr.kafka.service.KafkaAdminService;
-import io.brokr.storage.entity.KafkaClusterEntity;
-import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,20 +19,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TopicController {
 
-    private final KafkaClusterRepository clusterRepository;
-    private final KafkaAdminService kafkaAdminService;
-
-    private KafkaCluster getCluster(String clusterId) {
-        return clusterRepository.findById(clusterId)
-                .map(KafkaClusterEntity::toDomain)
-                .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + clusterId));
-    }
+    private final TopicApiService topicApiService;
 
     @GetMapping
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public List<TopicDto> getTopics(@PathVariable String clusterId) {
-        KafkaCluster cluster = getCluster(clusterId);
-        return kafkaAdminService.listTopics(cluster).stream()
+        return topicApiService.listTopics(clusterId).stream()
                 .map(TopicDto::fromDomain)
                 .collect(Collectors.toList());
     }
@@ -44,37 +32,27 @@ public class TopicController {
     @GetMapping("/{name}")
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
     public TopicDto getTopic(@PathVariable String clusterId, @PathVariable String name) {
-        KafkaCluster cluster = getCluster(clusterId);
-        return TopicDto.fromDomain(kafkaAdminService.getTopic(cluster, name));
+        return TopicDto.fromDomain(topicApiService.getTopic(clusterId, name));
     }
 
     @PostMapping
     @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public ResponseEntity<TopicDto> createTopic(@PathVariable String clusterId, @RequestBody TopicInput input) {
-        KafkaCluster cluster = getCluster(clusterId);
-        Topic newTopic = kafkaAdminService.createTopic(
-                cluster,
-                input.getName(),
-                input.getPartitions(),
-                input.getReplicationFactor(),
-                input.getConfigs()
-        );
+        Topic newTopic = topicApiService.createTopic(clusterId, input);
         return new ResponseEntity<>(TopicDto.fromDomain(newTopic), HttpStatus.CREATED);
     }
 
     @PutMapping("/{name}/config")
     @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public TopicDto updateTopicConfig(@PathVariable String clusterId, @PathVariable String name, @RequestBody Map<String, String> configs) {
-        KafkaCluster cluster = getCluster(clusterId);
-        kafkaAdminService.updateTopicConfig(cluster, name, configs);
-        return TopicDto.fromDomain(kafkaAdminService.getTopic(cluster, name));
+        Topic updatedTopic = topicApiService.updateTopicConfig(clusterId, name, configs);
+        return TopicDto.fromDomain(updatedTopic);
     }
 
     @DeleteMapping("/{name}")
     @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
     public ResponseEntity<Void> deleteTopic(@PathVariable String clusterId, @PathVariable String name) {
-        KafkaCluster cluster = getCluster(clusterId);
-        kafkaAdminService.deleteTopic(cluster, name);
+        topicApiService.deleteTopic(clusterId, name);
         return ResponseEntity.noContent().build();
     }
 }
