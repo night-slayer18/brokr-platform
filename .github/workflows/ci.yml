@@ -1,0 +1,99 @@
+name: Brokr Platform CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Start backing services
+        run: >
+          docker compose up -d
+          postgres
+          kafka-hotfix
+          kafka-minor
+          kafka-major
+          kafka-prod
+          schema-registry
+          kafka-connect
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to be healthy..."
+          end_time=$(( $(date +%s) + 300 ))
+          
+          while [ $(date +%s) -lt $end_time ]; do
+            healthy_count=0
+            all_services_running=true
+          
+            for service in postgres kafka-hotfix kafka-minor kafka-major kafka-prod schema-registry kafka-connect; do
+          
+              container_id=$(docker compose ps -q $service)
+          
+              if [ -z "$container_id" ]; then
+                all_services_running=false
+                status="not_running"
+              else
+                status=$(docker inspect -f '{{.State.Health.Status}}' $container_id 2>/dev/null || echo "no_health_check")
+              fi
+
+              if [ "$status" = "healthy" ]; then
+                healthy_count=$((healthy_count + 1))
+              elif [ "$status" = "no_health_check" ]; then
+                running_status=$(docker inspect -f '{{.State.Status}}' $container_id 2>/dev/null)
+                if [ "$running_status" = "running" ]; then
+                  healthy_count=$((healthy_count + 1))
+                else
+                  all_services_running=false
+                fi
+              elif [ "$status" = "not_running" ]; then
+                all_services_running=false
+              else
+                all_services_running=false
+              fi
+            done
+          
+            if [ "$all_services_running" = true ] && [ "$healthy_count" -eq 7 ]; then
+              echo "All 7 services are healthy!"
+              docker compose ps
+              exit 0
+            fi
+          
+            echo "Waiting... ($healthy_count/7 services healthy)"
+            docker compose ps
+            sleep 10
+          done
+          
+          echo "Timeout: Not all services became healthy after 5 minutes."
+          docker compose ps
+          docker compose logs
+          exit 1
+
+      - name: Build, test, and package with Maven
+        run: mvn -B install -Dspring.profiles.active=dev
+
+      - name: Stop backing services
+        if: always()
+        run: docker compose down

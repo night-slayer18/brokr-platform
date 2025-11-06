@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/graphql").permitAll()  // Allow GraphQL for login mutation (method-level security still applies)
                         .requestMatchers("/graphiql").permitAll() // Allow GraphiQL UI
+                        .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
                         .anyRequest().authenticated()
                 )
