@@ -1,0 +1,13 @@
+{
+  "name": "brokr-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal placeholder package.json to satisfy frontend-maven-plugin during CI builds",
+  "scripts": {
+    "build": "echo \"no-op build\"",
+    "start": "echo \"no-op start\""
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+
