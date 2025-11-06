@@ -4,7 +4,7 @@ CREATE TABLE kafka_streams_applications (
                                             name VARCHAR(255) NOT NULL,
                                             application_id VARCHAR(255) NOT NULL,
                                             cluster_id VARCHAR(255) NOT NULL,
-                                            topics TEXT,
+                                            topics TEXT[],
                                             configuration JSONB,
                                             is_active BOOLEAN NOT NULL DEFAULT true,
                                             state VARCHAR(20),

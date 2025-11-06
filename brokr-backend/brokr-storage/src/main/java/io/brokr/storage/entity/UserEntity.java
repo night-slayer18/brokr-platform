@@ -1,12 +1,14 @@
 package io.brokr.storage.entity;
 
-import io.brokr.core.model.User;
 import io.brokr.core.model.Role;
+import io.brokr.core.model.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +36,8 @@ public class UserEntity {
     private String lastName;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "role", columnDefinition = "user_role", nullable = false)
     private Role role;
 
     @Column(name = "organization_id")

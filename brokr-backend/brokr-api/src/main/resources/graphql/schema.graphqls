@@ -1,4 +1,5 @@
 scalar Map
+scalar Long
 
 enum Role {
     VIEWER
@@ -226,7 +227,7 @@ type TaskMetadata {
 
 type AuthResponse {
     token: String!
-    user: UserDto! to avoid leaking password
+    user: UserDto!
 }
 
 input UserInput {
