@@ -11,6 +11,7 @@ import io.brokr.storage.repository.EnvironmentRepository;
 import io.brokr.storage.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +26,7 @@ public class EnvironmentApiService {
     private final OrganizationRepository organizationRepository;
     private final AuthorizationService authorizationService;
 
+    @Transactional(readOnly = true)
     public List<Environment> listEnvironments(String organizationId) {
         User currentUser = authorizationService.getCurrentUser();
         List<EnvironmentEntity> environments = environmentRepository.findByOrganizationId(organizationId);

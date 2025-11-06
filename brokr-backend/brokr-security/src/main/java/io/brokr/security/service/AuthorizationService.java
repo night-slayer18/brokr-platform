@@ -3,9 +3,13 @@ package io.brokr.security.service;
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
 import io.brokr.security.model.BrokrUserDetails;
-import io.brokr.storage.entity.*;
+import io.brokr.storage.entity.KafkaClusterEntity;
+import io.brokr.storage.entity.KafkaConnectEntity;
+import io.brokr.storage.entity.KafkaStreamsApplicationEntity;
+import io.brokr.storage.entity.SchemaRegistryEntity;
 import io.brokr.storage.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -33,7 +37,11 @@ public class AuthorizationService {
         // Fallback for any other principal type (should not happen in normal flow)
         String username = authentication.getName();
         return userRepository.findByUsername(username)
-                .map(UserEntity::toDomain)
+                .map(entity -> {
+                    // Explicitly initialize lazy collection
+                    Hibernate.initialize(entity.getAccessibleEnvironmentIds());
+                    return entity.toDomain();
+                })
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
