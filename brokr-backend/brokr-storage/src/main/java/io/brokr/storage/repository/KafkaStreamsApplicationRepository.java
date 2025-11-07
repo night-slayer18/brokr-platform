@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface KafkaStreamsApplicationRepository extends JpaRepository<KafkaStreamsApplicationEntity, String> {
     List<KafkaStreamsApplicationEntity> findByClusterId(String clusterId);
+    List<KafkaStreamsApplicationEntity> findByClusterIdIn(List<String> clusterIds);
 
     boolean existsByNameAndClusterId(String name, String clusterId);
 

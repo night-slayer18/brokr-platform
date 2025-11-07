@@ -13,6 +13,8 @@ public interface EnvironmentRepository extends JpaRepository<EnvironmentEntity, 
     List<EnvironmentEntity> findByOrganizationId(String organizationId);
 
     List<EnvironmentEntity> findByOrganizationIdIn(List<String> organizationIds);
+    
+    List<EnvironmentEntity> findByIdIn(List<String> ids);
 
     List<EnvironmentEntity> findByOrganizationIdAndType(String organizationId, EnvironmentType type);
 

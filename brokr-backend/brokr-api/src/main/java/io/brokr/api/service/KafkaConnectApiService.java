@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,6 +26,12 @@ public class KafkaConnectApiService {
         return kafkaConnectRepository.findByClusterId(clusterId).stream()
                 .map(KafkaConnectEntity::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, List<KafkaConnect>> getKafkaConnectsForClusters(List<String> clusterIds) {
+        return kafkaConnectRepository.findByClusterIdIn(clusterIds).stream()
+                .map(KafkaConnectEntity::toDomain)
+                .collect(Collectors.groupingBy(KafkaConnect::getClusterId));
     }
 
     public KafkaConnect getKafkaConnectById(String id) {

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,12 @@ public class SchemaRegistryApiService {
         return schemaRegistryRepository.findByClusterId(clusterId).stream()
                 .map(SchemaRegistryEntity::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, List<SchemaRegistry>> getSchemaRegistriesForClusters(List<String> clusterIds) {
+        return schemaRegistryRepository.findByClusterIdIn(clusterIds).stream()
+                .map(SchemaRegistryEntity::toDomain)
+                .collect(Collectors.groupingBy(SchemaRegistry::getClusterId));
     }
 
     public SchemaRegistry getSchemaRegistryById(String id) {

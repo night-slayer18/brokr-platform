@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface KafkaConnectRepository extends JpaRepository<KafkaConnectEntity, String> {
     List<KafkaConnectEntity> findByClusterId(String clusterId);
+    List<KafkaConnectEntity> findByClusterIdIn(List<String> clusterIds);
     Optional<KafkaConnectEntity> findByNameAndClusterId(String name, String clusterId);
     boolean existsByNameAndClusterId(String name, String clusterId);
 }

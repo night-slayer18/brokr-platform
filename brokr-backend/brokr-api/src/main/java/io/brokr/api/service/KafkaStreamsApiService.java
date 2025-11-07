@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,6 +44,13 @@ public class KafkaStreamsApiService {
                     return app;
                 })
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, List<KafkaStreamsApplication>> getKafkaStreamsApplicationsForClusters(List<String> clusterIds) {
+        // Note: This does not populate the live state, consistent with the non-batch list view.
+        return streamsRepository.findByClusterIdIn(clusterIds).stream()
+                .map(KafkaStreamsApplicationEntity::toDomain)
+                .collect(Collectors.groupingBy(KafkaStreamsApplication::getClusterId));
     }
 
     public KafkaStreamsApplication getKafkaStreamsApplication(String id) {

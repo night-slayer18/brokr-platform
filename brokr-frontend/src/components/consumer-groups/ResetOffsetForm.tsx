@@ -26,8 +26,8 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 
 const resetOffsetSchema = z.object({
     topic: z.string().min(1, 'Topic is required'),
-    partition: z.coerce.number().int().min(0, 'Partition must be a non-negative number'),
-    offset: z.coerce.number().int().min(0, 'Offset must be a non-negative number'),
+    partition: z.number().int().min(0, 'Partition must be a non-negative number'),
+    offset: z.number().int().min(0, 'Offset must be a non-negative number'),
 });
 
 type ResetOffsetFormData = z.infer<typeof resetOffsetSchema>;
@@ -75,8 +75,8 @@ export function ResetOffsetForm({
                     clusterId,
                     groupId,
                     topic: data.topic,
-                    partition: data.partition,
-                    offset: data.offset,
+                    partition: Number(data.partition),
+                    offset: Number(data.offset),
                 },
             });
             toast.success(`Offset for topic "${data.topic}" partition ${data.partition} reset successfully`);
@@ -124,12 +124,12 @@ export function ResetOffsetForm({
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="partition">Partition</Label>
-                            <Input id="partition" type="number" {...register('partition')} disabled={loading}/>
+                            <Input id="partition" type="number" {...register('partition', { valueAsNumber: true })} disabled={loading}/>
                             {errors.partition && <p className="text-sm text-destructive">{errors.partition.message}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="offset">New Offset</Label>
-                            <Input id="offset" type="number" {...register('offset')} disabled={loading}/>
+                            <Input id="offset" type="number" {...register('offset', { valueAsNumber: true })} disabled={loading}/>
                             {errors.offset && <p className="text-sm text-destructive">{errors.offset.message}</p>}
                         </div>
                     </div>

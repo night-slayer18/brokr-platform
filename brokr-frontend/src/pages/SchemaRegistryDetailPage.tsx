@@ -10,6 +10,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {useEffect, useState} from 'react';
 import {useApolloClient} from '@apollo/client/react';
 import Editor from '@monaco-editor/react';
+import {toast} from "sonner";
 
 export default function SchemaRegistryDetailPage() {
     const {srId} = useParams<{ clusterId: string; srId: string }>();

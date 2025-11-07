@@ -1,38 +1,31 @@
 package io.brokr.api.graphql;
 
 import io.brokr.api.input.KafkaClusterInput;
-import io.brokr.api.service.ClusterApiService;
-import io.brokr.core.model.KafkaCluster;
-import io.brokr.core.model.KafkaConnect;
-import io.brokr.core.model.KafkaStreamsApplication;
-import io.brokr.core.model.SchemaRegistry;
-import io.brokr.storage.entity.KafkaConnectEntity;
-import io.brokr.storage.entity.KafkaStreamsApplicationEntity;
-import io.brokr.storage.entity.SchemaRegistryEntity;
-import io.brokr.storage.repository.KafkaConnectRepository;
-import io.brokr.storage.repository.KafkaStreamsApplicationRepository;
-import io.brokr.storage.repository.SchemaRegistryRepository;
+import io.brokr.api.service.*;
+import io.brokr.core.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
-import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
 public class ClusterResolver {
 
     private final ClusterApiService clusterApiService;
-
-    // Repositories for SchemaMappings remain here as they are GraphQL-specific concerns
-    private final SchemaRegistryRepository schemaRegistryRepository;
-    private final KafkaConnectRepository kafkaConnectRepository;
-    private final KafkaStreamsApplicationRepository kafkaStreamsApplicationRepository;
-
+    private final OrganizationApiService organizationApiService;
+    private final EnvironmentApiService environmentApiService;
+    private final SchemaRegistryApiService schemaRegistryApiService;
+    private final KafkaConnectApiService kafkaConnectApiService;
+    private final KafkaStreamsApiService kafkaStreamsApiService;
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId)")
@@ -46,33 +39,39 @@ public class ClusterResolver {
         return clusterApiService.getClusterById(id);
     }
 
-    // FIX: START: Add SchemaMappings for related fields
-    @SchemaMapping(typeName = "KafkaCluster", field = "schemaRegistries")
-    public List<SchemaRegistry> getSchemaRegistries(KafkaCluster cluster) {
-        return schemaRegistryRepository.findByClusterId(cluster.getId())
-                .stream()
-                .map(SchemaRegistryEntity::toDomain)
-                .toList();
+    @BatchMapping(typeName = "KafkaCluster", field = "organization")
+    public Map<KafkaCluster, Organization> getOrganization(List<KafkaCluster> clusters) {
+        List<String> organizationIds = clusters.stream().map(KafkaCluster::getOrganizationId).distinct().toList();
+        Map<String, Organization> orgsById = organizationApiService.getOrganizationsByIds(organizationIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> orgsById.get(c.getOrganizationId())));
     }
 
-    @SchemaMapping(typeName = "KafkaCluster", field = "kafkaConnects")
-    public List<KafkaConnect> getKafkaConnects(KafkaCluster cluster) {
-        return kafkaConnectRepository.findByClusterId(cluster.getId())
-                .stream()
-                .map(KafkaConnectEntity::toDomain)
-                .toList();
+    @BatchMapping(typeName = "KafkaCluster", field = "environment")
+    public Map<KafkaCluster, Environment> getEnvironment(List<KafkaCluster> clusters) {
+        List<String> environmentIds = clusters.stream().map(KafkaCluster::getEnvironmentId).distinct().toList();
+        Map<String, Environment> envsById = environmentApiService.getEnvironmentsByIds(environmentIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> envsById.get(c.getEnvironmentId())));
     }
 
-    @SchemaMapping(typeName = "KafkaCluster", field = "kafkaStreamsApplications")
-    public List<KafkaStreamsApplication> getKafkaStreamsApplications(KafkaCluster cluster) {
-        // Note: This does not populate the live state.
-        // The *list* view in GraphQL will show stored state.
-        // The dedicated query `kafkaStreamsApplication(id: ...)` *will* show live state.
-        // This is an acceptable performance trade-off.
-        return kafkaStreamsApplicationRepository.findByClusterId(cluster.getId())
-                .stream()
-                .map(KafkaStreamsApplicationEntity::toDomain)
-                .toList();
+    @BatchMapping(typeName = "KafkaCluster", field = "schemaRegistries")
+    public Map<KafkaCluster, List<SchemaRegistry>> getSchemaRegistries(List<KafkaCluster> clusters) {
+        List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
+        Map<String, List<SchemaRegistry>> schemasByClusterId = schemaRegistryApiService.getSchemaRegistriesForClusters(clusterIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> schemasByClusterId.getOrDefault(c.getId(), List.of())));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "kafkaConnects")
+    public Map<KafkaCluster, List<KafkaConnect>> getKafkaConnects(List<KafkaCluster> clusters) {
+        List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
+        Map<String, List<KafkaConnect>> connectsByClusterId = kafkaConnectApiService.getKafkaConnectsForClusters(clusterIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> connectsByClusterId.getOrDefault(c.getId(), List.of())));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "kafkaStreamsApplications")
+    public Map<KafkaCluster, List<KafkaStreamsApplication>> getKafkaStreamsApplications(List<KafkaCluster> clusters) {
+        List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
+        Map<String, List<KafkaStreamsApplication>> streamsByClusterId = kafkaStreamsApiService.getKafkaStreamsApplicationsForClusters(clusterIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> streamsByClusterId.getOrDefault(c.getId(), List.of())));
     }
 
     @MutationMapping

@@ -1,3 +1,4 @@
+import type { Environment } from '@/types';
 // GraphQL Query and Mutation Types
 import type {
     ConsumerGroup,

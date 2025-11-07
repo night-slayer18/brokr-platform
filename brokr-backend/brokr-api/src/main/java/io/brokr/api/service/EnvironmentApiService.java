@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -54,6 +55,12 @@ public class EnvironmentApiService {
         return environmentRepository.findById(id)
                 .map(EnvironmentEntity::toDomain)
                 .orElseThrow(() -> new ResourceNotFoundException("Environment not found with id: " + id));
+    }
+
+    public Map<String, Environment> getEnvironmentsByIds(List<String> ids) {
+        return environmentRepository.findByIdIn(ids).stream()
+                .map(EnvironmentEntity::toDomain)
+                .collect(Collectors.toMap(Environment::getId, Function.identity()));
     }
 
     public Environment createEnvironment(EnvironmentInput input) {

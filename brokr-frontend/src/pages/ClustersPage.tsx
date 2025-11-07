@@ -1,10 +1,11 @@
 import {useMutation, useQuery} from '@apollo/client/react'
-import {GET_CLUSTERS} from '@/graphql/queries'
+import {useNavigate} from 'react-router-dom'
 import {DELETE_CLUSTER_MUTATION, TEST_CLUSTER_CONNECTION_MUTATION} from '@/graphql/mutations'
 import type {
     DeleteClusterMutation,
     DeleteClusterMutationVariables,
     GetClustersQuery,
+    GetOrganizationsQuery,
     TestClusterConnectionMutation,
     TestClusterConnectionMutationVariables
 } from '@/graphql/types'
@@ -15,9 +16,10 @@ import {Badge} from '@/components/ui/badge'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Eye, Plus, RefreshCw, Server, Trash2} from 'lucide-react'
 import {toast} from 'sonner'
-import {useNavigate} from 'react-router-dom'
-
+import {useState} from "react";
 import {useAuth} from "@/hooks/useAuth";
+import {GET_CLUSTERS, GET_ORGANIZATIONS} from "@/graphql/queries";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
 
 interface ClusterCardProps {
     cluster: KafkaCluster
@@ -99,55 +101,59 @@ function ClusterCard({cluster, onDelete, onTest, canManage}: ClusterCardProps) {
 }
 
 export default function ClustersPage() {
-    const navigate = useNavigate()
-    const {user, canManageClusters} = useAuth()
+    const navigate = useNavigate();
+    const {user, canManageClusters} = useAuth();
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+    // For SUPER_ADMIN, this will be null until they select an org. For ADMIN, it's set from their user profile.
+    const [selectedOrgId, setSelectedOrgId] = useState<string | null>(isSuperAdmin ? null : user?.organizationId || null);
+
+    const {
+        data: organizationsData,
+        loading: organizationsLoading
+    } = useQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, {
+        skip: !isSuperAdmin,
+    });
+
+    // Determine the final orgId to use in the cluster query.
+    const orgIdForQuery = isSuperAdmin ? selectedOrgId : user?.organizationId;
+
     const {data, loading, refetch} = useQuery<GetClustersQuery>(GET_CLUSTERS, {
-        skip: !user?.organizationId,
-        variables: {
-            organizationId: user?.organizationId
-        }
-    })
-    const [deleteCluster] = useMutation<DeleteClusterMutation, DeleteClusterMutationVariables>(DELETE_CLUSTER_MUTATION)
-    const [testConnection] = useMutation<TestClusterConnectionMutation, TestClusterConnectionMutationVariables>(TEST_CLUSTER_CONNECTION_MUTATION)
+        skip: !orgIdForQuery, // Skip if no org is selected/available
+        variables: {organizationId: orgIdForQuery},
+    });
+
+    const [deleteCluster] = useMutation<DeleteClusterMutation, DeleteClusterMutationVariables>(DELETE_CLUSTER_MUTATION);
+    const [testConnection] = useMutation<TestClusterConnectionMutation, TestClusterConnectionMutationVariables>(TEST_CLUSTER_CONNECTION_MUTATION);
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this cluster?')) return
+        if (!confirm('Are you sure you want to delete this cluster?')) return;
 
         try {
-            await deleteCluster({variables: {id}})
-            toast.success('Cluster deleted successfully')
-            refetch()
+            await deleteCluster({variables: {id}});
+            toast.success('Cluster deleted successfully');
+            refetch();
         } catch (error: any) {
-            toast.error(error.message || 'Failed to delete cluster')
+            toast.error(error.message || 'Failed to delete cluster');
         }
-    }
+    };
 
     const handleTest = async (id: string) => {
         try {
-            const result = await testConnection({variables: {id}})
+            const result = await testConnection({variables: {id}});
             if (result.data?.testClusterConnection) {
-                toast.success('Connection test successful')
+                toast.success('Connection test successful');
             } else {
-                toast.error('Connection test failed')
+                toast.error('Connection test failed');
             }
-            await refetch()
+            await refetch();
         } catch (error: any) {
-            toast.error(error.message || 'Connection test failed')
+            toast.error(error.message || 'Connection test failed');
         }
-    }
+    };
 
-    if (loading) {
-        return (
-            <div className="space-y-6">
-                <Skeleton className="h-10 w-64"/>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-64"/>
-                    ))}
-                </div>
-            </div>
-        )
-    }
+    const isLoading = loading || organizationsLoading;
+    const clusters = data?.clusters || [];
 
     return (
         <div className="space-y-6">
@@ -171,41 +177,78 @@ export default function ClustersPage() {
                 )}
             </div>
 
-            {data?.clusters?.length === 0 ? (
-                <Card className="border-dashed border-2 border-primary/30 bg-card/30">
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <div className="relative mb-6">
-                            <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl"></div>
-                            <Server className="relative h-16 w-16 text-primary"/>
+            <Card>
+                <CardHeader className="flex-row items-center justify-between">
+                    <div className="space-y-1">
+                        <CardTitle>Cluster List</CardTitle>
+                        <CardDescription>
+                            {isSuperAdmin && !selectedOrgId
+                                ? "Select an organization to view its clusters."
+                                : "A list of clusters in the organization."
+                            }
+                        </CardDescription>
+                    </div>
+                    {isSuperAdmin && (
+                        <div className="w-full md:w-1/3">
+                            <Select onValueChange={setSelectedOrgId} value={selectedOrgId || undefined}>
+                                <SelectTrigger id="organization-select">
+                                    <SelectValue placeholder="Select an organization"/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {organizationsData?.organizations?.map(org => (
+                                        <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <h3 className="text-xl font-semibold mb-2 text-foreground">No clusters found</h3>
-                        <p className="text-muted-foreground text-center max-w-md mb-6">
-                            Get started by adding your first Kafka cluster to begin monitoring and management.
-                        </p>
-                        {canManageClusters() && (
-                            <Button
-                                onClick={() => navigate('/clusters/new')}
-                                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
-                            >
-                                <Plus className="mr-2 h-4 w-4"/>
-                                Add Your First Cluster
-                            </Button>
-                        )}
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {data?.clusters?.map((cluster) => (
-                        <ClusterCard
-                            key={cluster.id}
-                            cluster={cluster}
-                            onDelete={handleDelete}
-                            onTest={handleTest}
-                            canManage={canManageClusters()}
-                        />
-                    ))}
-                </div>
-            )}
+                    )}
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pt-4">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-64"/>
+                            ))}
+                        </div>
+                    ) : clusters.length === 0 ? (
+                        <div
+                            className="flex flex-col items-center justify-center py-16 border-dashed border-2 rounded-lg">
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl"></div>
+                                <Server className="relative h-16 w-16 text-primary"/>
+                            </div>
+                            <h3 className="text-xl font-semibold mb-2 text-foreground">No clusters found</h3>
+                            <p className="text-muted-foreground text-center max-w-md mb-6">
+                                {isSuperAdmin && !selectedOrgId
+                                    ? "Please select an organization to view its clusters."
+                                    : "Get started by adding your first Kafka cluster to begin monitoring and management."
+                                }
+                            </p>
+                            {canManageClusters() && (
+                                <Button
+                                    onClick={() => navigate('/clusters/new')}
+                                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
+                                >
+                                    <Plus className="mr-2 h-4 w-4"/>
+                                    Add Cluster
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pt-4">
+                            {clusters.map((cluster) => (
+                                <ClusterCard
+                                    key={cluster.id}
+                                    cluster={cluster}
+                                    onDelete={handleDelete}
+                                    onTest={handleTest}
+                                    canManage={canManageClusters()}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
-    )
+    );
 }

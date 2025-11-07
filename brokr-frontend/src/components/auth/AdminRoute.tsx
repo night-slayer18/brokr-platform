@@ -1,9 +1,9 @@
-import {useAuth} from '@/hooks/useAuth';
-import {Navigate, useLocation} from 'react-router-dom';
-import {toast} from 'sonner';
-import {JSX} from "react";
+import type { JSX } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Navigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 
-export function AdminRoute({children}: { children: JSX.Element }) {
+export function AdminRoute({ children }: { children: JSX.Element }) {
     const {user, canManageClusters} = useAuth();
     const location = useLocation();
 
