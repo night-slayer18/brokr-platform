@@ -17,6 +17,7 @@
         <frontend-maven-plugin.version>1.13.4</frontend-maven-plugin.version>
         <node.version>v20.10.0</node.version>
         <npm.version>10.2.3</npm.version>
+        <frontend.build.dir>build</frontend.build.dir>
     </properties>
 
     <build>
@@ -61,6 +62,30 @@
                         </goals>
                         <configuration>
                             <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-frontend-build-to-backend</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>../brokr-app/src/main/resources/static</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${frontend.build.dir}</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
                         </configuration>
                     </execution>
                 </executions>
