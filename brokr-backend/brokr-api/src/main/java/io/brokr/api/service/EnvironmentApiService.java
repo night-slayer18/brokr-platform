@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,6 +40,14 @@ public class EnvironmentApiService {
         return stream
                 .map(EnvironmentEntity::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<Environment>> getEnvironmentsForOrganizations(List<String> organizationIds) {
+        return environmentRepository.findByOrganizationIdIn(organizationIds)
+                .stream()
+                .map(EnvironmentEntity::toDomain)
+                .collect(Collectors.groupingBy(Environment::getOrganizationId));
     }
 
     public Environment getEnvironmentById(String id) {

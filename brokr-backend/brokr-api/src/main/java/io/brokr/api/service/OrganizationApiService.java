@@ -67,6 +67,13 @@ public class OrganizationApiService {
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
     }
 
+    public Map<String, Organization> getOrganizationsByIds(List<String> ids) {
+        return organizationRepository.findAllById(ids).stream()
+                .map(OrganizationEntity::toDomain)
+                .collect(Collectors.toMap(Organization::getId, java.util.function.Function.identity()));
+    }
+
+
     public OrganizationDto getOrganizationDtoById(String id) {
         // 1. Get the Org
         OrganizationDto orgDto = getOrganizationById(id).toDto();
