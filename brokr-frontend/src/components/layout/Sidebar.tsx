@@ -32,7 +32,7 @@ function SidebarLink({href, icon: Icon, children}: SidebarLinkProps) {
             className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                    ? 'bg-gradient-to-r from-purple-600/10 to-blue-600/10 text-purple-600 dark:text-purple-400'
+                    ? 'bg-gradient-to-r from-primary/10 to-primary/20 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
         >
@@ -47,7 +47,7 @@ export function Sidebar() {
         <aside className="w-64 border-r bg-card">
             <div className="flex h-16 items-center border-b px-6">
                 <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600"/>
+                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70"/>
                     <span className="text-lg font-bold conduktor-gradient-text">Brokr</span>
                 </div>
             </div>

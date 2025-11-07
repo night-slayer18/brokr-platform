@@ -197,3 +197,119 @@ export const GET_KAFKA_STREAMS = gql`
         }
     }
 `
+
+export const GET_SCHEMA_REGISTRY = gql`
+    query GetSchemaRegistry($id: ID!) {
+        schemaRegistry(id: $id) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+        }
+    }
+`
+
+export const GET_SCHEMA_REGISTRY_SUBJECTS = gql`
+    query GetSchemaRegistrySubjects($schemaRegistryId: ID!) {
+        schemaRegistrySubjects(schemaRegistryId: $schemaRegistryId)
+    }
+`
+
+export const GET_SCHEMA_REGISTRY_LATEST_SCHEMA = gql`
+    query GetSchemaRegistryLatestSchema($schemaRegistryId: ID!, $subject: String!) {
+        schemaRegistryLatestSchema(schemaRegistryId: $schemaRegistryId, subject: $subject)
+    }
+`
+
+export const GET_SCHEMA_REGISTRY_SCHEMA_VERSIONS = gql`
+    query GetSchemaRegistrySchemaVersions($schemaRegistryId: ID!, $subject: String!) {
+        schemaRegistrySchemaVersions(schemaRegistryId: $schemaRegistryId, subject: $subject)
+    }
+`
+
+export const GET_KAFKA_CONNECT = gql`
+    query GetKafkaConnect($id: ID!) {
+        kafkaConnect(id: $id) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+            connectors {
+                name
+                type
+                state
+                config
+                tasks {
+                    id
+                    state
+                    workerId
+                    trace
+                }
+            }
+        }
+    }
+`
+
+export const GET_KAFKA_STREAMS_APPLICATION = gql`
+    query GetKafkaStreamsApplication($id: ID!) {
+        kafkaStreamsApplication(id: $id) {
+            id
+            name
+            applicationId
+            topics
+            isActive
+            state
+            configuration
+            threads {
+                threadName
+                threadState
+                consumerClientId
+                tasks {
+                    taskId
+                    taskIdString
+                    topicPartitions
+                    taskState
+                }
+            }
+        }
+    }
+`
+
+export const GET_ENVIRONMENTS_BY_ORGANIZATION = gql`
+    query GetEnvironmentsByOrganization($organizationId: String) {
+        environments(organizationId: $organizationId) {
+            id
+            name
+            type
+            description
+            isActive
+            organization {
+                id
+            }
+        }
+    }
+`
+
+export const GET_ORGANIZATIONS = gql`
+    query GetOrganizations {
+        organizations {
+            id
+            name
+        }
+    }
+`
+
+export const GET_ORGANIZATION = gql`
+    query GetOrganization($id: ID!) {
+        organization(id: $id) {
+            id
+            name
+        }
+    }
+`

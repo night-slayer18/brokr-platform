@@ -6,8 +6,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Skeleton} from '@/components/ui/skeleton'
 import {Activity, FileText, Server, Users} from 'lucide-react'
 import React from "react";
-
-type ColorType = 'orange' | 'teal' | 'purple' | 'amber' | 'blue' | 'emerald' | 'violet'
+import {useNavigate} from "react-router-dom";
 
 interface StatCardProps {
     title: string
@@ -15,37 +14,16 @@ interface StatCardProps {
     description: string
     icon: React.ComponentType<{ className?: string }>
     trend?: number
-    color: ColorType
 }
 
-function StatCard({title, value, description, icon: Icon, trend, color}: StatCardProps) {
-    const colorClasses: Record<ColorType, string> = {
-        orange: 'from-orange-500/20 to-orange-600/20 border-orange-500/30',
-        teal: 'from-teal-500/20 to-teal-600/20 border-teal-500/30',
-        purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30',
-        amber: 'from-amber-500/20 to-amber-600/20 border-amber-500/30',
-        blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30',
-        emerald: 'from-emerald-500/20 to-emerald-600/20 border-emerald-500/30',
-        violet: 'from-violet-500/20 to-violet-600/20 border-violet-500/30',
-    }
-
-    const iconColorClasses: Record<ColorType, string> = {
-        orange: 'text-orange-400',
-        teal: 'text-teal-400',
-        purple: 'text-purple-400',
-        amber: 'text-amber-400',
-        blue: 'text-blue-400',
-        emerald: 'text-emerald-400',
-        violet: 'text-violet-400',
-    }
-
+function StatCard({title, value, description, icon: Icon, trend}: StatCardProps) {
     return (
         <Card
-            className={`bg-gradient-to-br ${colorClasses[color]} border backdrop-blur-sm hover:shadow-lg transition-all duration-300`}>
+            className={`bg-gradient-to-br from-primary/20 to-primary/10 border-primary/30 border backdrop-blur-sm hover:shadow-lg transition-all duration-300`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-foreground/80">{title}</CardTitle>
                 <div className={`p-2 rounded-lg bg-background/50`}>
-                    <Icon className={`h-5 w-5 ${iconColorClasses[color]}`}/>
+                    <Icon className={`h-5 w-5 text-primary`}/>
                 </div>
             </CardHeader>
             <CardContent>
@@ -62,8 +40,14 @@ function StatCard({title, value, description, icon: Icon, trend, color}: StatCar
 }
 
 export default function DashboardPage() {
+    const navigate = useNavigate();
     const {data: userData, loading: userLoading} = useQuery<GetMeQuery>(GET_ME)
-    const {data: clustersData, loading: clustersLoading} = useQuery<GetClustersQuery>(GET_CLUSTERS)
+    const {data: clustersData, loading: clustersLoading} = useQuery<GetClustersQuery>(GET_CLUSTERS, {
+        skip: !userData?.me?.organizationId,
+        variables: {
+            organizationId: userData?.me?.organizationId
+        }
+    })
 
     const clusterCount = clustersData?.clusters?.length || 0
     const activeClusterCount = clustersData?.clusters?.filter((c) => c.isReachable)?.length || 0
@@ -87,7 +71,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-orange-400 to-teal-400 bg-clip-text text-transparent">
+                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     Dashboard
                 </h2>
                 <p className="text-muted-foreground mt-2 text-lg">
@@ -102,28 +86,24 @@ export default function DashboardPage() {
                     value={clusterCount}
                     description={`${activeClusterCount} active`}
                     icon={Server}
-                    color="orange"
                 />
                 <StatCard
                     title="Topics"
                     value="-"
                     description="Select a cluster to view"
                     icon={FileText}
-                    color="teal"
                 />
                 <StatCard
                     title="Consumer Groups"
                     value="-"
                     description="Select a cluster to view"
                     icon={Users}
-                    color="purple"
                 />
                 <StatCard
                     title="System Health"
                     value={activeClusterCount === clusterCount ? "Healthy" : "Warning"}
                     description={`${activeClusterCount}/${clusterCount} clusters online`}
                     icon={Activity}
-                    color="amber"
                 />
             </div>
 
@@ -145,13 +125,16 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-2">
-                            <button className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
+                            <button onClick={() => navigate('/clusters')}
+                                    className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
                                 Create new topic
                             </button>
-                            <button className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
+                            <button onClick={() => navigate('/clusters/new')}
+                                    className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
                                 Connect to cluster
                             </button>
-                            <button className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
+                            <button onClick={() => navigate('/clusters')}
+                                    className="w-full text-left text-sm hover:bg-accent p-2 rounded-md">
                                 View consumer groups
                             </button>
                         </div>

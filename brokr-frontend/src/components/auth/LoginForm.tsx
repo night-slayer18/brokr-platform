@@ -54,14 +54,14 @@ export function LoginForm() {
 
     return (
         <Card
-            className="w-full max-w-md backdrop-blur-xl bg-card/50 border-2 border-orange-500/20 shadow-2xl shadow-orange-500/20">
+            className="w-full max-w-md backdrop-blur-xl bg-card/50 border-2 border-primary/20 shadow-2xl shadow-primary/20">
             <CardHeader className="space-y-1 pb-6">
                 <div className="flex items-center justify-center mb-6">
                     <div className="relative">
                         <div
-                            className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-600 to-teal-600 blur-lg opacity-75 animate-pulse"></div>
+                            className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary to-primary/70 blur-lg opacity-75 animate-pulse"></div>
                         <div
-                            className="relative h-16 w-16 rounded-xl bg-gradient-to-br from-orange-600 to-teal-600 flex items-center justify-center shadow-lg">
+                            className="relative h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5}
                                  stroke="currentColor" className="w-10 h-10 text-white">
                                 <path strokeLinecap="round" strokeLinejoin="round"
@@ -71,7 +71,7 @@ export function LoginForm() {
                     </div>
                 </div>
                 <CardTitle
-                    className="text-3xl font-bold text-center bg-gradient-to-r from-orange-400 to-teal-400 bg-clip-text text-transparent">
+                    className="text-3xl font-bold text-center bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     Welcome to Brokr
                 </CardTitle>
                 <CardDescription className="text-center text-base">
@@ -87,7 +87,7 @@ export function LoginForm() {
                             {...register('username')}
                             placeholder="Enter your username"
                             disabled={loading}
-                            className="h-11 bg-secondary/50 border-border/50 focus:border-orange-500 transition-all"
+                            className="h-11 bg-secondary/50 border-border/50 focus:border-primary transition-all"
                         />
                         {errors.username && (
                             <p className="text-sm text-destructive">{errors.username.message}</p>
@@ -101,14 +101,14 @@ export function LoginForm() {
                             {...register('password')}
                             placeholder="Enter your password"
                             disabled={loading}
-                            className="h-11 bg-secondary/50 border-border/50 focus:border-orange-500 transition-all"
+                            className="h-11 bg-secondary/50 border-border/50 focus:border-primary transition-all"
                         />
                         {errors.password && (
                             <p className="text-sm text-destructive">{errors.password.message}</p>
                         )}
                     </div>
                     <Button type="submit"
-                            className="w-full h-11 bg-gradient-to-r from-orange-600 to-teal-600 hover:from-orange-700 hover:to-teal-700 text-white font-semibold shadow-lg shadow-orange-500/50 transition-all"
+                            className="w-full h-11 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold shadow-lg shadow-primary/50 transition-all"
                             disabled={loading}>
                         {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
                         {loading ? 'Signing In...' : 'Sign In'}
@@ -118,11 +118,11 @@ export function LoginForm() {
                     <p className="text-sm text-muted-foreground mb-2">Demo Credentials</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                         <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">admin/admin123</span>
+                            className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">admin/admin123</span>
                         <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">orgadmin/orgadmin123</span>
+                            className="text-xs px-3 py-1.5 rounded-full bg-secondary/10 text-secondary-foreground border-secondary/20">orgadmin/orgadmin123</span>
                         <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">developer/developer123</span>
+                            className="text-xs px-3 py-1.5 rounded-full bg-muted/10 text-muted-foreground border-muted/20">developer/developer123</span>
                     </div>
                 </div>
             </CardContent>

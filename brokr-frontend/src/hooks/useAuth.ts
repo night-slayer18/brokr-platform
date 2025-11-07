@@ -23,6 +23,10 @@ export function useAuth() {
         return hasRole(['SERVER_ADMIN', 'SUPER_ADMIN'])
     }
 
+    const canManageClusters = () => {
+        return hasRole(['ADMIN', 'SUPER_ADMIN'])
+    }
+
     const canAccessEnvironment = (environmentId: string) => {
         if (!user) return false
         if (user.role === 'SUPER_ADMIN') return true
@@ -38,6 +42,7 @@ export function useAuth() {
         hasRole,
         canManageTopics,
         canManageUsers,
+        canManageClusters, // Add this
         canAccessEnvironment,
     }
 }

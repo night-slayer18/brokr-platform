@@ -42,7 +42,7 @@ export function Header() {
                             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                                 <Avatar>
                                     <AvatarFallback
-                                        className="bg-gradient-to-br from-purple-600 to-blue-600 text-white">
+                                        className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
                                         {getUserInitials()}
                                     </AvatarFallback>
                                 </Avatar>
