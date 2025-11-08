@@ -7,6 +7,7 @@ import {Skeleton} from '@/components/ui/skeleton'
 import {Activity, FileText, Server, Users} from 'lucide-react'
 import React from "react";
 import {useNavigate} from "react-router-dom";
+import type {KafkaCluster} from '@/types';
 
 interface StatCardProps {
     title: string
@@ -49,8 +50,8 @@ export default function DashboardPage() {
         }
     })
 
-    const clusterCount = clustersData?.clusters?.length || 0
-    const activeClusterCount = clustersData?.clusters?.filter((c) => c.isReachable)?.length || 0
+    const clusterCount = (clustersData?.clusters || []).length
+    const activeClusterCount = (clustersData?.clusters || []).filter((c: KafkaCluster) => c.isReachable)?.length || 0
 
     if (userLoading || clustersLoading) {
         return (

@@ -1,14 +1,23 @@
-import {useQuery} from '@apollo/client/react';
+import {useApolloClient, useQuery} from '@apollo/client/react';
 import {useParams} from 'react-router-dom';
-import {GET_SCHEMA_REGISTRY, GET_SCHEMA_REGISTRY_SUBJECTS, GET_SCHEMA_REGISTRY_LATEST_SCHEMA, GET_SCHEMA_REGISTRY_SCHEMA_VERSIONS} from '@/graphql/queries';
-import type {GetSchemaRegistryQuery, GetSchemaRegistryVariables, GetSchemaRegistrySubjectsQuery, GetSchemaRegistryLatestSchemaQuery, GetSchemaRegistrySchemaVersionsQuery} from '@/graphql/types';
+import {
+    GET_SCHEMA_REGISTRY,
+    GET_SCHEMA_REGISTRY_LATEST_SCHEMA,
+    GET_SCHEMA_REGISTRY_SCHEMA_VERSIONS,
+    GET_SCHEMA_REGISTRY_SUBJECTS
+} from '@/graphql/queries';
+import type {
+    GetSchemaRegistryLatestSchemaQuery,
+    GetSchemaRegistryQuery,
+    GetSchemaRegistrySchemaVersionsQuery,
+    GetSchemaRegistrySubjectsQuery
+} from '@/graphql/types';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
 import {formatRelativeTime} from '@/lib/formatters';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {useEffect, useState} from 'react';
-import {useApolloClient} from '@apollo/client/react';
 import Editor from '@monaco-editor/react';
 import {toast} from "sonner";
 
@@ -20,7 +29,7 @@ export default function SchemaRegistryDetailPage() {
         data: schemaRegistryData,
         loading: schemaRegistryLoading,
         error: schemaRegistryError
-    } = useQuery<GetSchemaRegistryQuery, GetSchemaRegistryVariables>(GET_SCHEMA_REGISTRY, {
+    } = useQuery<GetSchemaRegistryQuery>(GET_SCHEMA_REGISTRY, {
         variables: {id: srId!},
     });
 

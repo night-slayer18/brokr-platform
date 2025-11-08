@@ -3,6 +3,7 @@ package io.brokr.api.graphql;
 import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.api.service.*;
 import io.brokr.core.model.*;
+import io.brokr.kafka.service.KafkaAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
@@ -26,6 +27,7 @@ public class ClusterResolver {
     private final SchemaRegistryApiService schemaRegistryApiService;
     private final KafkaConnectApiService kafkaConnectApiService;
     private final KafkaStreamsApiService kafkaStreamsApiService;
+    private final KafkaAdminService kafkaAdminService;
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId)")
@@ -72,6 +74,15 @@ public class ClusterResolver {
         List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
         Map<String, List<KafkaStreamsApplication>> streamsByClusterId = kafkaStreamsApiService.getKafkaStreamsApplicationsForClusters(clusterIds);
         return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> streamsByClusterId.getOrDefault(c.getId(), List.of())));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "brokers")
+    public Map<KafkaCluster, List<BrokerNode>> getBrokers(List<KafkaCluster> clusters) {
+        return clusters.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        kafkaAdminService::getClusterNodes
+                ));
     }
 
     @MutationMapping

@@ -112,6 +112,14 @@ type KafkaCluster {
     isReachable: Boolean!
     lastConnectionError: String
     lastConnectionCheck: Long!
+    brokers: [BrokerNode!]
+}
+
+type BrokerNode {
+    id: Int!
+    host: String!
+    port: Int!
+    rack: String
 }
 
 type Topic {
@@ -324,6 +332,21 @@ input LoginInput {
     password: String!
 }
 
+input MessageInput {
+    topic: String!
+    partitions: [Int!]
+    offset: Long
+    limit: Int!
+}
+
+type Message {
+    partition: Int!
+    offset: Long!
+    timestamp: Long!
+    key: String
+    value: String
+}
+
 type Query {
     # User queries
     me: UserDto
@@ -364,6 +387,9 @@ type Query {
     # Kafka Streams queries
     kafkaStreamsApplications(clusterId: ID!): [KafkaStreamsApplication!]!
     kafkaStreamsApplication(id: ID!): KafkaStreamsApplication
+
+    # Message queries
+    messages(clusterId: ID!, input: MessageInput!): [Message!]!
 }
 
 type Mutation {

@@ -143,6 +143,23 @@ public class KafkaAdminService {
         }
     }
 
+    public List<BrokerNode> getClusterNodes(KafkaCluster cluster) {
+        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+            DescribeClusterResult result = adminClient.describeCluster();
+            return result.nodes().get().stream()
+                .map(node -> BrokerNode.builder()
+                    .id(node.id())
+                    .host(node.host())
+                    .port(node.port())
+                    .rack(node.rack())
+                    .build())
+                .collect(Collectors.toList());
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to describe cluster: {}", cluster.getName(), e);
+            throw new RuntimeException("Failed to describe cluster", e);
+        }
+    }
+
     public List<ConsumerGroup> listConsumerGroups(KafkaCluster cluster) {
         try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
             // Use the new listGroups() method

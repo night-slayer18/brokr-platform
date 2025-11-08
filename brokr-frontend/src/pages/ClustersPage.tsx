@@ -70,7 +70,7 @@ function ClusterCard({cluster, onDelete, onTest, canManage}: ClusterCardProps) {
                             variant="outline"
                             size="sm"
                             className="flex-1 border-primary/30 hover:bg-primary/10 hover:border-primary transition-all"
-                            onClick={() => navigate(`/clusters/${cluster.id}/topics`)}
+                            onClick={() => navigate(`/clusters/${cluster.id}`)}
                         >
                             <Eye className="h-4 w-4 mr-2"/>
                             View
@@ -133,8 +133,9 @@ export default function ClustersPage() {
             await deleteCluster({variables: {id}});
             toast.success('Cluster deleted successfully');
             refetch();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete cluster');
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : {message: 'Failed to delete cluster'}
+            toast.error(err.message || 'Failed to delete cluster');
         }
     };
 
@@ -147,13 +148,14 @@ export default function ClustersPage() {
                 toast.error('Connection test failed');
             }
             await refetch();
-        } catch (error: any) {
-            toast.error(error.message || 'Connection test failed');
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : {message: 'Connection test failed'}
+            toast.error(err.message || 'Connection test failed');
         }
     };
 
     const isLoading = loading || organizationsLoading;
-    const clusters = data?.clusters || [];
+    const clusters = data?.clusters;
 
     return (
         <div className="space-y-6">
@@ -210,7 +212,7 @@ export default function ClustersPage() {
                                 <Skeleton key={i} className="h-64"/>
                             ))}
                         </div>
-                    ) : clusters.length === 0 ? (
+                    ) : (clusters || []).length === 0 ? (
                         <div
                             className="flex flex-col items-center justify-center py-16 border-dashed border-2 rounded-lg">
                             <div className="relative mb-6">
@@ -236,7 +238,7 @@ export default function ClustersPage() {
                         </div>
                     ) : (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pt-4">
-                            {clusters.map((cluster) => (
+                            {(clusters || []).map((cluster: KafkaCluster) => (
                                 <ClusterCard
                                     key={cluster.id}
                                     cluster={cluster}

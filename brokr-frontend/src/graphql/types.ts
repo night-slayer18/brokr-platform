@@ -1,14 +1,15 @@
-import type { Environment } from '@/types';
 // GraphQL Query and Mutation Types
 import type {
     ConsumerGroup,
+    Environment,
     KafkaCluster,
     KafkaConnect,
     KafkaStreamsApplication,
+    Message,
     SchemaRegistry,
     Topic,
     User
-} from '@/types'
+} from '@/types';
 
 // Query Response Types
 export interface GetMeQuery {
@@ -63,6 +64,10 @@ export interface GetOrganizationQuery {
         id: string;
         name: string;
     };
+}
+
+export interface GetMessagesQuery {
+    messages: Message[]
 }
 
 // Mutation Response Types
@@ -136,6 +141,12 @@ export interface TopicInput {
     configs?: Record<string, string>
 }
 
+export interface MessageInput {
+    topic: string
+    partitions?: number[]
+    limit?: number
+}
+
 // Query Variables Types
 export interface GetClustersVariables {
     organizationId?: string
@@ -184,12 +195,15 @@ export interface GetEnvironmentsByOrganizationVariables {
     organizationId: string
 }
 
-export interface GetOrganizationsVariables {
-    // No variables needed for this query
-}
+export type GetOrganizationsVariables = Record<string, never>
 
 export interface GetOrganizationVariables {
     id: string;
+}
+
+export interface GetMessagesVariables {
+    clusterId: string
+    input: MessageInput
 }
 
 // Mutation Variables Types
@@ -287,11 +301,7 @@ export interface UpdateKafkaConnectMutation {
 }
 
 export interface DeleteKafkaConnectMutation {
-    id: string
-}
-
-export interface TestKafkaConnectConnectionMutation {
-    testKafkaConnectConnection: boolean
+    deleteKafkaConnect: boolean
 }
 
 export interface CreateKafkaStreamsApplicationMutation {
@@ -303,88 +313,16 @@ export interface UpdateKafkaStreamsApplicationMutation {
 }
 
 export interface DeleteKafkaStreamsApplicationMutation {
-    id: string
+    deleteKafkaStreamsApplication: boolean
 }
 
-export interface SchemaRegistryInput {
-    name: string
-    url: string
-    clusterId: string
-    securityProtocol?: 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL'
-    username?: string
-    password?: string
-    isActive?: boolean
-}
-
-export interface KafkaConnectInput {
-    name: string
-    url: string
-    clusterId: string
-    securityProtocol?: 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL'
-    username?: string
-    password?: string
-    isActive?: boolean
-}
-
-export interface KafkaStreamsApplicationInput {
-    name: string
-    applicationId: string
-    clusterId: string
-    topics?: string[]
-    configuration?: Record<string, any>
-    isActive?: boolean
-}
-
-export interface GetSchemaRegistryVariables {
-    id: string
-}
-
-export interface GetSchemaRegistrySubjectsVariables {
-    schemaRegistryId: string
-}
-
-export interface GetSchemaRegistryLatestSchemaVariables {
-    schemaRegistryId: string
-    subject: string
-}
-
-export interface GetSchemaRegistrySchemaVersionsVariables {
-    schemaRegistryId: string
-    subject: string
-}
-
-export interface GetKafkaConnectVariables {
-    id: string
-}
-
-export interface GetKafkaStreamsApplicationVariables {
-    id: string
-}
-
-export interface CreateSchemaRegistryMutationVariables {
-    input: SchemaRegistryInput
-}
-
-export interface UpdateSchemaRegistryMutationVariables {
-    id: string
-    input: SchemaRegistryInput
-}
-
+// Variable Interfaces (added missing ones for deletes/tests/detail queries)
 export interface DeleteSchemaRegistryMutationVariables {
     id: string
 }
 
 export interface TestSchemaRegistryConnectionMutationVariables {
     id: string
-}
-
-export interface CreateKafkaConnectMutationVariables {
-    input: KafkaConnectInput
-}
-
-export interface UpdateKafkaConnectMutationVariables {
-    id: string
-    input: KafkaConnectInput
 }
 
 export interface DeleteKafkaConnectMutationVariables {
@@ -395,15 +333,62 @@ export interface TestKafkaConnectConnectionMutationVariables {
     id: string
 }
 
+export interface DeleteKafkaStreamsApplicationMutationVariables {
+    id: string
+}
+
+export interface GetKafkaConnectVariables {
+    id: string
+}
+
+export interface GetKafkaStreamsApplicationVariables {
+    id: string
+}
+
+// Inputs for create/update operations (to support variables types)
+export interface SchemaRegistryInput {
+    clusterId: string
+    name: string
+    url: string
+    isActive?: boolean
+    securityProtocol?: 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL'
+    username?: string
+    password?: string
+}
+
+export interface KafkaConnectInput {
+    clusterId: string
+    name: string
+    url: string
+    isActive?: boolean
+    securityProtocol?: 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL'
+    username?: string
+    password?: string
+}
+
+export interface KafkaStreamsApplicationInput {
+    clusterId: string
+    name: string
+    applicationId: string
+    topics?: string[]
+    configuration?: Record<string, unknown>
+    isActive?: boolean
+}
+
+// Variables for create mutations
+export interface CreateSchemaRegistryMutationVariables {
+    input: SchemaRegistryInput
+}
+
+export interface CreateKafkaConnectMutationVariables {
+    input: KafkaConnectInput
+}
+
 export interface CreateKafkaStreamsApplicationMutationVariables {
     input: KafkaStreamsApplicationInput
 }
 
-export interface UpdateKafkaStreamsApplicationMutationVariables {
-    id: string
-    input: KafkaStreamsApplicationInput
-}
-
-export interface DeleteKafkaStreamsApplicationMutationVariables {
-    id: string
+// Missing mutation result types
+export interface TestKafkaConnectConnectionMutation {
+    testKafkaConnectConnection: boolean
 }

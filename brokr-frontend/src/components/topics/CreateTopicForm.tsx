@@ -65,8 +65,9 @@ export function CreateTopicForm({clusterId, isOpen, onOpenChange, onTopicCreated
             onTopicCreated();
             onOpenChange(false);
             reset();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to create topic');
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : {message: 'Failed to create topic'}
+            toast.error(err.message || 'Failed to create topic');
         }
     };
 
@@ -88,13 +89,15 @@ export function CreateTopicForm({clusterId, isOpen, onOpenChange, onTopicCreated
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="partitions">Partitions</Label>
-                            <Input id="partitions" type="number" {...register('partitions')} disabled={loading}/>
+                            <Input id="partitions" type="number" {...register('partitions', {valueAsNumber: true})}
+                                   disabled={loading}/>
                             {errors.partitions &&
                                 <p className="text-sm text-destructive">{errors.partitions.message}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="replicationFactor">Replication Factor</Label>
-                            <Input id="replicationFactor" type="number" {...register('replicationFactor')}
+                            <Input id="replicationFactor"
+                                   type="number" {...register('replicationFactor', {valueAsNumber: true})}
                                    disabled={loading}/>
                             {errors.replicationFactor &&
                                 <p className="text-sm text-destructive">{errors.replicationFactor.message}</p>}

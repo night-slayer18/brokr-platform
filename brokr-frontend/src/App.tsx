@@ -17,40 +17,54 @@ import KafkaConnectDetailPage from './pages/KafkaConnectDetailPage'
 import KafkaStreamsDetailPage from './pages/KafkaStreamsDetailPage'
 import CreateClusterPage from './pages/CreateClusterPage'
 
-import {AdminRoute} from "./components/auth/AdminRoute";
+import { AdminRoute } from "./components/auth/AdminRoute";
+import { ClusterLayout } from './components/layout/ClusterLayout';
+import ClusterOverviewPage from './pages/ClusterOverviewPage';
+import BrokersPage from './pages/BrokersPage';
 
 function App() {
     return (
         <>
             <Routes>
-                <Route path="/login" element={<LoginPage/>}/>
+                <Route path="/login" element={<LoginPage />} />
                 <Route
                     path="/"
                     element={
                         <ProtectedRoute>
-                            <AppLayout/>
+                            <AppLayout />
                         </ProtectedRoute>
                     }
                 >
-                    <Route index element={<Navigate to="/dashboard" replace/>}/>
-                    <Route path="dashboard" element={<DashboardPage/>}/>
-                    <Route path="clusters" element={<ClustersPage/>}/>
-                    <Route path="clusters/new" element={<AdminRoute><CreateClusterPage/></AdminRoute>}/>
-                    <Route path="clusters/:clusterId/topics" element={<TopicsPage/>}/>
-                    <Route path="clusters/:clusterId/topics/:topicName" element={<TopicDetailPage/>}/>
-                    <Route path="clusters/:clusterId/consumer-groups" element={<ConsumerGroupsPage/>}/>
-                    <Route path="clusters/:clusterId/consumer-groups/:groupId" element={<ConsumerGroupDetailPage/>}/>
-                    <Route path="clusters/:clusterId/schema-registry" element={<SchemaRegistryPage/>}/>
-                    <Route path="clusters/:clusterId/schema-registry/:srId" element={<SchemaRegistryDetailPage/>}/>
-                    <Route path="clusters/:clusterId/kafka-connect" element={<KafkaConnectPage/>}/>
-                    <Route path="clusters/:clusterId/kafka-connect/:kcId" element={<KafkaConnectDetailPage/>}/>
-                    <Route path="clusters/:clusterId/kafka-streams" element={<KafkaStreamsPage/>}/>
-                    <Route path="clusters/:clusterId/kafka-streams/:ksId" element={<KafkaStreamsDetailPage/>}/>
+                    <Route index element={<Navigate to="/dashboard" replace />} />
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="clusters" element={<ClustersPage />} />
+                    <Route path="clusters/new" element={<AdminRoute><CreateClusterPage /></AdminRoute>} />
+                </Route>
+                <Route
+                    path="/clusters/:clusterId"
+                    element={
+                        <ProtectedRoute>
+                            <ClusterLayout />
+                        </ProtectedRoute>
+                    }
+                >
+                    <Route index element={<ClusterOverviewPage />} />
+                    <Route path="brokers" element={<BrokersPage />} />
+                    <Route path="topics" element={<TopicsPage />} />
+                    <Route path="topics/:topicName" element={<TopicDetailPage />} />
+                    <Route path="consumer-groups" element={<ConsumerGroupsPage />} />
+                    <Route path="consumer-groups/:groupId" element={<ConsumerGroupDetailPage />} />
+                    <Route path="schema-registry" element={<SchemaRegistryPage />} />
+                    <Route path="schema-registry/:srId" element={<SchemaRegistryDetailPage />} />
+                    <Route path="kafka-connect" element={<KafkaConnectPage />} />
+                    <Route path="kafka-connect/:kcId" element={<KafkaConnectDetailPage />} />
+                    <Route path="kafka-streams" element={<KafkaStreamsPage />} />
+                    <Route path="kafka-streams/:ksId" element={<KafkaStreamsDetailPage />} />
                 </Route>
             </Routes>
-            <Toaster position="top-right" richColors/>
+            <Toaster position="top-right" richColors />
         </>
     )
 }
 
-export default App
+export default App;

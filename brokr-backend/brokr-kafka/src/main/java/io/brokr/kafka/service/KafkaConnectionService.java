@@ -35,6 +35,9 @@ public class KafkaConnectionService {
     public AdminClient createAdminClient(KafkaCluster cluster) {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());
+        props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
+        props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 5000);
+        props.put(AdminClientConfig.RETRIES_CONFIG, 1);
 
         // Apply security configuration
         if (cluster.getSecurityProtocol() != null) {

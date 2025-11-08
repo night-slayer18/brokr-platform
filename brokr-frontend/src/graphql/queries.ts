@@ -36,6 +36,12 @@ export const GET_CLUSTERS = gql`
             }
             lastConnectionCheck
             lastConnectionError
+            brokers {
+                id
+                host
+                port
+                rack
+            }
         }
     }
 `
@@ -60,6 +66,12 @@ export const GET_CLUSTER = gql`
             }
             lastConnectionCheck
             lastConnectionError
+            brokers {
+                id
+                host
+                port
+                rack
+            }
         }
     }
 `
@@ -277,6 +289,18 @@ export const GET_KAFKA_STREAMS_APPLICATION = gql`
                     taskState
                 }
             }
+        }
+    }
+`
+
+export const GET_MESSAGES = gql`
+    query GetMessages($clusterId: ID!, $input: MessageInput!) {
+        messages(clusterId: $clusterId, input: $input) {
+            partition
+            offset
+            timestamp
+            key
+            value
         }
     }
 `

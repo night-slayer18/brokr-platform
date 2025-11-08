@@ -48,6 +48,14 @@ export interface KafkaCluster {
     }
     lastConnectionCheck: number
     lastConnectionError?: string
+    brokers?: BrokerNode[]
+}
+
+export interface BrokerNode {
+    id: number
+    host: string
+    port: number
+    rack?: string | null
 }
 
 export interface Topic {
@@ -135,7 +143,7 @@ export interface KafkaStreamsApplication {
     topics: string[]
     isActive: boolean
     state: 'RUNNING' | 'REBALANCING' | 'PENDING_SHUTDOWN' | 'NOT_RUNNING' | 'ERROR'
-    configuration?: Record<string, any>
+    configuration?: Record<string, unknown>
     threads: ThreadMetadata[]
 }
 
@@ -151,4 +159,12 @@ export interface TaskMetadata {
     taskIdString: string
     topicPartitions: string[]
     taskState: string
+}
+
+export interface Message {
+    partition: number
+    offset: number
+    timestamp: number
+    key?: string | null
+    value?: string | null
 }

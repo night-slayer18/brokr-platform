@@ -42,4 +42,5 @@ public class KafkaCluster {
     private List<SchemaRegistry> schemaRegistries;
     private List<KafkaConnect> kafkaConnects;
     private List<KafkaStreamsApplication> kafkaStreamsApplications;
+    private List<BrokerNode> brokers;
 }

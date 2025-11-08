@@ -1,31 +1,31 @@
-import { useMutation, useQuery } from '@apollo/client/react'
-import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import {useMutation, useQuery} from '@apollo/client/react'
+import {useNavigate} from 'react-router-dom'
+import {useForm} from 'react-hook-form'
+import {zodResolver} from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CREATE_CLUSTER_MUTATION } from '@/graphql/mutations'
+import {toast} from 'sonner'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {CREATE_CLUSTER_MUTATION} from '@/graphql/mutations'
 import type {
     CreateClusterMutation,
     CreateClusterMutationVariables,
     GetEnvironmentsByOrganizationQuery,
     GetEnvironmentsByOrganizationVariables,
-    GetOrganizationsQuery,
     GetOrganizationQuery,
+    GetOrganizationsQuery,
     GetOrganizationVariables,
 } from '@/graphql/types'
-import { Loader2 } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { GET_CLUSTERS, GET_ENVIRONMENTS_BY_ORGANIZATION, GET_ORGANIZATIONS, GET_ORGANIZATION } from '@/graphql/queries'
-import { SECURITY_PROTOCOLS } from '@/lib/constants'
-import { useEffect } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import {Loader2} from 'lucide-react'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Switch} from '@/components/ui/switch'
+import {Textarea} from '@/components/ui/textarea'
+import {GET_CLUSTERS, GET_ENVIRONMENTS_BY_ORGANIZATION, GET_ORGANIZATION, GET_ORGANIZATIONS} from '@/graphql/queries'
+import {SECURITY_PROTOCOLS} from '@/lib/constants'
+import {useEffect} from 'react'
+import {useAuth} from '@/hooks/useAuth'
 
 const kafkaClusterSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -49,13 +49,13 @@ type KafkaClusterFormData = z.infer<typeof kafkaClusterSchema>;
 
 export default function CreateClusterPage() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const {user} = useAuth();
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
     const {
         register,
         handleSubmit,
-        formState: { errors },
+        formState: {errors},
         setValue,
         watch,
         reset,
@@ -75,25 +75,34 @@ export default function CreateClusterPage() {
     const selectedOrganizationId = watch('organizationId');
     const securityProtocol = watch('securityProtocol');
 
-    const { data: organizationsData, loading: organizationsLoading } = useQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, {
+    const {
+        data: organizationsData,
+        loading: organizationsLoading
+    } = useQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, {
         skip: !isSuperAdmin,
     });
 
-    const { data: singleOrganizationData, loading: singleOrganizationLoading } = useQuery<GetOrganizationQuery, GetOrganizationVariables>(GET_ORGANIZATION, {
-        variables: { id: user?.organizationId || '' },
+    const {
+        data: singleOrganizationData,
+        loading: singleOrganizationLoading
+    } = useQuery<GetOrganizationQuery, GetOrganizationVariables>(GET_ORGANIZATION, {
+        variables: {id: user?.organizationId || ''},
         skip: isSuperAdmin || !user?.organizationId,
     });
 
-    const { data: environmentsData, loading: environmentsLoading } = useQuery<GetEnvironmentsByOrganizationQuery, GetEnvironmentsByOrganizationVariables>(GET_ENVIRONMENTS_BY_ORGANIZATION, {
-        variables: { organizationId: selectedOrganizationId },
+    const {
+        data: environmentsData,
+        loading: environmentsLoading
+    } = useQuery<GetEnvironmentsByOrganizationQuery, GetEnvironmentsByOrganizationVariables>(GET_ENVIRONMENTS_BY_ORGANIZATION, {
+        variables: {organizationId: selectedOrganizationId},
         skip: !selectedOrganizationId,
     });
 
-    const [createCluster, { loading: createClusterLoading }] = useMutation<CreateClusterMutation, CreateClusterMutationVariables>(CREATE_CLUSTER_MUTATION, {
+    const [createCluster, {loading: createClusterLoading}] = useMutation<CreateClusterMutation, CreateClusterMutationVariables>(CREATE_CLUSTER_MUTATION, {
         refetchQueries: [
             {
                 query: GET_CLUSTERS,
-                variables: { organizationId: user?.organizationId },
+                variables: {organizationId: user?.organizationId},
             },
         ],
     });
@@ -122,8 +131,9 @@ export default function CreateClusterPage() {
             });
             toast.success(`Cluster "${formData.name}" created successfully`);
             navigate('/clusters');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to create cluster');
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : {message: 'Failed to create cluster'}
+            toast.error(err.message || 'Failed to create cluster');
         }
     };
 
