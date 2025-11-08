@@ -159,7 +159,7 @@ export default function TopicsPage() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => navigate(`/clusters/${clusterId}/topics/${topic.name}`)}
+                                                    onClick={() => navigate(`/clusters/${clusterId}/topics/${encodeURIComponent(topic.name)}`)}
                                                 >
                                                     <Eye className="h-4 w-4"/>
                                                 </Button>

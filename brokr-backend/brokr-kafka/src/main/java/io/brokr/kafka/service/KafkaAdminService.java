@@ -86,19 +86,66 @@ public class KafkaAdminService {
 
     public Topic getTopic(KafkaCluster cluster, String topicName) {
         try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+            // Kick off all async operations in parallel for better performance
             DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singleton(topicName));
-            TopicDescription description = describeTopicsResult.allTopicNames().get().get(topicName);
 
-            // Get topic configs
             ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
             DescribeConfigsResult describeConfigsResult = adminClient.describeConfigs(Collections.singleton(configResource));
-            Config config = describeConfigsResult.all().get().get(configResource);
 
+            // Wait for topic description first (we need it to get partition info)
+            TopicDescription description = describeTopicsResult.allTopicNames().get().get(topicName);
+
+            // Prepare offset specs for all partitions - earliest offsets
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> earliestOffsetSpecs = new HashMap<>();
+            for (var partition : description.partitions()) {
+                org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
+                earliestOffsetSpecs.put(tp, OffsetSpec.earliest());
+            }
+
+            // Prepare offset specs for all partitions - latest offsets
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> latestOffsetSpecs = new HashMap<>();
+            for (var partition : description.partitions()) {
+                org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
+                latestOffsetSpecs.put(tp, OffsetSpec.latest());
+            }
+
+            // Launch both offset queries in parallel (don't wait yet!)
+            ListOffsetsResult earliestOffsetsResult = adminClient.listOffsets(earliestOffsetSpecs);
+            ListOffsetsResult latestOffsetsResult = adminClient.listOffsets(latestOffsetSpecs);
+
+            // Now wait for all three async operations to complete in parallel
+            // This is much faster than sequential waits!
+            Config config = describeConfigsResult.all().get().get(configResource);
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliestOffsets =
+                    earliestOffsetsResult.all().get();
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latestOffsets =
+                    latestOffsetsResult.all().get();
+
+            // Process configs
             Map<String, String> topicConfigs = config.entries().stream()
                     .collect(Collectors.toMap(
                             ConfigEntry::name,
                             ConfigEntry::value
                     ));
+
+            // Build partition info list
+            List<io.brokr.core.model.PartitionInfo> partitionsInfo = new ArrayList<>();
+            for (var partition : description.partitions()) {
+                org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
+                long earliestOffset = earliestOffsets.get(tp).offset();
+                long latestOffset = latestOffsets.get(tp).offset();
+                long size = latestOffset - earliestOffset;
+
+                partitionsInfo.add(io.brokr.core.model.PartitionInfo.builder()
+                        .id(partition.partition())
+                        .leader(partition.leader().id())
+                        .replicas(partition.replicas().stream().map(org.apache.kafka.common.Node::id).collect(Collectors.toList()))
+                        .isr(partition.isr().stream().map(org.apache.kafka.common.Node::id).collect(Collectors.toList()))
+                        .earliestOffset(earliestOffset)
+                        .latestOffset(latestOffset)
+                        .size(size)
+                        .build());
+            }
 
             return Topic.builder()
                     .name(topicName)
@@ -106,6 +153,7 @@ public class KafkaAdminService {
                     .replicationFactor(description.partitions().get(0).replicas().size())
                     .isInternal(description.isInternal())
                     .configs(topicConfigs)
+                    .partitionsInfo(partitionsInfo)
                     .build();
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get topic: {} for cluster: {}", topicName, cluster.getName(), e);
@@ -147,13 +195,13 @@ public class KafkaAdminService {
         try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
             DescribeClusterResult result = adminClient.describeCluster();
             return result.nodes().get().stream()
-                .map(node -> BrokerNode.builder()
-                    .id(node.id())
-                    .host(node.host())
-                    .port(node.port())
-                    .rack(node.rack())
-                    .build())
-                .collect(Collectors.toList());
+                    .map(node -> BrokerNode.builder()
+                            .id(node.id())
+                            .host(node.host())
+                            .port(node.port())
+                            .rack(node.rack())
+                            .build())
+                    .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to describe cluster: {}", cluster.getName(), e);
             throw new RuntimeException("Failed to describe cluster", e);
