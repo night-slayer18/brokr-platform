@@ -43,27 +43,10 @@ const errorLink = new ErrorLink(({error, operation}) => {
 
 export const apolloClient = new ApolloClient({
     link: from([errorLink, authLink, httpLink]),
-    cache: new InMemoryCache({
-        typePolicies: {
-            Topic: {
-                keyFields: ["name"],
-            },
-            KafkaCluster: {
-                keyFields: ["id"],
-            },
-            ConsumerGroup: {
-                keyFields: ["groupId"],
-            },
-        },
-    }),
+    cache: new InMemoryCache(),
     defaultOptions: {
         watchQuery: {
-            fetchPolicy: "cache-first", // Use cache first for faster loads
-            nextFetchPolicy: "cache-first",
-        },
-        query: {
-            fetchPolicy: "cache-first", // Prioritize cache for speed
-            errorPolicy: "all",
+            fetchPolicy: "cache-and-network",
         },
     },
 });

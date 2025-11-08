@@ -144,6 +144,7 @@ export interface TopicInput {
 export interface MessageInput {
     topic: string
     partitions?: number[]
+    offset?: number | string
     limit?: number
 }
 

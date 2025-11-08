@@ -1,5 +1,9 @@
 server:
   port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/graphql+json,text/html,text/xml,text/plain,application/javascript,text/css
+    min-response-size: 1024
 
 spring:
   application:
@@ -7,8 +11,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/brokr
-    username: postgres
-    password: password
+    username: nightslayer
+    password:
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,7 +26,7 @@ spring:
 
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    locations: classpath:db
 
   graphql:
     path: /graphql
@@ -30,11 +34,21 @@ spring:
       enabled: true
       path: /graphiql
 
+  # Cache configuration
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
+    cache-names:
+      - kafkaMessages
+
 jwt:
-  secret: bXlTZWNyZXRLZXlGb3JKV1RHZW5lcmF0aW9u
+  secret: YnJva3ItcGxhdGZvcm0tc2VjdXJlLWp3dC1zaWduaW5nLWtleS0yNTYtYml0cy1taW5pbXVtLXNlY3VyaXR5LXN0YW5kYXJk
   expiration: 86400
 
 logging:
   level:
     io.brokr: DEBUG
+    io.brokr.kafka.service.KafkaConsumerService: DEBUG
     org.springframework.graphql: DEBUG
+    org.apache.kafka: DEBUG

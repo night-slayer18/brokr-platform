@@ -9,13 +9,12 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {formatDate, formatRelativeTime} from '@/lib/formatters';
 import {formatNumber} from '@/lib/utils';
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Button} from "@/components/ui/button";
 import {Label} from "@/components/ui/label";
-import {Loader2} from "lucide-react";
+import {Loader2, RefreshCw} from "lucide-react";
 import {toast} from "sonner";
-import Editor from "@monaco-editor/react";
 import type {Message} from "@/types";
 import {
     Pagination,
@@ -26,13 +25,13 @@ import {
     PaginationPrevious
 } from "@/components/ui/pagination";
 
-const MESSAGES_PER_PAGE = 10;
 
 export default function TopicDetailPage() {
     const {clusterId, topicName} = useParams<{ clusterId: string; topicName: string }>();
-    const [selectedPartition, setSelectedPartition] = useState<string>('all');
+    const [selectedPartition, setSelectedPartition] = useState<string>('');
     const [messageLimit, setMessageLimit] = useState<string>('100');
     const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     const {data, loading, error} = useQuery<GetTopicQuery, GetTopicVariables>(GET_TOPIC, {
         variables: {clusterId: clusterId!, name: topicName!},
@@ -50,35 +49,59 @@ export default function TopicDetailPage() {
     const topic = data?.topic;
     const messages = messagesData?.messages || [];
 
-
     const handleFetchMessages = () => {
         if (!clusterId || !topicName) {
             toast.error("Cluster ID or Topic Name is missing.");
             return;
         }
 
-        const partitions = selectedPartition === 'all' || !selectedPartition
+        const partitions = selectedPartition === '' || selectedPartition === 'all'
             ? topic?.partitionsInfo?.map(p => p.id)
             : [parseInt(selectedPartition)];
 
+        // Force a fresh fetch by calling getMessages directly
         getMessages({
             variables: {
                 clusterId,
                 input: {
                     topic: topicName,
                     partitions: partitions,
+                    offset: 'latest',
                     limit: parseInt(messageLimit),
                 },
             },
         });
     };
 
+    // Automatically fetch messages when page loads and topic data is available
+    useEffect(() => {
+        if (topic && clusterId && topicName) {
+            const partitions = topic.partitionsInfo?.map(p => p.id);
+            getMessages({
+                variables: {
+                    clusterId,
+                    input: {
+                        topic: topicName,
+                        partitions: partitions,
+                        offset: 'latest',
+                        limit: 100,
+                    },
+                },
+            });
+        }
+    }, [topic?.name, clusterId, topicName]); // Run when topic is loaded
+
     const paginatedMessages = messages.slice(
-        (currentPage - 1) * MESSAGES_PER_PAGE,
-        currentPage * MESSAGES_PER_PAGE
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
     );
 
-    const totalPages = Math.ceil(messages.length / MESSAGES_PER_PAGE);
+    const totalPages = Math.ceil(messages.length / rowsPerPage);
+
+    const handleRowsPerPageChange = (value: string) => {
+        setRowsPerPage(parseInt(value));
+        setCurrentPage(1); // Reset to first page when changing rows per page
+    };
 
     if (!clusterId || !topicName) {
         return <div className="text-destructive">Cluster ID or Topic Name is missing.</div>;
@@ -250,22 +273,35 @@ export default function TopicDetailPage() {
                                 </div>
                                 <div className="flex-1 min-w-[150px]">
                                     <Label htmlFor="partitionFilter">Partition (Optional)</Label>
-                                    <Select value={selectedPartition || "all"}
-                                            onValueChange={(value) => setSelectedPartition(value === "all" ? "" : value)}>
+                                    <Select
+                                        value={selectedPartition === '' ? "all" : selectedPartition}
+                                        onValueChange={(value) => setSelectedPartition(value === "all" ? "" : value)}
+                                    >
                                         <SelectTrigger id="partitionFilter">
-                                            <SelectValue placeholder="All Partitions"/>
+                                            <SelectValue>
+                                                {selectedPartition === ''
+                                                    ? "All Partitions"
+                                                    : `Partition ${selectedPartition}`
+                                                }
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All Partitions</SelectItem>
                                             {topic.partitionsInfo?.map(p => (
-                                                <SelectItem key={p.id} value={String(p.id)}>{p.id}</SelectItem>
+                                                <SelectItem key={p.id} value={String(p.id)}>
+                                                    Partition {p.id}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <Button onClick={handleFetchMessages} disabled={messagesLoading}>
-                                    {messagesLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                    Fetch Messages
+                                    {messagesLoading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                    ) : (
+                                        <RefreshCw className="mr-2 h-4 w-4"/>
+                                    )}
+                                    Refresh
                                 </Button>
                             </div>
 
@@ -279,95 +315,141 @@ export default function TopicDetailPage() {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Partition</TableHead>
-                                                <TableHead>Offset</TableHead>
-                                                <TableHead>Timestamp</TableHead>
-                                                <TableHead>Key</TableHead>
+                                                <TableHead className="w-20">Partition</TableHead>
+                                                <TableHead className="w-24">Offset</TableHead>
+                                                <TableHead className="w-32">Timestamp</TableHead>
+                                                <TableHead className="w-48">Key</TableHead>
                                                 <TableHead>Value</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {paginatedMessages.map((message: Message, index: number) => (
                                                 <TableRow key={`${message.partition}-${message.offset}-${index}`}>
-                                                    <TableCell>{message.partition}</TableCell>
-                                                    <TableCell>{formatNumber(message.offset)}</TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="w-20">{message.partition}</TableCell>
+                                                    <TableCell
+                                                        className="w-24">{formatNumber(message.offset)}</TableCell>
+                                                    <TableCell className="w-32">
                                                         <span title={formatDate(message.timestamp)}>
                                                             {formatRelativeTime(message.timestamp)}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell>
-                                                        <Editor
-                                                            height="50px"
-                                                            language="json"
-                                                            value={message.key || ''}
-                                                            options={{
-                                                                readOnly: true,
-                                                                minimap: {enabled: false},
-                                                                wordWrap: "on",
-                                                                lineNumbers: "off",
-                                                                folding: false,
-                                                                scrollBeyondLastLine: false,
-                                                                overviewRulerLanes: 0,
-                                                                scrollbar: {vertical: "hidden", horizontal: "hidden"},
-                                                                padding: {top: 0, bottom: 0},
-                                                            }}
-                                                        />
+                                                    <TableCell className="w-48">
+                                                        <pre
+                                                            className="overflow-auto text-xs bg-muted p-2 rounded border max-h-20 whitespace-pre-wrap break-all">
+                                                            {message.key || '(null)'}
+                                                        </pre>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Editor
-                                                            height="50px"
-                                                            language="json"
-                                                            value={message.value || ''}
-                                                            options={{
-                                                                readOnly: true,
-                                                                minimap: {enabled: false},
-                                                                wordWrap: "on",
-                                                                lineNumbers: "off",
-                                                                folding: false,
-                                                                scrollBeyondLastLine: false,
-                                                                overviewRulerLanes: 0,
-                                                                scrollbar: {vertical: "hidden", horizontal: "hidden"},
-                                                                padding: {top: 0, bottom: 0},
-                                                            }}
-                                                        />
+                                                        <pre
+                                                            className="overflow-auto text-xs bg-muted p-2 rounded border max-h-20 whitespace-pre-wrap break-all">
+                                                            {message.value || '(null)'}
+                                                        </pre>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
-                                    <Pagination className="mt-4">
-                                        <PaginationContent>
-                                            <PaginationItem>
-                                                <PaginationPrevious
-                                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                                    disabled={currentPage === 1}
-                                                />
-                                            </PaginationItem>
-                                            {Array.from({length: totalPages}, (_, i) => (
-                                                <PaginationItem key={i}>
-                                                    <PaginationLink
-                                                        onClick={() => setCurrentPage(i + 1)}
-                                                        isActive={currentPage === i + 1}
-                                                    >
-                                                        {i + 1}
-                                                    </PaginationLink>
+                                    <div className="flex items-center justify-between mt-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="rowsPerPage" className="text-sm">Rows per page:</Label>
+                                                <Select value={String(rowsPerPage)}
+                                                        onValueChange={handleRowsPerPageChange}>
+                                                    <SelectTrigger id="rowsPerPage" className="w-20">
+                                                        <SelectValue/>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="10">10</SelectItem>
+                                                        <SelectItem value="25">25</SelectItem>
+                                                        <SelectItem value="50">50</SelectItem>
+                                                        <SelectItem value="100">100</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">
+                                                Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, messages.length)} of {messages.length} messages
+                                            </span>
+                                        </div>
+                                        <Pagination>
+                                            <PaginationContent>
+                                                <PaginationItem>
+                                                    <PaginationPrevious
+                                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                        disabled={currentPage === 1}
+                                                    />
                                                 </PaginationItem>
-                                            ))}
-                                            <PaginationItem>
-                                                <PaginationNext
-                                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                                    disabled={currentPage === totalPages}
-                                                />
-                                            </PaginationItem>
-                                        </PaginationContent>
-                                    </Pagination>
+
+                                                {/* Show first page */}
+                                                {totalPages > 0 && (
+                                                    <PaginationItem>
+                                                        <PaginationLink
+                                                            onClick={() => setCurrentPage(1)}
+                                                            isActive={currentPage === 1}
+                                                        >
+                                                            1
+                                                        </PaginationLink>
+                                                    </PaginationItem>
+                                                )}
+
+                                                {/* Show ellipsis if current page is far from start */}
+                                                {currentPage > 3 && totalPages > 5 && (
+                                                    <PaginationItem>
+                                                        <span className="px-4">...</span>
+                                                    </PaginationItem>
+                                                )}
+
+                                                {/* Show pages around current page */}
+                                                {Array.from({length: totalPages}, (_, i) => i + 1)
+                                                    .filter(page => {
+                                                        if (totalPages <= 5) return page > 1 && page < totalPages;
+                                                        return page > 1 && page < totalPages && Math.abs(page - currentPage) <= 1;
+                                                    })
+                                                    .map(page => (
+                                                        <PaginationItem key={page}>
+                                                            <PaginationLink
+                                                                onClick={() => setCurrentPage(page)}
+                                                                isActive={currentPage === page}
+                                                            >
+                                                                {page}
+                                                            </PaginationLink>
+                                                        </PaginationItem>
+                                                    ))
+                                                }
+
+                                                {/* Show ellipsis if current page is far from end */}
+                                                {currentPage < totalPages - 2 && totalPages > 5 && (
+                                                    <PaginationItem>
+                                                        <span className="px-4">...</span>
+                                                    </PaginationItem>
+                                                )}
+
+                                                {/* Show last page */}
+                                                {totalPages > 1 && (
+                                                    <PaginationItem>
+                                                        <PaginationLink
+                                                            onClick={() => setCurrentPage(totalPages)}
+                                                            isActive={currentPage === totalPages}
+                                                        >
+                                                            {totalPages}
+                                                        </PaginationLink>
+                                                    </PaginationItem>
+                                                )}
+
+                                                <PaginationItem>
+                                                    <PaginationNext
+                                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                        disabled={currentPage === totalPages}
+                                                    />
+                                                </PaginationItem>
+                                            </PaginationContent>
+                                        </Pagination>
+                                    </div>
                                 </>
                             )}
                             {messages.length === 0 && !messagesLoading && (
-                                <p className="text-muted-foreground">No messages fetched yet. Use the controls above to
-                                    fetch
-                                    messages.</p>
+                                <p className="text-muted-foreground text-center py-8">
+                                    No messages found in this topic. Messages will appear here as they are produced.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
@@ -379,45 +461,49 @@ export default function TopicDetailPage() {
                             <CardTitle>Configuration</CardTitle>
                             <CardDescription>Topic-level configurations in table and JSON format.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent>
                             {topic.configs && Object.keys(topic.configs).length > 0 ? (
-                                <>
-                                    <div>
-                                        <h3 className="text-sm font-semibold mb-3">Table View</h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Configuration Key</TableHead>
-                                                    <TableHead>Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {Object.entries(topic.configs).map(([key, value]) => (
-                                                    <TableRow key={key}>
-                                                        <TableCell className="font-medium">{key}</TableCell>
-                                                        <TableCell
-                                                            className="font-mono text-sm">{String(value)}</TableCell>
+                                <Tabs defaultValue="table" className="space-y-4">
+                                    <TabsList>
+                                        <TabsTrigger value="table">Table View</TabsTrigger>
+                                        <TabsTrigger value="json">JSON View</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="table">
+                                        <div className="border rounded-lg overflow-auto max-h-[600px]">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="w-1/3">Property</TableHead>
+                                                        <TableHead>Value</TableHead>
                                                     </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold mb-3">JSON View</h3>
-                                        <Editor
-                                            height="400px"
-                                            language="json"
-                                            value={JSON.stringify(topic.configs, null, 2)}
-                                            options={{
-                                                readOnly: true,
-                                                minimap: {enabled: false},
-                                                wordWrap: "on",
-                                                lineNumbers: "on",
-                                                scrollBeyondLastLine: false,
-                                            }}
-                                        />
-                                    </div>
-                                </>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {Object.entries(topic.configs).map(([key, value]) => (
+                                                        <TableRow key={key}>
+                                                            <TableCell
+                                                                className="font-mono text-sm font-medium">{key}</TableCell>
+                                                            <TableCell>
+                                                                <pre
+                                                                    className="font-mono text-xs bg-muted p-2 rounded border overflow-auto">
+                                                                    {JSON.stringify(value, null, 2)}
+                                                                </pre>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="json">
+                                        <div className="border rounded-lg overflow-auto max-h-[600px] bg-muted/30">
+                                            <pre className="p-4 font-mono text-sm">
+                                                {JSON.stringify(topic.configs, null, 2)}
+                                            </pre>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
                             ) : (
                                 <p className="text-muted-foreground text-center py-4">
                                     No configuration settings available

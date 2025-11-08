@@ -8,6 +8,6 @@ import java.util.List;
 public class MessageInput {
     private String topic;
     private List<Integer> partitions;
-    private Long offset;
+    private String offset; // Can be "latest", "earliest", or a numeric offset
     private Integer limit;
 }

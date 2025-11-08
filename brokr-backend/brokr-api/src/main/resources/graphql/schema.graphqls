@@ -335,7 +335,7 @@ input LoginInput {
 input MessageInput {
     topic: String!
     partitions: [Int!]
-    offset: Long
+    offset: String
     limit: Int!
 }
 
