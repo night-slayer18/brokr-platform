@@ -20,6 +20,16 @@ import {useState} from "react";
 import {useAuth} from "@/hooks/useAuth";
 import {GET_CLUSTERS, GET_ORGANIZATIONS} from "@/graphql/queries";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ClusterCardProps {
     cluster: KafkaCluster
@@ -107,6 +117,7 @@ export default function ClustersPage() {
 
     // For SUPER_ADMIN, this will be null until they select an org. For ADMIN, it's set from their user profile.
     const [selectedOrgId, setSelectedOrgId] = useState<string | null>(isSuperAdmin ? null : user?.organizationId || null);
+    const [clusterToDelete, setClusterToDelete] = useState<string | null>(null);
 
     const {
         data: organizationsData,
@@ -126,16 +137,22 @@ export default function ClustersPage() {
     const [deleteCluster] = useMutation<DeleteClusterMutation, DeleteClusterMutationVariables>(DELETE_CLUSTER_MUTATION);
     const [testConnection] = useMutation<TestClusterConnectionMutation, TestClusterConnectionMutationVariables>(TEST_CLUSTER_CONNECTION_MUTATION);
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this cluster?')) return;
+    const handleDeleteClick = (id: string) => {
+        setClusterToDelete(id);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!clusterToDelete) return;
 
         try {
-            await deleteCluster({variables: {id}});
+            await deleteCluster({variables: {id: clusterToDelete}});
             toast.success('Cluster deleted successfully');
             refetch();
         } catch (error: unknown) {
             const err = error instanceof Error ? error : {message: 'Failed to delete cluster'}
             toast.error(err.message || 'Failed to delete cluster');
+        } finally {
+            setClusterToDelete(null);
         }
     };
 
@@ -242,7 +259,7 @@ export default function ClustersPage() {
                                 <ClusterCard
                                     key={cluster.id}
                                     cluster={cluster}
-                                    onDelete={handleDelete}
+                                    onDelete={handleDeleteClick}
                                     onTest={handleTest}
                                     canManage={canManageClusters()}
                                 />
@@ -251,6 +268,40 @@ export default function ClustersPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!clusterToDelete} onOpenChange={(open) => !open && setClusterToDelete(null)}>
+                <AlertDialogContent className="sm:max-w-[500px]">
+                    <AlertDialogHeader className="space-y-5 text-center sm:text-center">
+                        <div className="flex justify-center">
+                            <div
+                                className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 ring-8 ring-destructive/20">
+                                <Trash2 className="h-8 w-8 text-destructive"/>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <AlertDialogTitle className="text-2xl font-bold">Delete Cluster</AlertDialogTitle>
+                            <AlertDialogDescription className="text-base leading-relaxed px-6">
+                                Are you sure you want to delete this cluster? This action <span
+                                className="font-semibold text-destructive">cannot be undone</span>.
+                                <br/>
+                                <br/>
+                                All associated data and configurations will be permanently removed from the system.
+                            </AlertDialogDescription>
+                        </div>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-3 sm:gap-3 flex-col sm:flex-row">
+                        <AlertDialogCancel className="w-full sm:flex-1">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="w-full sm:flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/50"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4"/>
+                            Delete Cluster
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

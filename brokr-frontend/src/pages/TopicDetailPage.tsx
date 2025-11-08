@@ -13,7 +13,7 @@ import {useEffect, useState} from "react";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Button} from "@/components/ui/button";
 import {Label} from "@/components/ui/label";
-import {Loader2, RefreshCw} from "lucide-react";
+import {Eye, Loader2, RefreshCw} from "lucide-react";
 import {toast} from "sonner";
 import type {Message} from "@/types";
 import {
@@ -24,6 +24,7 @@ import {
     PaginationNext,
     PaginationPrevious
 } from "@/components/ui/pagination";
+import {MessageDetailPanel} from "@/components/topics/MessageDetailPanel";
 
 
 export default function TopicDetailPage() {
@@ -32,6 +33,8 @@ export default function TopicDetailPage() {
     const [messageLimit, setMessageLimit] = useState<string>('100');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+    const [isMessageDetailOpen, setIsMessageDetailOpen] = useState(false);
 
     const {data, loading, error} = useQuery<GetTopicQuery, GetTopicVariables>(GET_TOPIC, {
         variables: {clusterId: clusterId!, name: topicName!},
@@ -101,6 +104,11 @@ export default function TopicDetailPage() {
     const handleRowsPerPageChange = (value: string) => {
         setRowsPerPage(parseInt(value));
         setCurrentPage(1); // Reset to first page when changing rows per page
+    };
+
+    const handleMessageClick = (message: Message) => {
+        setSelectedMessage(message);
+        setIsMessageDetailOpen(true);
     };
 
     if (!clusterId || !topicName) {
@@ -256,9 +264,10 @@ export default function TopicDetailPage() {
                             <CardDescription>Fetch and view messages from this topic.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-wrap items-end gap-4 mb-4">
-                                <div className="flex-1 min-w-[150px]">
-                                    <Label htmlFor="messageLimit">Number of Messages</Label>
+                            <div className="flex flex-wrap items-end gap-4 mb-6">
+                                <div className="flex-1 min-w-[200px] space-y-2">
+                                    <Label htmlFor="messageLimit" className="text-sm font-medium">Number of
+                                        Messages</Label>
                                     <Select value={messageLimit} onValueChange={setMessageLimit}>
                                         <SelectTrigger id="messageLimit">
                                             <SelectValue placeholder="Select limit"/>
@@ -271,8 +280,9 @@ export default function TopicDetailPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="flex-1 min-w-[150px]">
-                                    <Label htmlFor="partitionFilter">Partition (Optional)</Label>
+                                <div className="flex-1 min-w-[200px] space-y-2">
+                                    <Label htmlFor="partitionFilter" className="text-sm font-medium">Partition
+                                        (Optional)</Label>
                                     <Select
                                         value={selectedPartition === '' ? "all" : selectedPartition}
                                         onValueChange={(value) => setSelectedPartition(value === "all" ? "" : value)}
@@ -295,7 +305,7 @@ export default function TopicDetailPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <Button onClick={handleFetchMessages} disabled={messagesLoading}>
+                                <Button onClick={handleFetchMessages} disabled={messagesLoading} className="mb-0.5">
                                     {messagesLoading ? (
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
                                     ) : (
@@ -320,33 +330,71 @@ export default function TopicDetailPage() {
                                                 <TableHead className="w-32">Timestamp</TableHead>
                                                 <TableHead className="w-48">Key</TableHead>
                                                 <TableHead>Value</TableHead>
+                                                <TableHead className="w-20">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {paginatedMessages.map((message: Message, index: number) => (
-                                                <TableRow key={`${message.partition}-${message.offset}-${index}`}>
-                                                    <TableCell className="w-20">{message.partition}</TableCell>
-                                                    <TableCell
-                                                        className="w-24">{formatNumber(message.offset)}</TableCell>
-                                                    <TableCell className="w-32">
-                                                        <span title={formatDate(message.timestamp)}>
-                                                            {formatRelativeTime(message.timestamp)}
+                                            {paginatedMessages.map((message: Message, index: number) => {
+                                                const truncateText = (text: string | null | undefined, maxLength: number = 50) => {
+                                                    if (!text) return <span
+                                                        className="text-muted-foreground italic">null</span>;
+                                                    if (text.length <= maxLength) return text;
+                                                    return (
+                                                        <span>
+                                                            {text.substring(0, maxLength)}
+                                                            <span className="text-muted-foreground">...</span>
                                                         </span>
-                                                    </TableCell>
-                                                    <TableCell className="w-48">
-                                                        <pre
-                                                            className="overflow-auto text-xs bg-muted p-2 rounded border max-h-20 whitespace-pre-wrap break-all">
-                                                            {message.key || '(null)'}
-                                                        </pre>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <pre
-                                                            className="overflow-auto text-xs bg-muted p-2 rounded border max-h-20 whitespace-pre-wrap break-all">
-                                                            {message.value || '(null)'}
-                                                        </pre>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                    );
+                                                };
+
+                                                return (
+                                                    <TableRow
+                                                        key={`${message.partition}-${message.offset}-${index}`}
+                                                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                                        onClick={() => handleMessageClick(message)}
+                                                    >
+                                                        <TableCell
+                                                            className="w-20 font-mono">{message.partition}</TableCell>
+                                                        <TableCell
+                                                            className="w-24 font-mono">{formatNumber(message.offset)}</TableCell>
+                                                        <TableCell className="w-32">
+                                                            <span title={formatDate(message.timestamp)}
+                                                                  className="text-sm">
+                                                                {formatRelativeTime(message.timestamp)}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="w-48">
+                                                            <div className="flex items-center gap-2">
+                                                                <code
+                                                                    className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
+                                                                    {truncateText(message.key, 40)}
+                                                                </code>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <code
+                                                                    className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
+                                                                    {truncateText(message.value, 75)}
+                                                                </code>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="w-20">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="opacity-60 hover:opacity-100"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleMessageClick(message);
+                                                                }}
+                                                            >
+                                                                <Eye className="h-4 w-4"/>
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                     <div className="flex items-center justify-between mt-4">
@@ -513,6 +561,13 @@ export default function TopicDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Message Detail Panel */}
+            <MessageDetailPanel
+                message={selectedMessage}
+                isOpen={isMessageDetailOpen}
+                onOpenChange={setIsMessageDetailOpen}
+            />
         </div>
     );
 }
