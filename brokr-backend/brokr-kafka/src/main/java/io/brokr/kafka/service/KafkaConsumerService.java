@@ -25,13 +25,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class KafkaConsumerService {
 
-    private static final int FETCH_MIN_BYTES = 1;
-    private static final int FETCH_MAX_WAIT_MS = 500;
-    private static final int DEFAULT_MAX_POLL_RECORDS = 500;
+    private static final int FETCH_MIN_BYTES = 1024;
+    private static final int FETCH_MAX_WAIT_MS = 100;
+    private static final int DEFAULT_MAX_POLL_RECORDS = 5000;
     private static final int SESSION_TIMEOUT_MS = 10000;
     private static final int HEARTBEAT_INTERVAL_MS = 3000;
     private static final int MAX_EMPTY_POLLS = 3;
-    private static final long POLL_TIMEOUT_MS = 1000;
+    private static final long POLL_TIMEOUT_MS = 500;
 
     public List<Message> consumeMessages(KafkaCluster cluster, String topic, List<Integer> partitions, String offset, Integer limit) {
         long startTime = System.currentTimeMillis();
@@ -85,16 +85,20 @@ public class KafkaConsumerService {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
-        // Performance optimizations
+        // Performance optimizations - CRITICAL for pagination performance
         props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, String.valueOf(FETCH_MIN_BYTES));
         props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, String.valueOf(FETCH_MAX_WAIT_MS));
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(Math.max(limit, DEFAULT_MAX_POLL_RECORDS)));
+
+        // Dynamic max poll records based on user's limit
+        int maxPollRecords = Math.max(limit, DEFAULT_MAX_POLL_RECORDS);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(maxPollRecords));
+
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, String.valueOf(SESSION_TIMEOUT_MS));
         props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, String.valueOf(HEARTBEAT_INTERVAL_MS));
 
-        // Additional performance tuning
-        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, String.valueOf(52428800)); // 50MB
-        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, String.valueOf(1048576)); // 1MB
+        // Buffer sizes - optimized for monitoring platform with variable message sizes
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, String.valueOf(52428800)); // 50MB - unchanged
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, String.valueOf(2097152)); // 2MB - handle larger messages
         props.put(ConsumerConfig.CHECK_CRCS_CONFIG, "false"); // Skip CRC checks for speed
 
         // Apply security configuration
@@ -102,6 +106,7 @@ public class KafkaConsumerService {
 
         return props;
     }
+
 
     private void applySecurityConfiguration(Properties props, KafkaCluster cluster) {
         if (cluster.getSecurityProtocol() == null) {
