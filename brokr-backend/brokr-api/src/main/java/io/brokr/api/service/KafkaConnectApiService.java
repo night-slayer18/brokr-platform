@@ -56,7 +56,7 @@ public class KafkaConnectApiService {
                 .isActive(input.isActive())
                 .build();
 
-        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect);
+        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect).join();
         if (!isReachable) {
             throw new ValidationException("Failed to connect to Kafka Connect. Please check the URL and credentials.");
         }
@@ -77,7 +77,7 @@ public class KafkaConnectApiService {
         entity.setActive(input.isActive());
 
         KafkaConnect kafkaConnect = entity.toDomain();
-        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect);
+        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect).join();
         kafkaConnect.setReachable(isReachable);
 
         return kafkaConnectRepository.save(KafkaConnectEntity.fromDomain(kafkaConnect)).toDomain();
@@ -96,7 +96,7 @@ public class KafkaConnectApiService {
                 .orElseThrow(() -> new ResourceNotFoundException("Kafka Connect not found"));
 
         KafkaConnect kafkaConnect = entity.toDomain();
-        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect);
+        boolean isReachable = kafkaConnectService.testConnection(kafkaConnect).join();
 
         entity.setReachable(isReachable);
         entity.setLastConnectionCheck(System.currentTimeMillis());

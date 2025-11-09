@@ -15,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -25,126 +26,125 @@ public class KafkaConnectService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    public boolean testConnection(KafkaConnect kafkaConnect) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(kafkaConnect.getUrl() + "/connectors"))
-                    .timeout(Duration.ofSeconds(5))
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
+    /**
+     * Tests connection to Kafka Connect asynchronously.
+     * @return CompletableFuture that completes with true if connection is successful
+     */
+    public CompletableFuture<Boolean> testConnection(KafkaConnect kafkaConnect) {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(kafkaConnect.getUrl() + "/connectors"))
+                .timeout(Duration.ofSeconds(5))
+                .header("Accept", "application/json")
+                .GET();
 
-            // Add authentication if needed
-            if (kafkaConnect.getUsername() != null && kafkaConnect.getPassword() != null) {
-                String auth = kafkaConnect.getUsername() + ":" + kafkaConnect.getPassword();
-                String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
-                request = HttpRequest.newBuilder()
-                        .uri(URI.create(kafkaConnect.getUrl() + "/connectors"))
-                        .timeout(Duration.ofSeconds(5))
-                        .header("Accept", "application/json")
-                        .header("Authorization", "Basic " + encodedAuth)
-                        .GET()
-                        .build();
-            }
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.statusCode() == 200;
-        } catch (Exception e) {
-            log.error("Failed to connect to Kafka Connect: {}", kafkaConnect.getUrl(), e);
-            return false;
+        // Add authentication if needed
+        if (kafkaConnect.getUsername() != null && kafkaConnect.getPassword() != null) {
+            String auth = kafkaConnect.getUsername() + ":" + kafkaConnect.getPassword();
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+            requestBuilder.header("Authorization", "Basic " + encodedAuth);
         }
+
+        HttpRequest request = requestBuilder.build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> response.statusCode() == 200)
+                .exceptionally(e -> {
+                    log.error("Failed to connect to Kafka Connect: {}", kafkaConnect.getUrl(), e);
+                    return false;
+                });
     }
 
-    public List<Connector> getConnectors(KafkaConnect kafkaConnect) {
-        try {
-            // FIX: Use ?expand=status and ?expand=info to get all data in one call
-            String url = kafkaConnect.getUrl() + "/connectors?expand=status&expand=info";
+    /**
+     * Gets connectors from Kafka Connect asynchronously.
+     * @return CompletableFuture that completes with list of connectors
+     */
+    public CompletableFuture<List<Connector>> getConnectors(KafkaConnect kafkaConnect) {
+        // FIX: Use ?expand=status and ?expand=info to get all data in one call
+        String url = kafkaConnect.getUrl() + "/connectors?expand=status&expand=info";
 
-            HttpRequest connectorsRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .header("Accept", "application/json")
+                .GET();
 
-            // Add authentication if needed
-            if (kafkaConnect.getUsername() != null && kafkaConnect.getPassword() != null) {
-                String auth = kafkaConnect.getUsername() + ":" + kafkaConnect.getPassword();
-                String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
-                connectorsRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(Duration.ofSeconds(10))
-                        .header("Accept", "application/json")
-                        .header("Authorization", "Basic " + encodedAuth)
-                        .GET()
-                        .build();
-            }
-
-            HttpResponse<String> connectorsResponse = httpClient.send(connectorsRequest, HttpResponse.BodyHandlers.ofString());
-            if (connectorsResponse.statusCode() != 200) {
-                log.error("Failed to get connectors from {}. Status: {}", kafkaConnect.getUrl(), connectorsResponse.statusCode());
-                return List.of();
-            }
-
-            JsonNode connectorsJson = objectMapper.readTree(connectorsResponse.body());
-            List<Connector> connectors = new ArrayList<>();
-
-            Iterator<Map.Entry<String, JsonNode>> fields = connectorsJson.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> entry = fields.next();
-                String connectorName = entry.getKey();
-                JsonNode details = entry.getValue();
-
-                JsonNode infoNode = details.get("info");
-                JsonNode statusNode = details.get("status");
-
-                if (infoNode == null || statusNode == null) {
-                    log.warn("Connector {} missing info or status block in expanded response", connectorName);
-                    continue;
-                }
-
-                // Get Config
-                JsonNode configNode = infoNode.get("config");
-                String config = configNode != null ? configNode.toString() : "{}";
-                String type = configNode != null && configNode.has("connector.class") ? configNode.get("connector.class").asText() : "unknown";
-
-                // Get State
-                JsonNode connectorStatus = statusNode.get("connector");
-                String stateString = connectorStatus != null && connectorStatus.has("state") ? connectorStatus.get("state").asText() : "UNASSIGNED";
-                ConnectorState state = ConnectorState.valueOf(stateString);
-
-                // Get Tasks
-                List<Task> tasks = new ArrayList<>();
-                JsonNode tasksJson = statusNode.get("tasks");
-                if (tasksJson != null && tasksJson.isArray()) {
-                    for (JsonNode taskNode : tasksJson) {
-                        int taskId = taskNode.get("id").asInt();
-                        String taskState = taskNode.get("state").asText();
-                        String workerId = taskNode.get("worker_id").asText();
-                        String trace = taskNode.has("trace") ? taskNode.get("trace").asText() : null;
-
-                        tasks.add(Task.builder()
-                                .id(taskId)
-                                .state(taskState)
-                                .workerId(workerId)
-                                .trace(trace)
-                                .build());
-                    }
-                }
-
-                connectors.add(Connector.builder()
-                        .name(connectorName)
-                        .type(type)
-                        .state(state)
-                        .config(config)
-                        .tasks(tasks)
-                        .build());
-            }
-
-            return connectors;
-        } catch (Exception e) {
-            log.error("Failed to get connectors from Kafka Connect: {}", kafkaConnect.getUrl(), e);
-            return List.of();
+        // Add authentication if needed
+        if (kafkaConnect.getUsername() != null && kafkaConnect.getPassword() != null) {
+            String auth = kafkaConnect.getUsername() + ":" + kafkaConnect.getPassword();
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+            requestBuilder.header("Authorization", "Basic " + encodedAuth);
         }
+
+        HttpRequest connectorsRequest = requestBuilder.build();
+
+        return httpClient.sendAsync(connectorsRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(connectorsResponse -> {
+                    try {
+                        if (connectorsResponse.statusCode() != 200) {
+                            log.error("Failed to get connectors from {}. Status: {}", kafkaConnect.getUrl(), connectorsResponse.statusCode());
+                            return List.<Connector>of();
+                        }
+
+                        JsonNode connectorsJson = objectMapper.readTree(connectorsResponse.body());
+                        List<Connector> connectors = new ArrayList<>();
+
+                        Iterator<Map.Entry<String, JsonNode>> fields = connectorsJson.fields();
+                        while (fields.hasNext()) {
+                            Map.Entry<String, JsonNode> entry = fields.next();
+                            String connectorName = entry.getKey();
+                            JsonNode details = entry.getValue();
+
+                            JsonNode infoNode = details.get("info");
+                            JsonNode statusNode = details.get("status");
+
+                            if (infoNode == null || statusNode == null) {
+                                log.warn("Connector {} missing info or status block in expanded response", connectorName);
+                                continue;
+                            }
+
+                            // Get Config
+                            JsonNode configNode = infoNode.get("config");
+                            String config = configNode != null ? configNode.toString() : "{}";
+                            String type = configNode != null && configNode.has("connector.class") ? configNode.get("connector.class").asText() : "unknown";
+
+                            // Get State
+                            JsonNode connectorStatus = statusNode.get("connector");
+                            String stateString = connectorStatus != null && connectorStatus.has("state") ? connectorStatus.get("state").asText() : "UNASSIGNED";
+                            ConnectorState state = ConnectorState.valueOf(stateString);
+
+                            // Get Tasks
+                            List<Task> tasks = new ArrayList<>();
+                            JsonNode tasksJson = statusNode.get("tasks");
+                            if (tasksJson != null && tasksJson.isArray()) {
+                                for (JsonNode taskNode : tasksJson) {
+                                    int taskId = taskNode.get("id").asInt();
+                                    String taskState = taskNode.get("state").asText();
+                                    String workerId = taskNode.get("worker_id").asText();
+                                    String trace = taskNode.has("trace") ? taskNode.get("trace").asText() : null;
+
+                                    tasks.add(Task.builder()
+                                            .id(taskId)
+                                            .state(taskState)
+                                            .workerId(workerId)
+                                            .trace(trace)
+                                            .build());
+                                }
+                            }
+
+                            connectors.add(Connector.builder()
+                                    .name(connectorName)
+                                    .type(type)
+                                    .state(state)
+                                    .config(config)
+                                    .tasks(tasks)
+                                    .build());
+                        }
+
+                        return connectors;
+                    } catch (Exception e) {
+                        log.error("Failed to get connectors from Kafka Connect: {}", kafkaConnect.getUrl(), e);
+                        return List.<Connector>of();
+                    }
+                });
     }
 }

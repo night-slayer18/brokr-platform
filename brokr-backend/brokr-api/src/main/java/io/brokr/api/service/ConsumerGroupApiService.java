@@ -30,9 +30,16 @@ public class ConsumerGroupApiService {
         KafkaCluster cluster = getCluster(clusterId);
         List<ConsumerGroup> groups = kafkaAdminService.listConsumerGroups(cluster);
 
-        // Add topic offsets to each group
+        // Batch fetch offsets for all groups at once (much more efficient than N+1 calls)
+        List<String> groupIds = groups.stream()
+                .map(ConsumerGroup::getGroupId)
+                .collect(java.util.stream.Collectors.toList());
+
+        Map<String, Map<String, Long>> allOffsets = kafkaAdminService.getConsumerGroupOffsetsBatch(cluster, groupIds);
+
+        // Set topic offsets for each group from the batch result
         groups.forEach(group -> {
-            Map<String, Long> topicOffsets = kafkaAdminService.getConsumerGroupOffsets(cluster, group.getGroupId());
+            Map<String, Long> topicOffsets = allOffsets.getOrDefault(group.getGroupId(), new java.util.HashMap<>());
             group.setTopicOffsets(topicOffsets);
         });
 

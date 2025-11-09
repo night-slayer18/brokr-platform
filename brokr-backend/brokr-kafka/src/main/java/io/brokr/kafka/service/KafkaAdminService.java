@@ -9,6 +9,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -308,6 +309,10 @@ public class KafkaAdminService {
         }
     }
 
+    /**
+     * Gets consumer group offsets for a single group.
+     * For multiple groups, use getConsumerGroupOffsetsBatch for better performance.
+     */
     public Map<String, Long> getConsumerGroupOffsets(KafkaCluster cluster, String groupId) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -343,6 +348,94 @@ public class KafkaAdminService {
             log.error("Failed to get consumer group offsets: {} for cluster: {}", groupId, cluster.getName(), e);
             kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to get consumer group offsets", e);
+        }
+    }
+
+    /**
+     * Batch method to get offsets for multiple consumer groups efficiently.
+     * This reduces network calls by batching the listOffsets call for all partitions.
+     *
+     * @param cluster The Kafka cluster
+     * @param groupIds List of consumer group IDs
+     * @return Map of groupId -> topic -> lag
+     */
+    public Map<String, Map<String, Long>> getConsumerGroupOffsetsBatch(KafkaCluster cluster, List<String> groupIds) {
+        if (groupIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+
+            // Step 1: Get offsets for all groups in parallel
+            @SuppressWarnings("unchecked")
+            List<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>> groupOffsetFutures =
+                    groupIds.stream()
+                            .<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>>map(groupId -> 
+                                CompletableFuture.supplyAsync(() -> {
+                                    try {
+                                        ListConsumerGroupOffsetsResult offsetsResult = adminClient.listConsumerGroupOffsets(groupId);
+                                        Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsets =
+                                                offsetsResult.partitionsToOffsetAndMetadata().get();
+                                        return Map.entry(groupId, offsets);
+                                    } catch (InterruptedException | ExecutionException e) {
+                                        log.warn("Failed to get offsets for group {}: {}", groupId, e.getMessage());
+                                        return Map.entry(groupId, new HashMap<>());
+                                    }
+                                }))
+                            .collect(Collectors.toList());
+
+            // Wait for all group offset requests to complete
+            CompletableFuture<List<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>> allGroupOffsetsFuture =
+                    CompletableFuture.allOf(groupOffsetFutures.toArray(new CompletableFuture[0]))
+                            .thenApply(v -> groupOffsetFutures.stream()
+                                    .map(CompletableFuture::join)
+                                    .collect(Collectors.toList()));
+
+            List<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>> allGroupOffsets =
+                    allGroupOffsetsFuture.get();
+
+            // Step 2: Collect all unique topic partitions from all groups
+            Set<org.apache.kafka.common.TopicPartition> allTopicPartitions = new HashSet<>();
+            for (Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>> entry : allGroupOffsets) {
+                allTopicPartitions.addAll(entry.getValue().keySet());
+            }
+
+            // Step 3: Get end offsets for ALL partitions in ONE batch call
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> latestOffsetSpecs = new HashMap<>();
+            for (org.apache.kafka.common.TopicPartition tp : allTopicPartitions) {
+                latestOffsetSpecs.put(tp, OffsetSpec.latest());
+            }
+
+            ListOffsetsResult latestOffsetsResult = adminClient.listOffsets(latestOffsetSpecs);
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latestOffsets =
+                    latestOffsetsResult.all().get();
+
+            // Step 4: Calculate lag for each group
+            Map<String, Map<String, Long>> result = new HashMap<>();
+            for (Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>> groupEntry : allGroupOffsets) {
+                String groupId = groupEntry.getKey();
+                Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsets = groupEntry.getValue();
+
+                Map<String, Long> lagByTopic = new HashMap<>();
+                for (Map.Entry<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsetEntry : offsets.entrySet()) {
+                    org.apache.kafka.common.TopicPartition tp = offsetEntry.getKey();
+                    long currentOffset = offsetEntry.getValue().offset();
+                    ListOffsetsResult.ListOffsetsResultInfo latestInfo = latestOffsets.get(tp);
+                    if (latestInfo != null) {
+                        long endOffset = latestInfo.offset();
+                        long lag = endOffset - currentOffset;
+                        lagByTopic.merge(tp.topic(), lag, Long::sum);
+                    }
+                }
+                result.put(groupId, lagByTopic);
+            }
+
+            return result;
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get consumer group offsets batch for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            throw new RuntimeException("Failed to get consumer group offsets batch", e);
         }
     }
 
