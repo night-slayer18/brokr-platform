@@ -1,6 +1,7 @@
 import {useLazyQuery, useQuery} from '@apollo/client/react';
 import {useParams} from 'react-router-dom';
 import {GET_MESSAGES, GET_TOPIC} from '@/graphql/queries';
+import {apolloClient} from '@/lib/apollo-client';
 import type {GetMessagesQuery, GetMessagesVariables, GetTopicQuery, GetTopicVariables} from '@/graphql/types';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
@@ -52,7 +53,7 @@ export default function TopicDetailPage() {
     const topic = data?.topic;
     const messages = messagesData?.messages || [];
 
-    const handleFetchMessages = () => {
+    const handleFetchMessages = async () => {
         if (!clusterId || !topicName) {
             toast.error("Cluster ID or Topic Name is missing.");
             return;
@@ -62,18 +63,66 @@ export default function TopicDetailPage() {
             ? topic?.partitionsInfo?.map(p => p.id)
             : [parseInt(selectedPartition)];
 
-        // Force a fresh fetch by calling getMessages directly
-        getMessages({
-            variables: {
-                clusterId,
-                input: {
-                    topic: topicName,
-                    partitions: partitions,
-                    offset: 'latest',
-                    limit: parseInt(messageLimit),
-                },
+        const variables = {
+            clusterId,
+            input: {
+                topic: topicName,
+                partitions: partitions,
+                offset: 'latest' as const,
+                limit: parseInt(messageLimit),
             },
-        });
+        };
+
+        // Force a fresh fetch by using network-only policy (bypasses cache completely)
+        const startTime = performance.now();
+        try {
+            // First, evict the old cache entry to ensure we get fresh data
+            apolloClient.cache.evict({ 
+                id: 'ROOT_QUERY',
+                fieldName: 'messages',
+                args: variables,
+            });
+            apolloClient.cache.gc(); // Garbage collect evicted entries
+            
+            // Fetch fresh data from network (bypasses cache)
+            const result = await apolloClient.query<GetMessagesQuery, GetMessagesVariables>({
+                query: GET_MESSAGES,
+                variables,
+                fetchPolicy: 'network-only', // Always fetch fresh data, bypass cache
+            });
+            
+            // Write the fresh result to cache
+            if (result.data) {
+                apolloClient.writeQuery<GetMessagesQuery, GetMessagesVariables>({
+                    query: GET_MESSAGES,
+                    variables,
+                    data: result.data,
+                });
+            }
+            
+            // Trigger the lazy query to read from the updated cache
+            // This will now show the fresh data we just fetched
+            getMessages({ variables });
+            
+            // Reset to first page when new messages are fetched
+            setCurrentPage(1);
+            
+            // Calculate fetch duration and show success toast
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            const messageCount = result.data?.messages?.length || 0;
+            toast.success(
+                `Fetched ${messageCount} message${messageCount !== 1 ? 's' : ''} in ${duration}s`,
+                {
+                    duration: 3000,
+                }
+            );
+        } catch (error) {
+            console.error('Failed to fetch messages:', error);
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            toast.error(`Failed to fetch messages after ${duration}s`);
+        }
     };
 
     // Automatically fetch messages when page loads and topic data is available
@@ -92,7 +141,15 @@ export default function TopicDetailPage() {
                 },
             });
         }
-    }, [topic?.name, clusterId, topicName]); // Run when topic is loaded
+    }, [topic, clusterId, topicName, getMessages]); // Run when topic is loaded
+
+    // Reset to first page if current page is out of bounds
+    useEffect(() => {
+        const totalPages = Math.ceil(messages.length / rowsPerPage);
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(1);
+        }
+    }, [messages.length, rowsPerPage, currentPage]);
 
     const paginatedMessages = messages.slice(
         (currentPage - 1) * rowsPerPage,
@@ -268,7 +325,10 @@ export default function TopicDetailPage() {
                                 <div className="flex-1 min-w-[200px] space-y-2">
                                     <Label htmlFor="messageLimit" className="text-sm font-medium">Number of
                                         Messages</Label>
-                                    <Select value={messageLimit} onValueChange={setMessageLimit}>
+                                    <Select value={messageLimit} onValueChange={(value) => {
+                                        setMessageLimit(value);
+                                        setCurrentPage(1); // Reset to first page when limit changes
+                                    }}>
                                         <SelectTrigger id="messageLimit">
                                             <SelectValue placeholder="Select limit"/>
                                         </SelectTrigger>
@@ -415,7 +475,11 @@ export default function TopicDetailPage() {
                                                 </Select>
                                             </div>
                                             <span className="text-sm text-muted-foreground">
-                                                Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, messages.length)} of {messages.length} messages
+                                                {messages.length > 0 ? (
+                                                    <>Showing {Math.min((currentPage - 1) * rowsPerPage + 1, messages.length)} to {Math.min(currentPage * rowsPerPage, messages.length)} of {messages.length} messages</>
+                                                ) : (
+                                                    <>No messages to display</>
+                                                )}
                                             </span>
                                         </div>
                                         <Pagination>

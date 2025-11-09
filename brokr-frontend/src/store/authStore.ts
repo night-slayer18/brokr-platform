@@ -1,3 +1,4 @@
+import { apolloClient } from '@/lib/apollo-client'
 import {create} from 'zustand'
 import {persist} from 'zustand/middleware'
 
@@ -40,9 +41,11 @@ export const useAuthStore = create<AuthState>()(
                 } catch (error) {
                     console.error('Failed to logout on server:', error)
                 }
+                await apolloClient.clearStore()
                 set({user: null, isAuthenticated: false})
             },
             updateUser: (user) => {
+                apolloClient.clearStore()
                 set({user})
             },
         }),

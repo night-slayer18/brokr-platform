@@ -5,6 +5,7 @@ import io.brokr.api.input.UserInput;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthenticationService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -28,6 +29,17 @@ public class AuthResolver {
         return attributes != null ? attributes.getResponse() : null;
     }
 
+    private HttpServletRequest getRequest() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        return attributes != null ? attributes.getRequest() : null;
+    }
+
+    private boolean isSecureRequest() {
+        HttpServletRequest request = getRequest();
+        if (request == null) return false;
+        return request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+    }
+
     @MutationMapping
     public Map<String, Object> login(@Argument LoginInput input) {
         Map<String, Object> authResult = authenticationService.authenticate(input.getUsername(), input.getPassword());
@@ -38,7 +50,7 @@ public class AuthResolver {
             String token = (String) authResult.get("token");
             Cookie cookie = new Cookie("brokr_token", token);
             cookie.setHttpOnly(true);
-            cookie.setSecure(false); // Set to true in production with HTTPS
+            cookie.setSecure(isSecureRequest()); // Automatically set based on HTTPS
             cookie.setPath("/");
             cookie.setMaxAge(86400); // 24 hours (matches JWT expiration)
             response.addCookie(cookie);
@@ -74,7 +86,7 @@ public class AuthResolver {
             String token = (String) authResult.get("token");
             Cookie cookie = new Cookie("brokr_token", token);
             cookie.setHttpOnly(true);
-            cookie.setSecure(false); // Set to true in production with HTTPS
+            cookie.setSecure(isSecureRequest()); // Automatically set based on HTTPS
             cookie.setPath("/");
             cookie.setMaxAge(86400); // 24 hours
             response.addCookie(cookie);

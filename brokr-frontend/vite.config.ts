@@ -17,6 +17,17 @@ export default defineConfig({
             '/graphql': {
                 target: 'http://localhost:8080',
                 changeOrigin: true,
+                secure: false,
+            },
+            '/auth': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+                secure: false,
             },
         },
     },

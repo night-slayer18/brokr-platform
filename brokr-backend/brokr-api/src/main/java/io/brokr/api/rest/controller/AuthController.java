@@ -5,6 +5,7 @@ import io.brokr.api.input.UserInput;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthenticationService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,16 +25,19 @@ public class AuthController {
     private final AuthenticationService authenticationService;
 
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody LoginInput input, HttpServletResponse response) {
+    public Map<String, Object> login(@RequestBody LoginInput input, HttpServletRequest request, HttpServletResponse response) {
         Map<String, Object> authResult = authenticationService.authenticate(input.getUsername(), input.getPassword());
         
         // Set HttpOnly cookie with JWT token (secure against XSS)
         String token = (String) authResult.get("token");
         Cookie cookie = new Cookie("brokr_token", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Set to true in production with HTTPS
+        // Set Secure flag based on whether request is HTTPS (production) or HTTP (dev)
+        cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
         cookie.setPath("/");
         cookie.setMaxAge(86400); // 24 hours (matches JWT expiration)
+        // Don't set domain - let it default to the request's domain
+        // This allows cookies to work with Vite proxy (localhost:3000) and production
         response.addCookie(cookie);
         
         // Remove token from response body for security
@@ -43,11 +47,11 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Map<String, String> logout(HttpServletResponse response) {
+    public Map<String, String> logout(HttpServletRequest request, HttpServletResponse response) {
         // Clear the cookie
         Cookie cookie = new Cookie("brokr_token", "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
         cookie.setPath("/");
         cookie.setMaxAge(0); // Delete the cookie
         response.addCookie(cookie);
@@ -59,7 +63,7 @@ public class AuthController {
 
     @PostMapping("/register")
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public Map<String, Object> register(@RequestBody UserInput input, HttpServletResponse response) {
+    public Map<String, Object> register(@RequestBody UserInput input, HttpServletRequest request, HttpServletResponse response) {
         // Convert API Input DTO to Core Model
         User user = User.builder()
                 .username(input.getUsername())
@@ -79,7 +83,7 @@ public class AuthController {
         String token = (String) authResult.get("token");
         Cookie cookie = new Cookie("brokr_token", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Set to true in production with HTTPS
+        cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
         cookie.setPath("/");
         cookie.setMaxAge(86400); // 24 hours
         response.addCookie(cookie);
