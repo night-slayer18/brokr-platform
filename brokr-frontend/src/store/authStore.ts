@@ -15,9 +15,8 @@ export interface User {
 
 interface AuthState {
     user: User | null
-    token: string | null
     isAuthenticated: boolean
-    login: (token: string, user: User) => void
+    login: (user: User) => void
     logout: () => void
     updateUser: (user: User) => void
 }
@@ -26,25 +25,31 @@ export const useAuthStore = create<AuthState>()(
     persist(
         (set) => ({
             user: null,
-            token: null,
             isAuthenticated: false,
-            login: (token, user) => {
-                localStorage.setItem('brokr_token', token)
-                localStorage.setItem('brokr_user', JSON.stringify(user))
-                set({user, token, isAuthenticated: true})
+            // Token is now stored in HttpOnly cookie, not in localStorage (secure against XSS)
+            login: (user) => {
+                set({user, isAuthenticated: true})
             },
-            logout: () => {
-                localStorage.removeItem('brokr_token')
-                localStorage.removeItem('brokr_user')
-                set({user: null, token: null, isAuthenticated: false})
+            logout: async () => {
+                // Call backend to clear the HttpOnly cookie
+                try {
+                    await fetch('/auth/logout', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                    })
+                } catch (error) {
+                    console.error('Failed to logout on server:', error)
+                }
+                set({user: null, isAuthenticated: false})
             },
             updateUser: (user) => {
-                localStorage.setItem('brokr_user', JSON.stringify(user))
                 set({user})
             },
         }),
         {
             name: 'brokr-auth',
+            // Only persist user data, not token (token is in HttpOnly cookie)
+            partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
         }
     )
 )

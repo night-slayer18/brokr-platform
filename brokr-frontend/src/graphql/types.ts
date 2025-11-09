@@ -84,7 +84,7 @@ export interface GetMessagesQuery {
 // Mutation Response Types
 export interface LoginMutation {
     login: {
-        token: string
+        // Token is now in HttpOnly cookie, not returned in response (secure against XSS)
         user: User
     }
 }

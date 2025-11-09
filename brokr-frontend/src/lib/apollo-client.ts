@@ -1,23 +1,15 @@
 import {ApolloClient, from, HttpLink, InMemoryCache,} from "@apollo/client";
-import {SetContextLink} from "@apollo/client/link/context";
 import {ErrorLink} from "@apollo/client/link/error";
 import {CombinedGraphQLErrors, CombinedProtocolErrors} from "@apollo/client/errors";
 
 const httpLink = new HttpLink({
     // Use relative URL when served from backend, absolute URL for dev mode
     uri: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? "/graphql",
-    credentials: "same-origin",
+    credentials: "same-origin", // Include cookies (HttpOnly cookie with JWT token)
 });
 
-const authLink = new SetContextLink((prevContext) => {
-    const token = localStorage.getItem("brokr_token");
-    return {
-        headers: {
-            ...prevContext.headers,
-            authorization: token ? `Bearer ${token}` : "",
-        },
-    };
-});
+// No need for authLink anymore - JWT token is in HttpOnly cookie and sent automatically
+// The backend JwtAuthenticationFilter reads from the cookie
 
 const errorLink = new ErrorLink(({error, operation}) => {
     if (CombinedGraphQLErrors.is(error)) {
@@ -26,8 +18,8 @@ const errorLink = new ErrorLink(({error, operation}) => {
                 `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}, Operation: ${operation.operationName}`
             );
             if (message.includes("Unauthorized") || message.includes("401")) {
-                localStorage.removeItem("brokr_token");
-                localStorage.removeItem("brokr_user");
+                // Clear auth state and redirect to login
+                // Cookie will be cleared by backend on logout
                 window.location.href = "/login";
             }
         });
@@ -43,7 +35,7 @@ const errorLink = new ErrorLink(({error, operation}) => {
 });
 
 export const apolloClient = new ApolloClient({
-    link: from([errorLink, authLink, httpLink]),
+    link: from([errorLink, httpLink]),
     cache: new InMemoryCache(),
     defaultOptions: {
         watchQuery: {

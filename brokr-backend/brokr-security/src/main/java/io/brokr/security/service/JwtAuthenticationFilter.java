@@ -2,6 +2,7 @@ package io.brokr.security.service;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,16 +29,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        final String authHeader = request.getHeader("Authorization");
-        final String jwt;
+        String jwt = null;
         final String userEmail;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // First, try to get token from HttpOnly cookie (preferred, more secure)
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("brokr_token".equals(cookie.getName())) {
+                    jwt = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        // Fallback to Authorization header for backward compatibility (e.g., API clients)
+        if (jwt == null) {
+            final String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                jwt = authHeader.substring(7);
+            }
+        }
+
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
         userEmail = jwtService.extractUsername(jwt);
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {

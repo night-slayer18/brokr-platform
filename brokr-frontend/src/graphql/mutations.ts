@@ -3,7 +3,7 @@ import {gql} from '@apollo/client'
 export const LOGIN_MUTATION = gql`
     mutation Login($input: LoginInput!) {
         login(input: $input) {
-            token
+            # Token is now in HttpOnly cookie, not returned in response (secure against XSS)
             user {
                 id
                 username

@@ -43,8 +43,9 @@ export function LoginForm() {
                 },
             })
 
-            const {token, user} = (result.data as { login: { token: string; user: any } }).login
-            login(token, user)
+            // Token is now in HttpOnly cookie, not in response
+            const {user} = (result.data as { login: { user: any } }).login
+            login(user)
             toast.success('Logged in successfully')
             navigate('/dashboard')
         } catch (error: any) {
