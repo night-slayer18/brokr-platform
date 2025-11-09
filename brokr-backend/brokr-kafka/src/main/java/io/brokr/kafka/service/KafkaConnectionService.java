@@ -2,6 +2,7 @@ package io.brokr.kafka.service;
 
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.SecurityProtocol;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -10,29 +11,77 @@ import org.apache.kafka.common.config.SslConfigs;
 import org.springframework.stereotype.Service;
 
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.Map;
 
 @Service
 @Slf4j
 public class KafkaConnectionService {
 
+    private final Map<String, AdminClient> adminClientCache = new ConcurrentHashMap<>();
+
     public boolean testConnection(KafkaCluster cluster) {
-        try (AdminClient adminClient = createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = getOrCreateAdminClient(cluster);
             // Try to list clusters with a short timeout
             adminClient.describeCluster().nodes().get(5, TimeUnit.SECONDS);
             return true;
         } catch (TimeoutException e) {
             log.error("Connection timeout to cluster: {}", cluster.getName(), e);
+            // Remove broken client from cache
+            removeAdminClient(cluster.getId());
             return false;
         } catch (ExecutionException | InterruptedException e) {
             log.error("Failed to connect to cluster: {}", cluster.getName(), e);
+            // Remove broken client from cache
+            removeAdminClient(cluster.getId());
             return false;
         }
     }
 
-    public AdminClient createAdminClient(KafkaCluster cluster) {
+    /**
+     * Gets or creates a cached AdminClient for the given cluster.
+     * AdminClients are expensive to create, so we cache and reuse them.
+     *
+     * @param cluster The Kafka cluster configuration
+     * @return A cached or newly created AdminClient
+     */
+    public AdminClient getOrCreateAdminClient(KafkaCluster cluster) {
+        return adminClientCache.computeIfAbsent(cluster.getId(), id -> {
+            log.info("Creating new AdminClient for cluster: {}", cluster.getName());
+            return createAdminClient(cluster);
+        });
+    }
+
+    /**
+     * Removes an AdminClient from the cache and closes it.
+     * Useful when a client becomes broken or cluster configuration changes.
+     *
+     * @param clusterId The cluster ID
+     */
+    public void removeAdminClient(String clusterId) {
+        AdminClient client = adminClientCache.remove(clusterId);
+        if (client != null) {
+            try {
+                client.close();
+                log.info("Closed and removed AdminClient for cluster: {}", clusterId);
+            } catch (Exception e) {
+                log.warn("Error closing AdminClient for cluster {}: {}", clusterId, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Creates a new AdminClient instance. This method is now private
+     * and should only be called by getOrCreateAdminClient.
+     *
+     * @param cluster The Kafka cluster configuration
+     * @return A new AdminClient instance
+     */
+    private AdminClient createAdminClient(KafkaCluster cluster) {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
@@ -85,5 +134,19 @@ public class KafkaConnectionService {
         }
 
         return AdminClient.create(props);
+    }
+
+    @PreDestroy
+    public void destroy() {
+        log.info("Shutting down KafkaConnectionService, closing {} AdminClient instances", adminClientCache.size());
+        adminClientCache.forEach((clusterId, client) -> {
+            try {
+                client.close();
+                log.debug("Closed AdminClient for cluster: {}", clusterId);
+            } catch (Exception e) {
+                log.warn("Error closing AdminClient for cluster {}: {}", clusterId, e.getMessage());
+            }
+        });
+        adminClientCache.clear();
     }
 }

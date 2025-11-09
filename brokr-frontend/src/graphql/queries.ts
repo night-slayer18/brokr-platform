@@ -76,6 +76,25 @@ export const GET_CLUSTER = gql`
     }
 `
 
+export const GET_CLUSTER_OVERVIEW = gql`
+    query GetClusterOverview($id: ID!) {
+        cluster(id: $id) {
+            id
+            name
+            isReachable
+            brokers {
+                id
+            }
+            topics {
+                name
+            }
+            consumerGroups {
+                groupId
+            }
+        }
+    }
+`
+
 export const GET_TOPICS = gql`
     query GetTopics($clusterId: ID!) {
         topics(clusterId: $clusterId) {

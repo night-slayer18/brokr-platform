@@ -24,6 +24,17 @@ export interface GetClusterQuery {
     cluster: KafkaCluster
 }
 
+export interface GetClusterOverviewQuery {
+    cluster: {
+        id: string
+        name: string
+        isReachable: boolean
+        brokers: Array<{ id: number }>
+        topics: Array<{ name: string }>
+        consumerGroups: Array<{ groupId: string }>
+    }
+}
+
 export interface GetTopicsQuery {
     topics: Topic[]
 }
@@ -155,6 +166,10 @@ export interface GetClustersVariables {
 }
 
 export interface GetClusterVariables {
+    id: string
+}
+
+export interface GetClusterOverviewVariables {
     id: string
 }
 

@@ -15,9 +15,9 @@
 
     <properties>
         <frontend-maven-plugin.version>1.13.4</frontend-maven-plugin.version>
-        <node.version>v20.10.0</node.version>
-        <npm.version>10.2.3</npm.version>
-        <frontend.build.dir>build</frontend.build.dir>
+        <node.version>v22.20.0</node.version>
+        <npm.version>10.9.3</npm.version>
+        <frontend.build.dir>dist</frontend.build.dir>
     </properties>
 
     <build>
@@ -62,6 +62,9 @@
                         </goals>
                         <configuration>
                             <arguments>run build</arguments>
+                            <environmentVariables>
+                                <VITE_GRAPHQL_ENDPOINT>/graphql</VITE_GRAPHQL_ENDPOINT>
+                            </environmentVariables>
                         </configuration>
                     </execution>
                 </executions>
@@ -79,10 +82,11 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>../brokr-app/src/main/resources/static</outputDirectory>
+                            <outputDirectory>${project.basedir}/../brokr-backend/brokr-app/src/main/resources/static
+                            </outputDirectory>
                             <resources>
                                 <resource>
-                                    <directory>${frontend.build.dir}</directory>
+                                    <directory>${project.basedir}/${frontend.build.dir}</directory>
                                     <filtering>false</filtering>
                                 </resource>
                             </resources>

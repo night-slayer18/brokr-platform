@@ -22,7 +22,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -40,11 +39,32 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/graphql").permitAll()  // Allow GraphQL for login mutation (method-level security still applies)
-                        .requestMatchers("/graphiql").permitAll() // Allow GraphiQL UI
                         .requestMatchers("/actuator/health").permitAll()
+
+                        // GraphQL endpoints - rely on method-level security (@PreAuthorize)
+                        .requestMatchers("/graphql").permitAll()
+                        .requestMatchers("/graphiql").hasAuthority("ROLE_SUPER_ADMIN")  // Only SUPER_ADMIN can access GraphiQL
+
+                        // Admin only
                         .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
+
+                        // Static resources for frontend (must be public for login page to load)
+                        .requestMatchers("/", "/index.html", "/assets/**", "/vite.svg", "/*.js", "/*.css", "/*.ico", "/*.png", "/*.jpg", "/*.svg").permitAll()
+
+                        // Allow all other GET requests for SPA routing (they will be handled by WebMvcConfig to serve index.html)
+                        // This allows routes like /clusters/123, /login, etc. to work on page reload
+                        .requestMatchers(request -> 
+                            request.getMethod().equals("GET") && 
+                            !request.getRequestURI().startsWith("/api/") &&
+                            !request.getRequestURI().startsWith("/actuator/") &&
+                            !request.getRequestURI().startsWith("/auth/") &&
+                            !request.getRequestURI().equals("/graphql") &&
+                            !request.getRequestURI().equals("/graphiql")
+                        ).permitAll()
+
+                        // All other requests require authentication
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -56,8 +76,7 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
@@ -71,7 +90,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        // Allow both dev frontend (3000) and production (served from 8080)
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:8080"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);

@@ -4,12 +4,8 @@ import io.brokr.core.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.*;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.config.ConfigResource;
-import org.apache.kafka.common.config.SaslConfigs;
-import org.apache.kafka.common.config.SslConfigs;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -24,7 +20,8 @@ public class KafkaAdminService {
     private final KafkaConnectionService kafkaConnectionService;
 
     public List<Topic> listTopics(KafkaCluster cluster) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             ListTopicsResult topicsResult = adminClient.listTopics();
             Set<String> topicNames = topicsResult.names().get();
 
@@ -63,12 +60,14 @@ public class KafkaAdminService {
                     .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to list topics for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to list topics", e);
         }
     }
 
     public Topic createTopic(KafkaCluster cluster, String topicName, int partitions, int replicationFactor, Map<String, String> configs) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             NewTopic newTopic = new NewTopic(topicName, partitions, (short) replicationFactor);
             if (configs != null && !configs.isEmpty()) {
                 newTopic.configs(configs);
@@ -80,12 +79,14 @@ public class KafkaAdminService {
             return getTopic(cluster, topicName);
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to create topic: {} for cluster: {}", topicName, cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to create topic", e);
         }
     }
 
     public Topic getTopic(KafkaCluster cluster, String topicName) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             // Kick off all async operations in parallel for better performance
             DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(Collections.singleton(topicName));
 
@@ -157,13 +158,15 @@ public class KafkaAdminService {
                     .build();
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get topic: {} for cluster: {}", topicName, cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to get topic", e);
         }
     }
 
     // <<< FIX: Implemented updateTopicConfig >>>
     public void updateTopicConfig(KafkaCluster cluster, String topicName, Map<String, String> configs) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             ConfigResource resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
 
             // Create a list of config entries to alter
@@ -177,22 +180,26 @@ public class KafkaAdminService {
 
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to update topic config: {} for cluster: {}", topicName, cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to update topic config", e);
         }
     }
 
     public void deleteTopic(KafkaCluster cluster, String topicName) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(topicName));
             result.all().get();
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to delete topic: {} for cluster: {}", topicName, cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to delete topic", e);
         }
     }
 
     public List<BrokerNode> getClusterNodes(KafkaCluster cluster) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             DescribeClusterResult result = adminClient.describeCluster();
             return result.nodes().get().stream()
                     .map(node -> BrokerNode.builder()
@@ -204,12 +211,14 @@ public class KafkaAdminService {
                     .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to describe cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to describe cluster", e);
         }
     }
 
     public List<ConsumerGroup> listConsumerGroups(KafkaCluster cluster) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             // Use the new listGroups() method
             ListGroupsResult result = adminClient.listGroups();
             Collection<GroupListing> groupListings = result.all().get(); // Returns Collection<GroupListing>
@@ -250,12 +259,14 @@ public class KafkaAdminService {
                     .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to list consumer groups for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to list consumer groups", e);
         }
     }
 
     public Optional<ConsumerGroup> getConsumerGroup(KafkaCluster cluster, String groupId) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
 
             DescribeConsumerGroupsResult describeResult = adminClient.describeConsumerGroups(Collections.singleton(groupId));
             Map<String, ConsumerGroupDescription> groupDescriptions = describeResult.all().get();
@@ -291,80 +302,37 @@ public class KafkaAdminService {
 
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get consumer group [{}]: {}", groupId, e.getMessage());
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             // If group doesn't exist, Kafka throws an error. We treat this as "not found".
             return Optional.empty();
         }
     }
 
     public Map<String, Long> getConsumerGroupOffsets(KafkaCluster cluster, String groupId) {
-        Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());
-
-        if (cluster.getSecurityProtocol() != null) {
-            props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, cluster.getSecurityProtocol().name());
-
-            // Configure SASL if needed
-            if (cluster.getSecurityProtocol() != SecurityProtocol.PLAINTEXT &&
-                    cluster.getSecurityProtocol() != SecurityProtocol.SSL &&
-                    cluster.getSaslMechanism() != null) {
-
-                props.put(SaslConfigs.SASL_MECHANISM, cluster.getSaslMechanism());
-
-                if (cluster.getSaslUsername() != null && cluster.getSaslPassword() != null) {
-                    props.put(SaslConfigs.SASL_JAAS_CONFIG,
-                            String.format("org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                                    cluster.getSaslUsername(), cluster.getSaslPassword()));
-                }
-            }
-
-            // Configure SSL if needed
-            if (cluster.getSecurityProtocol() == SecurityProtocol.SSL ||
-                    cluster.getSecurityProtocol() == SecurityProtocol.SASL_SSL) {
-
-                if (cluster.getSslTruststoreLocation() != null) {
-                    props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, cluster.getSslTruststoreLocation());
-                }
-                if (cluster.getSslTruststorePassword() != null) {
-                    props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, cluster.getSslTruststorePassword());
-                }
-                if (cluster.getSslKeystoreLocation() != null) {
-                    props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, cluster.getSslKeystoreLocation());
-                }
-                if (cluster.getSslKeystorePassword() != null) {
-                    props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, cluster.getSslKeystorePassword());
-                }
-                if (cluster.getSslKeyPassword() != null) {
-                    props.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, cluster.getSslKeyPassword());
-                }
-            }
-        }
-
-        // Add any additional properties
-        if (cluster.getProperties() != null) {
-            props.putAll(cluster.getProperties());
-        }
-
-
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster);
-             KafkaConsumer<String, String> consumer = new KafkaConsumer<>(
-                     props,
-                     new StringDeserializer(),
-                     new StringDeserializer())) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
 
             // Get consumer group offsets
             ListConsumerGroupOffsetsResult offsetsResult = adminClient.listConsumerGroupOffsets(groupId);
             Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsets = offsetsResult.partitionsToOffsetAndMetadata().get();
 
-            // Get end offsets for comparison
+            // Get end offsets using AdminClient (no need for KafkaConsumer)
             Set<org.apache.kafka.common.TopicPartition> topicPartitions = offsets.keySet();
-            Map<org.apache.kafka.common.TopicPartition, Long> endOffsets = consumer.endOffsets(topicPartitions);
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> latestOffsetSpecs = new HashMap<>();
+            for (org.apache.kafka.common.TopicPartition tp : topicPartitions) {
+                latestOffsetSpecs.put(tp, OffsetSpec.latest());
+            }
+
+            ListOffsetsResult latestOffsetsResult = adminClient.listOffsets(latestOffsetSpecs);
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latestOffsets =
+                    latestOffsetsResult.all().get();
 
             Map<String, Long> lagByTopic = new HashMap<>();
 
             for (Map.Entry<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
                 org.apache.kafka.common.TopicPartition tp = entry.getKey();
                 long currentOffset = entry.getValue().offset();
-                long endOffset = endOffsets.get(tp);
+                long endOffset = latestOffsets.get(tp).offset();
                 long lag = endOffset - currentOffset;
 
                 lagByTopic.merge(tp.topic(), lag, Long::sum);
@@ -373,12 +341,14 @@ public class KafkaAdminService {
             return lagByTopic;
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get consumer group offsets: {} for cluster: {}", groupId, cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to get consumer group offsets", e);
         }
     }
 
     public boolean resetConsumerGroupOffset(KafkaCluster cluster, String groupId, String topic, int partition, long offset) {
-        try (AdminClient adminClient = kafkaConnectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
 
             org.apache.kafka.common.TopicPartition topicPartition = new org.apache.kafka.common.TopicPartition(topic, partition);
             OffsetAndMetadata offsetAndMetadata = new OffsetAndMetadata(offset);
@@ -392,6 +362,7 @@ public class KafkaAdminService {
 
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to reset offset for group [{}], topic [{}], partition [{}]: {}", groupId, topic, partition, e.getMessage(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to reset consumer group offset", e);
         }
     }

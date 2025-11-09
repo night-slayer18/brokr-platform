@@ -4,8 +4,9 @@ import {ErrorLink} from "@apollo/client/link/error";
 import {CombinedGraphQLErrors, CombinedProtocolErrors} from "@apollo/client/errors";
 
 const httpLink = new HttpLink({
-    uri: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? "http://localhost:8080/graphql",
-    // credentials: "include",  // if needed
+    // Use relative URL when served from backend, absolute URL for dev mode
+    uri: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? "/graphql",
+    credentials: "same-origin",
 });
 
 const authLink = new SetContextLink((prevContext) => {
@@ -46,7 +47,14 @@ export const apolloClient = new ApolloClient({
     cache: new InMemoryCache(),
     defaultOptions: {
         watchQuery: {
-            fetchPolicy: "cache-and-network",
+            // Use cache-first for better performance: show cached data immediately, then update in background
+            fetchPolicy: "cache-first",
+            // Ensure subsequent queries also use cache (prevents unnecessary network requests)
+            nextFetchPolicy: "cache-first",
+        },
+        query: {
+            // For one-time queries, also prefer cache
+            fetchPolicy: "cache-first",
         },
     },
 });

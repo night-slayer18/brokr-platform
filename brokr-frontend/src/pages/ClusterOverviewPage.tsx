@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client/react';
 import { Link, useParams } from 'react-router-dom';
-import { GET_CLUSTER, GET_CONSUMER_GROUPS, GET_TOPICS } from '@/graphql/queries';
-import type { GetClusterQuery, GetClusterVariables, GetConsumerGroupsQuery, GetTopicsQuery } from '@/graphql/types';
+import { GET_CLUSTER_OVERVIEW } from '@/graphql/queries';
+import type { GetClusterOverviewQuery, GetClusterOverviewVariables } from '@/graphql/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -29,22 +29,10 @@ function StatCard({ title, value, description, icon: Icon, to }: { title: string
 export default function ClusterOverviewPage() {
     const { clusterId } = useParams<{ clusterId: string }>();
 
-    const { data: clusterData, loading: clusterLoading, error: clusterError } = useQuery<GetClusterQuery, GetClusterVariables>(GET_CLUSTER, {
+    const { data, loading, error } = useQuery<GetClusterOverviewQuery, GetClusterOverviewVariables>(GET_CLUSTER_OVERVIEW, {
         variables: { id: clusterId! },
         skip: !clusterId,
     });
-
-    const { data: topicsData, loading: topicsLoading } = useQuery<GetTopicsQuery>(GET_TOPICS, {
-        variables: { clusterId: clusterId! },
-        skip: !clusterId,
-    });
-
-    const { data: consumerGroupsData, loading: consumerGroupsLoading } = useQuery<GetConsumerGroupsQuery>(GET_CONSUMER_GROUPS, {
-        variables: { clusterId: clusterId! },
-        skip: !clusterId,
-    });
-
-    const loading = clusterLoading || topicsLoading || consumerGroupsLoading;
 
     if (loading) {
         return (
@@ -59,13 +47,13 @@ export default function ClusterOverviewPage() {
         );
     }
 
-    if (clusterError) {
-        return <div className="text-destructive">Error loading cluster details: {clusterError.message}</div>;
+    if (error) {
+        return <div className="text-destructive">Error loading cluster details: {error.message}</div>;
     }
 
-    const cluster = clusterData?.cluster;
-    const topicsCount = topicsData?.topics?.length || 0;
-    const consumerGroupsCount = consumerGroupsData?.consumerGroups?.length || 0;
+    const cluster = data?.cluster;
+    const topicsCount = cluster?.topics?.length || 0;
+    const consumerGroupsCount = cluster?.consumerGroups?.length || 0;
     const brokersCount = cluster?.brokers?.length || 0;
 
     return (

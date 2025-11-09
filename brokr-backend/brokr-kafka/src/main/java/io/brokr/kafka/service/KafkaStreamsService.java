@@ -27,7 +27,8 @@ public class KafkaStreamsService {
      * internal consumer group.
      */
     public StreamsState getState(KafkaStreamsApplication app, KafkaCluster cluster) {
-        try (AdminClient adminClient = connectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = connectionService.getOrCreateAdminClient(cluster);
             ConsumerGroupDescription groupDesc = getGroupDescription(adminClient, app.getApplicationId());
             if (groupDesc == null) {
                 return StreamsState.NOT_RUNNING;
@@ -35,6 +36,7 @@ public class KafkaStreamsService {
             return mapKafkaStateToStreamsState(groupDesc.state());
         } catch (Exception e) {
             log.warn("Could not get state for streams app [{}]: {}", app.getApplicationId(), e.getMessage());
+            connectionService.removeAdminClient(cluster.getId());
             // Check if the specific cause is GroupIdNotFound
             if (e.getCause() instanceof GroupIdNotFoundException || e instanceof GroupIdNotFoundException) {
                 return StreamsState.NOT_RUNNING;
@@ -53,7 +55,8 @@ public class KafkaStreamsService {
      * custom REST endpoint on the streams application itself.
      */
     public List<ThreadMetadata> getThreads(KafkaStreamsApplication app, KafkaCluster cluster) {
-        try (AdminClient adminClient = connectionService.createAdminClient(cluster)) {
+        try {
+            AdminClient adminClient = connectionService.getOrCreateAdminClient(cluster);
             ConsumerGroupDescription groupDesc = getGroupDescription(adminClient, app.getApplicationId());
             if (groupDesc == null) {
                 return Collections.emptyList();
@@ -86,6 +89,7 @@ public class KafkaStreamsService {
 
         } catch (Exception e) {
             log.warn("Could not get threads for streams app [{}]: {}", app.getApplicationId(), e.getMessage());
+            connectionService.removeAdminClient(cluster.getId());
             return Collections.emptyList();
         }
     }
