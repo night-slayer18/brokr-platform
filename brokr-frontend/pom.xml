@@ -72,6 +72,30 @@
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>clean-old-static-files</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Delete entire assets directory (will be recreated with new files) -->
+                                <delete dir="${project.basedir}/../brokr-backend/brokr-app/src/main/resources/static/assets" failonerror="false" includeemptydirs="true" />
+                                <!-- Delete old JS and CSS files from root (if any) -->
+                                <delete failonerror="false" includeemptydirs="true">
+                                    <fileset dir="${project.basedir}/../brokr-backend/brokr-app/src/main/resources/static" includes="**/*.js,**/*.css" />
+                                </delete>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
                 <executions>
@@ -82,14 +106,14 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${project.basedir}/../brokr-backend/brokr-app/src/main/resources/static
-                            </outputDirectory>
+                            <outputDirectory>${project.basedir}/../brokr-backend/brokr-app/src/main/resources/static</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>${project.basedir}/${frontend.build.dir}</directory>
                                     <filtering>false</filtering>
                                 </resource>
                             </resources>
+                            <overwrite>true</overwrite>
                         </configuration>
                     </execution>
                 </executions>

@@ -1,8 +1,8 @@
-import {useLazyQuery, useQuery} from '@apollo/client/react';
 import {useParams} from 'react-router-dom';
 import {GET_MESSAGES, GET_TOPIC} from '@/graphql/queries';
-import {apolloClient} from '@/lib/apollo-client';
-import type {GetMessagesQuery, GetMessagesVariables, GetTopicQuery, GetTopicVariables} from '@/graphql/types';
+import type {GetMessagesQuery, GetTopicQuery} from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useQueryClient} from '@tanstack/react-query';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
@@ -37,21 +37,21 @@ export default function TopicDetailPage() {
     const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
     const [isMessageDetailOpen, setIsMessageDetailOpen] = useState(false);
 
-    const {data, loading, error} = useQuery<GetTopicQuery, GetTopicVariables>(GET_TOPIC, {
-        variables: {clusterId: clusterId!, name: topicName!},
-        skip: !clusterId || !topicName,
-        fetchPolicy: 'cache-first', // Use cache for faster loads
-        nextFetchPolicy: 'cache-first',
-    });
-
-    const [getMessages, {
-        data: messagesData,
-        loading: messagesLoading,
-        error: messagesError
-    }] = useLazyQuery<GetMessagesQuery, GetMessagesVariables>(GET_MESSAGES);
+    const queryClient = useQueryClient();
+    const [messagesData, setMessagesData] = useState<GetMessagesQuery | null>(null);
+    
+    const {data, isLoading: loading, error} = useGraphQLQuery<GetTopicQuery, {clusterId: string; name: string}>(GET_TOPIC, 
+        clusterId && topicName ? {clusterId, name: topicName} : undefined,
+        {
+            enabled: !!clusterId && !!topicName,
+        }
+    );
 
     const topic = data?.topic;
     const messages = messagesData?.messages || [];
+
+    const [messagesLoading, setMessagesLoading] = useState(false);
+    const [messagesError, setMessagesError] = useState<Error | null>(null);
 
     const handleFetchMessages = async () => {
         if (!clusterId || !topicName) {
@@ -73,44 +73,24 @@ export default function TopicDetailPage() {
             },
         };
 
-        // Force a fresh fetch by using network-only policy (bypasses cache completely)
+        // Force a fresh fetch
         const startTime = performance.now();
+        setMessagesLoading(true);
+        setMessagesError(null);
+        
         try {
-            // First, evict the old cache entry to ensure we get fresh data
-            apolloClient.cache.evict({ 
-                id: 'ROOT_QUERY',
-                fieldName: 'messages',
-                args: variables,
-            });
-            apolloClient.cache.gc(); // Garbage collect evicted entries
+            // Invalidate cache and fetch fresh data
+            await queryClient.invalidateQueries({queryKey: ['graphql', GET_MESSAGES]});
+            const {executeGraphQL} = await import('@/lib/graphql-client');
+            const result = await executeGraphQL<GetMessagesQuery>(GET_MESSAGES, variables);
             
-            // Fetch fresh data from network (bypasses cache)
-            const result = await apolloClient.query<GetMessagesQuery, GetMessagesVariables>({
-                query: GET_MESSAGES,
-                variables,
-                fetchPolicy: 'network-only', // Always fetch fresh data, bypass cache
-            });
-            
-            // Write the fresh result to cache
-            if (result.data) {
-                apolloClient.writeQuery<GetMessagesQuery, GetMessagesVariables>({
-                    query: GET_MESSAGES,
-                    variables,
-                    data: result.data,
-                });
-            }
-            
-            // Trigger the lazy query to read from the updated cache
-            // This will now show the fresh data we just fetched
-            getMessages({ variables });
-            
-            // Reset to first page when new messages are fetched
+            setMessagesData(result);
             setCurrentPage(1);
             
             // Calculate fetch duration and show success toast
             const endTime = performance.now();
             const duration = ((endTime - startTime) / 1000).toFixed(2);
-            const messageCount = result.data?.messages?.length || 0;
+            const messageCount = result?.messages?.length || 0;
             toast.success(
                 `Fetched ${messageCount} message${messageCount !== 1 ? 's' : ''} in ${duration}s`,
                 {
@@ -119,9 +99,13 @@ export default function TopicDetailPage() {
             );
         } catch (error) {
             console.error('Failed to fetch messages:', error);
+            const err = error instanceof Error ? error : new Error('Failed to fetch messages');
+            setMessagesError(err);
             const endTime = performance.now();
             const duration = ((endTime - startTime) / 1000).toFixed(2);
             toast.error(`Failed to fetch messages after ${duration}s`);
+        } finally {
+            setMessagesLoading(false);
         }
     };
 
@@ -129,19 +113,27 @@ export default function TopicDetailPage() {
     useEffect(() => {
         if (topic && clusterId && topicName) {
             const partitions = topic.partitionsInfo?.map(p => p.id);
-            getMessages({
-                variables: {
-                    clusterId,
-                    input: {
-                        topic: topicName,
-                        partitions: partitions,
-                        offset: 'latest',
-                        limit: 100,
-                    },
+            const variables = {
+                clusterId,
+                input: {
+                    topic: topicName,
+                    partitions: partitions,
+                    offset: 'latest' as const,
+                    limit: 100,
                 },
-            });
+            };
+            
+            (async () => {
+                try {
+                    const {executeGraphQL} = await import('@/lib/graphql-client');
+                    const result = await executeGraphQL<GetMessagesQuery>(GET_MESSAGES, variables);
+                    setMessagesData(result);
+                } catch (err) {
+                    console.error('Failed to fetch messages:', err);
+                }
+            })();
         }
-    }, [topic, clusterId, topicName, getMessages]); // Run when topic is loaded
+    }, [topic, clusterId, topicName, queryClient]); // Run when topic is loaded
 
     // Reset to first page if current page is out of bounds
     useEffect(() => {

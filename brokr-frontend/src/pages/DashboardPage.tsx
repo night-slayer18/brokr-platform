@@ -1,5 +1,4 @@
 // src/pages/DashboardPage.tsx
-import {useQuery} from '@apollo/client/react'
 import {GET_CLUSTERS, GET_ME} from '@/graphql/queries'
 import type {GetClustersQuery, GetMeQuery} from '@/graphql/types'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
@@ -8,6 +7,7 @@ import {Activity, FileText, Server, Users} from 'lucide-react'
 import React from "react";
 import {useNavigate} from "react-router-dom";
 import type {KafkaCluster} from '@/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 
 interface StatCardProps {
     title: string
@@ -42,13 +42,13 @@ function StatCard({title, value, description, icon: Icon, trend}: StatCardProps)
 
 export default function DashboardPage() {
     const navigate = useNavigate();
-    const {data: userData, loading: userLoading} = useQuery<GetMeQuery>(GET_ME)
-    const {data: clustersData, loading: clustersLoading} = useQuery<GetClustersQuery>(GET_CLUSTERS, {
-        skip: !userData?.me?.organizationId,
-        variables: {
-            organizationId: userData?.me?.organizationId
+    const {data: userData, isLoading: userLoading} = useGraphQLQuery<GetMeQuery>(GET_ME)
+    const {data: clustersData, isLoading: clustersLoading} = useGraphQLQuery<GetClustersQuery, {organizationId?: string}>(GET_CLUSTERS, 
+        userData?.me?.organizationId ? {organizationId: userData.me.organizationId} : undefined,
+        {
+            enabled: !!userData?.me?.organizationId,
         }
-    })
+    )
 
     const clusterCount = (clustersData?.clusters || []).length
     const activeClusterCount = (clustersData?.clusters || []).filter((c: KafkaCluster) => c.isReachable)?.length || 0

@@ -1,17 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import {ApolloProvider} from '@apollo/client/react'
+import {QueryClientProvider} from '@tanstack/react-query'
 import {BrowserRouter} from 'react-router-dom'
 import App from './App.tsx'
-import {apolloClient} from './lib/apollo-client.ts'
+import {queryClient} from './lib/query-client.ts'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        <ApolloProvider client={apolloClient}>
+        <QueryClientProvider client={queryClient}>
             <BrowserRouter>
                 <App/>
             </BrowserRouter>
-        </ApolloProvider>
+        </QueryClientProvider>
     </React.StrictMode>,
 )

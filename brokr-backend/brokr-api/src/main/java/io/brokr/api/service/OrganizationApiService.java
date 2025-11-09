@@ -12,6 +12,7 @@ import io.brokr.storage.repository.EnvironmentRepository;
 import io.brokr.storage.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -25,12 +26,14 @@ public class OrganizationApiService {
     private final OrganizationRepository organizationRepository;
     private final EnvironmentRepository environmentRepository;
 
+    @Transactional(readOnly = true)
     public List<Organization> listOrganizations() {
         return organizationRepository.findAll().stream()
                 .map(OrganizationEntity::toDomain)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<OrganizationDto> listOrganizationsWithEnvironments() {
         // 1. Fetch all organizations (1 query)
         List<OrganizationDto> orgDtos = organizationRepository.findAll().stream()
@@ -61,12 +64,14 @@ public class OrganizationApiService {
         return orgDtos;
     }
 
+    @Transactional(readOnly = true)
     public Organization getOrganizationById(String id) {
         return organizationRepository.findById(id)
                 .map(OrganizationEntity::toDomain)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Organization> getOrganizationsByIds(List<String> ids) {
         return organizationRepository.findAllById(ids).stream()
                 .map(OrganizationEntity::toDomain)
@@ -74,6 +79,7 @@ public class OrganizationApiService {
     }
 
 
+    @Transactional(readOnly = true)
     public OrganizationDto getOrganizationDtoById(String id) {
         // 1. Get the Org
         OrganizationDto orgDto = getOrganizationById(id).toDto();
@@ -90,6 +96,7 @@ public class OrganizationApiService {
         return orgDto;
     }
 
+    @Transactional
     public Organization createOrganization(OrganizationInput input) {
         if (organizationRepository.existsByName(input.getName())) {
             throw new ValidationException("Organization with this name already exists");
@@ -105,6 +112,7 @@ public class OrganizationApiService {
         return organizationRepository.save(OrganizationEntity.fromDomain(org)).toDomain();
     }
 
+    @Transactional
     public Organization updateOrganization(String id, OrganizationInput input) {
         OrganizationEntity entity = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
@@ -132,6 +140,7 @@ public class OrganizationApiService {
         return dto;
     }
 
+    @Transactional
     public boolean deleteOrganization(String id) {
         if (organizationRepository.existsById(id)) {
             organizationRepository.deleteById(id);

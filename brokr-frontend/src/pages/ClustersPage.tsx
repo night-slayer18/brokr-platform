@@ -1,13 +1,10 @@
-import {useMutation, useQuery} from '@apollo/client/react'
 import {useNavigate} from 'react-router-dom'
 import {DELETE_CLUSTER_MUTATION, TEST_CLUSTER_CONNECTION_MUTATION} from '@/graphql/mutations'
 import type {
     DeleteClusterMutation,
-    DeleteClusterMutationVariables,
     GetClustersQuery,
     GetOrganizationsQuery,
-    TestClusterConnectionMutation,
-    TestClusterConnectionMutationVariables
+    TestClusterConnectionMutation
 } from '@/graphql/types'
 import type {KafkaCluster} from '@/types'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
@@ -30,6 +27,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
 
 interface ClusterCardProps {
     cluster: KafkaCluster
@@ -119,23 +119,27 @@ export default function ClustersPage() {
     const [selectedOrgId, setSelectedOrgId] = useState<string | null>(isSuperAdmin ? null : user?.organizationId || null);
     const [clusterToDelete, setClusterToDelete] = useState<string | null>(null);
 
+    const queryClient = useQueryClient();
+    
     const {
         data: organizationsData,
-        loading: organizationsLoading
-    } = useQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, {
-        skip: !isSuperAdmin,
+        isLoading: organizationsLoading
+    } = useGraphQLQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, undefined, {
+        enabled: isSuperAdmin,
     });
 
     // Determine the final orgId to use in the cluster query.
     const orgIdForQuery = isSuperAdmin ? selectedOrgId : user?.organizationId;
 
-    const {data, loading, refetch} = useQuery<GetClustersQuery>(GET_CLUSTERS, {
-        skip: !orgIdForQuery, // Skip if no org is selected/available
-        variables: {organizationId: orgIdForQuery},
-    });
+    const {data, isLoading: loading} = useGraphQLQuery<GetClustersQuery, {organizationId?: string}>(GET_CLUSTERS, 
+        orgIdForQuery ? {organizationId: orgIdForQuery} : undefined,
+        {
+            enabled: !!orgIdForQuery, // Skip if no org is selected/available
+        }
+    );
 
-    const [deleteCluster] = useMutation<DeleteClusterMutation, DeleteClusterMutationVariables>(DELETE_CLUSTER_MUTATION);
-    const [testConnection] = useMutation<TestClusterConnectionMutation, TestClusterConnectionMutationVariables>(TEST_CLUSTER_CONNECTION_MUTATION);
+    const {mutate: deleteCluster} = useGraphQLMutation<DeleteClusterMutation, {id: string}>(DELETE_CLUSTER_MUTATION);
+    const {mutate: testConnection} = useGraphQLMutation<TestClusterConnectionMutation, {id: string}>(TEST_CLUSTER_CONNECTION_MUTATION);
 
     const handleDeleteClick = (id: string) => {
         setClusterToDelete(id);
@@ -144,31 +148,40 @@ export default function ClustersPage() {
     const handleDeleteConfirm = async () => {
         if (!clusterToDelete) return;
 
-        try {
-            await deleteCluster({variables: {id: clusterToDelete}});
-            toast.success('Cluster deleted successfully');
-            refetch();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to delete cluster'}
-            toast.error(err.message || 'Failed to delete cluster');
-        } finally {
-            setClusterToDelete(null);
-        }
+        deleteCluster(
+            {id: clusterToDelete},
+            {
+                onSuccess: () => {
+                    toast.success('Cluster deleted successfully');
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_CLUSTERS]});
+                    setClusterToDelete(null);
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to delete cluster'}
+                    toast.error(err.message || 'Failed to delete cluster');
+                },
+            }
+        );
     };
 
     const handleTest = async (id: string) => {
-        try {
-            const result = await testConnection({variables: {id}});
-            if (result.data?.testClusterConnection) {
-                toast.success('Connection test successful');
-            } else {
-                toast.error('Connection test failed');
+        testConnection(
+            {id},
+            {
+                onSuccess: (result) => {
+                    if (result.testClusterConnection) {
+                        toast.success('Connection test successful');
+                    } else {
+                        toast.error('Connection test failed');
+                    }
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_CLUSTERS]});
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Connection test failed'}
+                    toast.error(err.message || 'Connection test failed');
+                },
             }
-            await refetch();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Connection test failed'}
-            toast.error(err.message || 'Connection test failed');
-        }
+        );
     };
 
     const isLoading = loading || organizationsLoading;

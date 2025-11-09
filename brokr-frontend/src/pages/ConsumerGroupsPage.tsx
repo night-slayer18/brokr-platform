@@ -1,7 +1,7 @@
-import {useQuery} from '@apollo/client/react';
 import {Link, useParams} from 'react-router-dom';
 import {GET_CONSUMER_GROUPS} from '@/graphql/queries';
 import type {GetConsumerGroupsQuery} from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
@@ -18,10 +18,12 @@ export default function ConsumerGroupsPage() {
     const [isResetOffsetFormOpen, setIsResetOffsetFormOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<string | undefined>(undefined);
 
-    const {data, loading, error, refetch} = useQuery<GetConsumerGroupsQuery>(GET_CONSUMER_GROUPS, {
-        variables: {clusterId: clusterId!},
-        skip: !clusterId,
-    });
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetConsumerGroupsQuery, {clusterId: string}>(GET_CONSUMER_GROUPS, 
+        clusterId ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
     const handleResetOffsetClick = (groupId: string) => {
         setSelectedGroup(groupId);

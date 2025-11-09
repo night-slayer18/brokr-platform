@@ -1,7 +1,7 @@
-import { useQuery } from '@apollo/client/react';
 import { Link, useParams } from 'react-router-dom';
 import { GET_CLUSTER_OVERVIEW } from '@/graphql/queries';
-import type { GetClusterOverviewQuery, GetClusterOverviewVariables } from '@/graphql/types';
+import type { GetClusterOverviewQuery } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -29,10 +29,12 @@ function StatCard({ title, value, description, icon: Icon, to }: { title: string
 export default function ClusterOverviewPage() {
     const { clusterId } = useParams<{ clusterId: string }>();
 
-    const { data, loading, error } = useQuery<GetClusterOverviewQuery, GetClusterOverviewVariables>(GET_CLUSTER_OVERVIEW, {
-        variables: { id: clusterId! },
-        skip: !clusterId,
-    });
+    const { data, isLoading: loading, error } = useGraphQLQuery<GetClusterOverviewQuery, {id: string}>(GET_CLUSTER_OVERVIEW, 
+        clusterId ? {id: clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
     if (loading) {
         return (

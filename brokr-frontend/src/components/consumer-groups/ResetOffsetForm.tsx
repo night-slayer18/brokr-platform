@@ -12,13 +12,15 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog';
-import {useMutation, useQuery} from '@apollo/client/react';
 import {RESET_CONSUMER_OFFSET_MUTATION} from '@/graphql/mutations';
 import type {
     GetTopicsQuery,
-    ResetConsumerOffsetMutation,
-    ResetConsumerOffsetMutationVariables
+    ResetConsumerOffsetMutation
 } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
+import {GET_CONSUMER_GROUPS} from '@/graphql/queries';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
 import {GET_TOPICS} from "@/graphql/queries";
@@ -47,11 +49,14 @@ export function ResetOffsetForm({
                                     onOpenChange,
                                     onOffsetReset,
                                 }: ResetOffsetFormProps) {
-    const [resetConsumerGroupOffset, {loading: mutationLoading}] = useMutation<ResetConsumerOffsetMutation, ResetConsumerOffsetMutationVariables>(RESET_CONSUMER_OFFSET_MUTATION);
-    const {data: topicsData, loading: topicsLoading} = useQuery<GetTopicsQuery>(GET_TOPICS, {
-        variables: {clusterId},
-        skip: !clusterId || !isOpen, // Only fetch when the dialog is open
-    });
+    const queryClient = useQueryClient();
+    const {mutate: resetConsumerGroupOffset, isPending: mutationLoading} = useGraphQLMutation<ResetConsumerOffsetMutation, {clusterId: string; groupId: string; topic: string; partition: number; offset: number}>(RESET_CONSUMER_OFFSET_MUTATION);
+    const {data: topicsData, isLoading: topicsLoading} = useGraphQLQuery<GetTopicsQuery, {clusterId: string}>(GET_TOPICS, 
+        clusterId && isOpen ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId && isOpen, // Only fetch when the dialog is open
+        }
+    );
 
     const {
         register,
@@ -69,23 +74,27 @@ export function ResetOffsetForm({
     });
 
     const onSubmit = async (data: ResetOffsetFormData) => {
-        try {
-            await resetConsumerGroupOffset({
-                variables: {
-                    clusterId,
-                    groupId,
-                    topic: data.topic,
-                    partition: Number(data.partition),
-                    offset: Number(data.offset),
+        resetConsumerGroupOffset(
+            {
+                clusterId,
+                groupId,
+                topic: data.topic,
+                partition: Number(data.partition),
+                offset: Number(data.offset),
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Offset for topic "${data.topic}" partition ${data.partition} reset successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_CONSUMER_GROUPS]});
+                    onOffsetReset();
+                    onOpenChange(false);
+                    reset();
                 },
-            });
-            toast.success(`Offset for topic "${data.topic}" partition ${data.partition} reset successfully`);
-            onOffsetReset();
-            onOpenChange(false);
-            reset();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to reset offset');
-        }
+                onError: (error: any) => {
+                    toast.error(error.message || 'Failed to reset offset');
+                },
+            }
+        );
     };
 
     const loading = mutationLoading || topicsLoading;

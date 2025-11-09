@@ -12,11 +12,13 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog';
-import {useMutation} from '@apollo/client/react';
 import {CREATE_KAFKA_CONNECT_MUTATION} from '@/graphql/mutations';
-import type {CreateKafkaConnectMutation, CreateKafkaConnectMutationVariables} from '@/graphql/types';
+import type {CreateKafkaConnectMutation} from '@/graphql/types';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
+import {GET_KAFKA_CONNECTS} from '@/graphql/queries';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {SECURITY_PROTOCOLS} from '@/lib/constants';
 
@@ -44,7 +46,8 @@ export function CreateKafkaConnectForm({
                                            onOpenChange,
                                            onKafkaConnectCreated
                                        }: CreateKafkaConnectFormProps) {
-    const [createKafkaConnect, {loading}] = useMutation<CreateKafkaConnectMutation, CreateKafkaConnectMutationVariables>(CREATE_KAFKA_CONNECT_MUTATION);
+    const queryClient = useQueryClient();
+    const {mutate: createKafkaConnect, isPending: loading} = useGraphQLMutation<CreateKafkaConnectMutation, {input: any}>(CREATE_KAFKA_CONNECT_MUTATION);
 
     const {
         register,
@@ -68,28 +71,32 @@ export function CreateKafkaConnectForm({
     const securityProtocol = watch('securityProtocol');
 
     const onSubmit = async (data: KafkaConnectFormData) => {
-        try {
-            await createKafkaConnect({
-                variables: {
-                    input: {
-                        clusterId,
-                        name: data.name,
-                        url: data.url,
-                        securityProtocol: data.securityProtocol,
-                        username: data.username,
-                        password: data.password,
-                        isActive: data.isActive,
-                    },
+        createKafkaConnect(
+            {
+                input: {
+                    clusterId,
+                    name: data.name,
+                    url: data.url,
+                    securityProtocol: data.securityProtocol,
+                    username: data.username,
+                    password: data.password,
+                    isActive: data.isActive,
                 },
-            });
-            toast.success(`Kafka Connect "${data.name}" created successfully`);
-            onKafkaConnectCreated();
-            onOpenChange(false);
-            reset();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to create Kafka Connect'}
-            toast.error(err.message || 'Failed to create Kafka Connect');
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Kafka Connect "${data.name}" created successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_CONNECTS]});
+                    onKafkaConnectCreated();
+                    onOpenChange(false);
+                    reset();
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to create Kafka Connect'}
+                    toast.error(err.message || 'Failed to create Kafka Connect');
+                },
+            }
+        );
     };
 
     return (

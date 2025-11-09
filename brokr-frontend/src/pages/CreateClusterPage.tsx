@@ -1,4 +1,4 @@
-import {useMutation, useQuery} from '@apollo/client/react'
+import {useQueryClient} from '@tanstack/react-query'
 import {useNavigate} from 'react-router-dom'
 import {useForm} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
@@ -11,13 +11,12 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {CREATE_CLUSTER_MUTATION} from '@/graphql/mutations'
 import type {
     CreateClusterMutation,
-    CreateClusterMutationVariables,
     GetEnvironmentsByOrganizationQuery,
-    GetEnvironmentsByOrganizationVariables,
     GetOrganizationQuery,
     GetOrganizationsQuery,
-    GetOrganizationVariables,
 } from '@/graphql/types'
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
 import {Loader2} from 'lucide-react'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Switch} from '@/components/ui/switch'
@@ -75,36 +74,39 @@ export default function CreateClusterPage() {
     const selectedOrganizationId = watch('organizationId');
     const securityProtocol = watch('securityProtocol');
 
+    const queryClient = useQueryClient();
+    
     const {
         data: organizationsData,
-        loading: organizationsLoading
-    } = useQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, {
-        skip: !isSuperAdmin,
+        isLoading: organizationsLoading
+    } = useGraphQLQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS, undefined, {
+        enabled: isSuperAdmin,
     });
 
     const {
         data: singleOrganizationData,
-        loading: singleOrganizationLoading
-    } = useQuery<GetOrganizationQuery, GetOrganizationVariables>(GET_ORGANIZATION, {
-        variables: {id: user?.organizationId || ''},
-        skip: isSuperAdmin || !user?.organizationId,
-    });
+        isLoading: singleOrganizationLoading
+    } = useGraphQLQuery<GetOrganizationQuery, {id: string}>(GET_ORGANIZATION, 
+        user?.organizationId ? {id: user.organizationId} : undefined,
+        {
+            enabled: !isSuperAdmin && !!user?.organizationId,
+        }
+    );
 
     const {
         data: environmentsData,
-        loading: environmentsLoading
-    } = useQuery<GetEnvironmentsByOrganizationQuery, GetEnvironmentsByOrganizationVariables>(GET_ENVIRONMENTS_BY_ORGANIZATION, {
-        variables: {organizationId: selectedOrganizationId},
-        skip: !selectedOrganizationId,
-    });
+        isLoading: environmentsLoading
+    } = useGraphQLQuery<GetEnvironmentsByOrganizationQuery, {organizationId: string}>(GET_ENVIRONMENTS_BY_ORGANIZATION, 
+        selectedOrganizationId ? {organizationId: selectedOrganizationId} : undefined,
+        {
+            enabled: !!selectedOrganizationId,
+        }
+    );
 
-    const [createCluster, {loading: createClusterLoading}] = useMutation<CreateClusterMutation, CreateClusterMutationVariables>(CREATE_CLUSTER_MUTATION, {
-        refetchQueries: [
-            {
-                query: GET_CLUSTERS,
-                variables: {organizationId: user?.organizationId},
-            },
-        ],
+    const {mutate: createCluster, isPending: createClusterLoading} = useGraphQLMutation<CreateClusterMutation, any>(CREATE_CLUSTER_MUTATION, {
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['graphql', GET_CLUSTERS]});
+        },
     });
 
     useEffect(() => {
@@ -121,20 +123,24 @@ export default function CreateClusterPage() {
 
 
     const onSubmit = async (formData: KafkaClusterFormData) => {
-        try {
-            await createCluster({
-                variables: {
-                    input: {
-                        ...formData,
-                    },
+        createCluster(
+            {
+                input: {
+                    ...formData,
                 },
-            });
-            toast.success(`Cluster "${formData.name}" created successfully`);
-            navigate('/clusters');
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to create cluster'}
-            toast.error(err.message || 'Failed to create cluster');
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Cluster "${formData.name}" created successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_CLUSTERS]});
+                    navigate('/clusters');
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to create cluster'}
+                    toast.error(err.message || 'Failed to create cluster');
+                },
+            }
+        );
     };
 
     const loading = createClusterLoading || organizationsLoading || singleOrganizationLoading || environmentsLoading;

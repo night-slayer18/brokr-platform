@@ -1,4 +1,4 @@
-import {gql} from '@apollo/client'
+import gql from 'graphql-tag'
 
 export const GET_ME = gql`
     query GetMe {
@@ -344,6 +344,22 @@ export const GET_ORGANIZATIONS = gql`
         organizations {
             id
             name
+            description
+            isActive
+            users {
+                id
+                username
+                email
+                firstName
+                lastName
+                role
+                isActive
+            }
+            environments {
+                id
+                name
+                type
+            }
         }
     }
 `
@@ -353,6 +369,64 @@ export const GET_ORGANIZATION = gql`
         organization(id: $id) {
             id
             name
+            description
+            isActive
+            users {
+                id
+                username
+                email
+                firstName
+                lastName
+                role
+                organizationId
+                accessibleEnvironmentIds
+                isActive
+            }
+            environments {
+                id
+                name
+                type
+                description
+                isActive
+            }
+            clusters {
+                id
+                name
+                description
+                isActive
+            }
+        }
+    }
+`
+
+export const GET_USERS = gql`
+    query GetUsers($organizationId: String) {
+        users(organizationId: $organizationId) {
+            id
+            username
+            email
+            firstName
+            lastName
+            role
+            organizationId
+            accessibleEnvironmentIds
+            isActive
+        }
+    }
+`
+
+export const GET_USER = gql`
+    query GetUser($id: ID!) {
+        user(id: $id) {
+            id
+            username
+            email
+            firstName
+            lastName
+            role
+            organizationId
+            accessibleEnvironmentIds
+            isActive
         }
     }
 `

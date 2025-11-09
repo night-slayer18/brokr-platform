@@ -1,7 +1,7 @@
-import {useQuery} from '@apollo/client/react';
 import {Link, useParams} from 'react-router-dom';
 import {GET_CONSUMER_GROUP} from '@/graphql/queries';
-import type {GetConsumerGroupQuery, GetConsumerGroupVariables} from '@/graphql/types';
+import type {GetConsumerGroupQuery} from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
@@ -20,12 +20,15 @@ export default function ConsumerGroupDetailPage() {
 
     const {
         data,
-        loading,
+        isLoading: loading,
         error,
         refetch
-    } = useQuery<GetConsumerGroupQuery, GetConsumerGroupVariables>(GET_CONSUMER_GROUP, {
-        variables: {clusterId: clusterId!, groupId: groupId!},
-    });
+    } = useGraphQLQuery<GetConsumerGroupQuery, {clusterId: string; groupId: string}>(GET_CONSUMER_GROUP, 
+        clusterId && groupId ? {clusterId, groupId} : undefined,
+        {
+            enabled: !!clusterId && !!groupId,
+        }
+    );
 
     if (loading) {
         return (

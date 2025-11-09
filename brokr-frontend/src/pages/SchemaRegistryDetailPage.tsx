@@ -1,4 +1,3 @@
-import {useApolloClient, useQuery} from '@apollo/client/react';
 import {useParams} from 'react-router-dom';
 import {
     GET_SCHEMA_REGISTRY,
@@ -12,6 +11,8 @@ import type {
     GetSchemaRegistrySchemaVersionsQuery,
     GetSchemaRegistrySubjectsQuery
 } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {executeGraphQL} from '@/lib/graphql-client';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
@@ -23,15 +24,17 @@ import {toast} from "sonner";
 
 export default function SchemaRegistryDetailPage() {
     const {srId} = useParams<{ clusterId: string; srId: string }>();
-    const client = useApolloClient();
 
     const {
         data: schemaRegistryData,
-        loading: schemaRegistryLoading,
+        isLoading: schemaRegistryLoading,
         error: schemaRegistryError
-    } = useQuery<GetSchemaRegistryQuery>(GET_SCHEMA_REGISTRY, {
-        variables: {id: srId!},
-    });
+    } = useGraphQLQuery<GetSchemaRegistryQuery, {id: string}>(GET_SCHEMA_REGISTRY, 
+        srId ? {id: srId} : undefined,
+        {
+            enabled: !!srId,
+        }
+    );
 
     const [subjects, setSubjects] = useState<string[]>([]);
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -58,9 +61,8 @@ export default function SchemaRegistryDetailPage() {
     const fetchSubjects = async () => {
         setSubjectsLoading(true);
         try {
-            const {data} = await client.query<GetSchemaRegistrySubjectsQuery>({
-                query: GET_SCHEMA_REGISTRY_SUBJECTS,
-                variables: {schemaRegistryId: srId!},
+            const data = await executeGraphQL<GetSchemaRegistrySubjectsQuery>(GET_SCHEMA_REGISTRY_SUBJECTS, {
+                schemaRegistryId: srId!,
             });
             if (data && data.schemaRegistrySubjects) {
                 setSubjects(data.schemaRegistrySubjects);
@@ -78,9 +80,9 @@ export default function SchemaRegistryDetailPage() {
     const fetchLatestSchema = async (subject: string) => {
         setSchemaLoading(true);
         try {
-            const {data} = await client.query<GetSchemaRegistryLatestSchemaQuery>({
-                query: GET_SCHEMA_REGISTRY_LATEST_SCHEMA,
-                variables: {schemaRegistryId: srId!, subject},
+            const data = await executeGraphQL<GetSchemaRegistryLatestSchemaQuery>(GET_SCHEMA_REGISTRY_LATEST_SCHEMA, {
+                schemaRegistryId: srId!,
+                subject,
             });
             if (data && data.schemaRegistryLatestSchema) {
                 setLatestSchema(JSON.stringify(JSON.parse(data.schemaRegistryLatestSchema), null, 2));
@@ -95,9 +97,9 @@ export default function SchemaRegistryDetailPage() {
 
     const fetchSchemaVersions = async (subject: string) => {
         try {
-            const {data} = await client.query<GetSchemaRegistrySchemaVersionsQuery>({
-                query: GET_SCHEMA_REGISTRY_SCHEMA_VERSIONS,
-                variables: {schemaRegistryId: srId!, subject},
+            const data = await executeGraphQL<GetSchemaRegistrySchemaVersionsQuery>(GET_SCHEMA_REGISTRY_SCHEMA_VERSIONS, {
+                schemaRegistryId: srId!,
+                subject,
             });
             if (data && data.schemaRegistrySchemaVersions) {
                 setSchemaVersions(data.schemaRegistrySchemaVersions);

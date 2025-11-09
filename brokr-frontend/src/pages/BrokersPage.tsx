@@ -1,7 +1,7 @@
-import { useQuery } from '@apollo/client/react';
 import { useParams } from 'react-router-dom';
 import { GET_CLUSTER } from '@/graphql/queries';
-import type { GetClusterQuery, GetClusterVariables } from '@/graphql/types';
+import type { GetClusterQuery } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,10 +9,12 @@ import type { BrokerNode } from '@/types';
 
 export default function BrokersPage() {
     const { clusterId } = useParams<{ clusterId: string }>();
-    const { data, loading, error } = useQuery<GetClusterQuery, GetClusterVariables>(GET_CLUSTER, {
-        variables: { id: clusterId! },
-        skip: !clusterId,
-    });
+    const { data, isLoading: loading, error } = useGraphQLQuery<GetClusterQuery, {id: string}>(GET_CLUSTER, 
+        clusterId ? {id: clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
     if (loading) {
         return (

@@ -8,10 +8,12 @@ export function useAuth() {
 
     const hasRole = (role: string | string[]) => {
         if (!user) return false
+        // Normalize role comparison (case-insensitive, trim whitespace)
+        const userRole = user.role?.trim().toUpperCase()
         if (Array.isArray(role)) {
-            return role.includes(user.role)
+            return role.some(r => r.trim().toUpperCase() === userRole)
         }
-        return user.role === role
+        return role.trim().toUpperCase() === userRole
     }
 
     const canManageTopics = () => {
@@ -24,6 +26,14 @@ export function useAuth() {
 
     const canManageClusters = () => {
         return hasRole(['ADMIN', 'SUPER_ADMIN'])
+    }
+
+    const canManageOrganizations = () => {
+        return hasRole('SUPER_ADMIN')
+    }
+
+    const isSuperAdmin = () => {
+        return hasRole('SUPER_ADMIN')
     }
 
     const canAccessEnvironment = (environmentId: string) => {
@@ -40,7 +50,9 @@ export function useAuth() {
         hasRole,
         canManageTopics,
         canManageUsers,
-        canManageClusters, // Add this
+        canManageClusters,
+        canManageOrganizations,
+        isSuperAdmin,
         canAccessEnvironment,
     }
 }

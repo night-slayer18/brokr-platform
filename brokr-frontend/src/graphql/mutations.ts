@@ -1,4 +1,4 @@
-import {gql} from '@apollo/client'
+import gql from 'graphql-tag'
 
 export const LOGIN_MUTATION = gql`
     mutation Login($input: LoginInput!) {
@@ -207,5 +207,71 @@ export const UPDATE_KAFKA_STREAMS_APPLICATION_MUTATION = gql`
 export const DELETE_KAFKA_STREAMS_APPLICATION_MUTATION = gql`
     mutation DeleteKafkaStreamsApplication($id: ID!) {
         deleteKafkaStreamsApplication(id: $id)
+    }
+`
+
+export const CREATE_ORGANIZATION_MUTATION = gql`
+    mutation CreateOrganization($input: OrganizationInput!) {
+        createOrganization(input: $input) {
+            id
+            name
+            description
+            isActive
+        }
+    }
+`
+
+export const UPDATE_ORGANIZATION_MUTATION = gql`
+    mutation UpdateOrganization($id: ID!, $input: OrganizationInput!) {
+        updateOrganization(id: $id, input: $input) {
+            id
+            name
+            description
+            isActive
+        }
+    }
+`
+
+export const DELETE_ORGANIZATION_MUTATION = gql`
+    mutation DeleteOrganization($id: ID!) {
+        deleteOrganization(id: $id)
+    }
+`
+
+export const CREATE_USER_MUTATION = gql`
+    mutation CreateUser($input: UserInput!) {
+        createUser(input: $input) {
+            id
+            username
+            email
+            firstName
+            lastName
+            role
+            organizationId
+            accessibleEnvironmentIds
+            isActive
+        }
+    }
+`
+
+export const UPDATE_USER_MUTATION = gql`
+    mutation UpdateUser($id: ID!, $input: UserInput!) {
+        updateUser(id: $id, input: $input) {
+            id
+            username
+            email
+            firstName
+            lastName
+            role
+            organizationId
+            accessibleEnvironmentIds
+            isActive
+        }
+    }
+`
+
+export const DELETE_USER_MUTATION = gql`
+    mutation DeleteUser($id: ID!) {
+        deleteUser(id: $id)
     }
 `

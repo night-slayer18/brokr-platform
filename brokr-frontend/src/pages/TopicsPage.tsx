@@ -1,9 +1,8 @@
 import {useState} from 'react';
-import {useMutation, useQuery} from '@apollo/client/react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_TOPICS} from '@/graphql/queries';
 import {DELETE_TOPIC_MUTATION} from '@/graphql/mutations';
-import type {DeleteTopicMutation, DeleteTopicMutationVariables, GetTopicsQuery} from '@/graphql/types';
+import type {DeleteTopicMutation, GetTopicsQuery} from '@/graphql/types';
 import type {Topic} from '@/types';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
@@ -22,6 +21,9 @@ import {
     DialogHeader,
     DialogTitle
 } from "@/components/ui/dialog";
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
 
 export default function TopicsPage() {
     const {clusterId} = useParams<{ clusterId: string }>();
@@ -31,12 +33,15 @@ export default function TopicsPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
 
-    const {data, loading, error, refetch} = useQuery<GetTopicsQuery>(GET_TOPICS, {
-        variables: {clusterId: clusterId!},
-        skip: !clusterId,
-    });
+    const queryClient = useQueryClient();
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetTopicsQuery, {clusterId: string}>(GET_TOPICS, 
+        clusterId ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
-    const [deleteTopic] = useMutation<DeleteTopicMutation, DeleteTopicMutationVariables>(DELETE_TOPIC_MUTATION);
+    const {mutate: deleteTopic} = useGraphQLMutation<DeleteTopicMutation, {clusterId: string; name: string}>(DELETE_TOPIC_MUTATION);
 
     const openDeleteDialog = (topicName: string) => {
         setTopicToDelete(topicName);
@@ -44,18 +49,22 @@ export default function TopicsPage() {
     };
 
     const handleDeleteTopic = async () => {
-        if (!topicToDelete) return;
+        if (!topicToDelete || !clusterId) return;
 
-        try {
-            await deleteTopic({variables: {clusterId: clusterId!, name: topicToDelete}});
-            toast.success(`Topic "${topicToDelete}" deleted successfully`);
-            refetch();
-        } catch (err: any) {
-            toast.error(err.message || 'Failed to delete topic');
-        } finally {
-            setIsDeleteDialogOpen(false);
-            setTopicToDelete(null);
-        }
+        deleteTopic(
+            {clusterId, name: topicToDelete},
+            {
+                onSuccess: () => {
+                    toast.success(`Topic "${topicToDelete}" deleted successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_TOPICS]});
+                    setIsDeleteDialogOpen(false);
+                    setTopicToDelete(null);
+                },
+                onError: (err: any) => {
+                    toast.error(err.message || 'Failed to delete topic');
+                },
+            }
+        );
     };
 
     if (!clusterId) {

@@ -2,9 +2,9 @@ import { Link, Outlet, useParams, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LayoutDashboard, Server, Users, FileText, Database, PlugZap, Zap } from 'lucide-react';
-import { useQuery } from '@apollo/client/react';
 import { GET_CLUSTER } from '@/graphql/queries';
-import type { GetClusterQuery, GetClusterVariables } from '@/graphql/types';
+import type { GetClusterQuery } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Breadcrumb,
@@ -14,16 +14,19 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
+import { UserMenu } from './UserMenu';
 import React from 'react';
 
 export function ClusterLayout() {
     const { clusterId } = useParams<{ clusterId: string }>();
     const location = useLocation();
 
-    const { data, loading } = useQuery<GetClusterQuery, GetClusterVariables>(GET_CLUSTER, {
-        variables: { id: clusterId! },
-        skip: !clusterId,
-    });
+    const { data, isLoading: loading } = useGraphQLQuery<GetClusterQuery, {id: string}>(GET_CLUSTER, 
+        clusterId ? {id: clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
     const clusterName = data?.cluster?.name || '...';
 
@@ -98,12 +101,16 @@ export function ClusterLayout() {
                 </ScrollArea>
             </aside>
             <div className="flex flex-1 flex-col overflow-hidden">
-                <header className="border-b bg-card h-16 flex items-center px-6">
+                <header className="border-b bg-card h-16 flex items-center justify-between px-6">
                     <Breadcrumb>
                         <BreadcrumbList>
                             {breadcrumbItems}
                         </BreadcrumbList>
                     </Breadcrumb>
+                    {/* Profile icon in header for easy access on all cluster pages */}
+                    <div className="ml-auto">
+                        <UserMenu />
+                    </div>
                 </header>
                 <main className="flex-1 overflow-y-auto p-6">
                     <Outlet />

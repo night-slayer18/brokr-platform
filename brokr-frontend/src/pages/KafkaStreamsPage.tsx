@@ -1,13 +1,14 @@
 import {useState} from 'react';
-import {useMutation, useQuery} from '@apollo/client/react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_KAFKA_STREAMS} from '@/graphql/queries';
 import {DELETE_KAFKA_STREAMS_APPLICATION_MUTATION} from '@/graphql/mutations';
 import type {
     DeleteKafkaStreamsApplicationMutation,
-    DeleteKafkaStreamsApplicationMutationVariables,
     GetKafkaStreamsQuery
 } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
@@ -35,12 +36,15 @@ export default function KafkaStreamsPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
-    const {data, loading, error, refetch} = useQuery<GetKafkaStreamsQuery>(GET_KAFKA_STREAMS, {
-        variables: {clusterId: clusterId!},
-        skip: !clusterId,
-    });
+    const queryClient = useQueryClient();
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetKafkaStreamsQuery, {clusterId: string}>(GET_KAFKA_STREAMS, 
+        clusterId ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
-    const [deleteKafkaStreamsApplication] = useMutation<DeleteKafkaStreamsApplicationMutation, DeleteKafkaStreamsApplicationMutationVariables>(DELETE_KAFKA_STREAMS_APPLICATION_MUTATION);
+    const {mutate: deleteKafkaStreamsApplication} = useGraphQLMutation<DeleteKafkaStreamsApplicationMutation, {id: string}>(DELETE_KAFKA_STREAMS_APPLICATION_MUTATION);
 
     const openDeleteDialog = (id: string, name: string) => {
         setItemToDelete({id, name});
@@ -50,17 +54,21 @@ export default function KafkaStreamsPage() {
     const handleDelete = async () => {
         if (!itemToDelete) return;
 
-        try {
-            await deleteKafkaStreamsApplication({variables: {id: itemToDelete.id}});
-            toast.success(`Kafka Streams Application "${itemToDelete.name}" deleted successfully`);
-            refetch();
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: 'Failed to delete Kafka Streams Application'}
-            toast.error(error.message || 'Failed to delete Kafka Streams Application');
-        } finally {
-            setIsDeleteDialogOpen(false);
-            setItemToDelete(null);
-        }
+        deleteKafkaStreamsApplication(
+            {id: itemToDelete.id},
+            {
+                onSuccess: () => {
+                    toast.success(`Kafka Streams Application "${itemToDelete.name}" deleted successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_STREAMS]});
+                    setIsDeleteDialogOpen(false);
+                    setItemToDelete(null);
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Failed to delete Kafka Streams Application'}
+                    toast.error(error.message || 'Failed to delete Kafka Streams Application');
+                },
+            }
+        );
     };
 
     if (!clusterId) {

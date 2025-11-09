@@ -1,15 +1,15 @@
 import {useState} from 'react';
-import {useMutation, useQuery} from '@apollo/client/react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_KAFKA_CONNECTS} from '@/graphql/queries';
 import {DELETE_KAFKA_CONNECT_MUTATION, TEST_KAFKA_CONNECT_CONNECTION_MUTATION} from '@/graphql/mutations';
 import type {
     DeleteKafkaConnectMutation,
-    DeleteKafkaConnectMutationVariables,
     GetKafkaConnectsQuery,
-    TestKafkaConnectConnectionMutation,
-    TestKafkaConnectConnectionMutationVariables
+    TestKafkaConnectConnectionMutation
 } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
@@ -37,13 +37,16 @@ export default function KafkaConnectPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
-    const {data, loading, error, refetch} = useQuery<GetKafkaConnectsQuery>(GET_KAFKA_CONNECTS, {
-        variables: {clusterId: clusterId!},
-        skip: !clusterId,
-    });
+    const queryClient = useQueryClient();
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetKafkaConnectsQuery, {clusterId: string}>(GET_KAFKA_CONNECTS, 
+        clusterId ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
-    const [deleteKafkaConnect] = useMutation<DeleteKafkaConnectMutation, DeleteKafkaConnectMutationVariables>(DELETE_KAFKA_CONNECT_MUTATION);
-    const [testConnection] = useMutation<TestKafkaConnectConnectionMutation, TestKafkaConnectConnectionMutationVariables>(TEST_KAFKA_CONNECT_CONNECTION_MUTATION);
+    const {mutate: deleteKafkaConnect} = useGraphQLMutation<DeleteKafkaConnectMutation, {id: string}>(DELETE_KAFKA_CONNECT_MUTATION);
+    const {mutate: testConnection} = useGraphQLMutation<TestKafkaConnectConnectionMutation, {id: string}>(TEST_KAFKA_CONNECT_CONNECTION_MUTATION);
 
     const openDeleteDialog = (id: string, name: string) => {
         setItemToDelete({id, name});
@@ -53,32 +56,41 @@ export default function KafkaConnectPage() {
     const handleDelete = async () => {
         if (!itemToDelete) return;
 
-        try {
-            await deleteKafkaConnect({variables: {id: itemToDelete.id}});
-            toast.success(`Kafka Connect instance "${itemToDelete.name}" deleted successfully`);
-            refetch();
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: 'Failed to delete Kafka Connect instance'}
-            toast.error(error.message || 'Failed to delete Kafka Connect instance');
-        } finally {
-            setIsDeleteDialogOpen(false);
-            setItemToDelete(null);
-        }
+        deleteKafkaConnect(
+            {id: itemToDelete.id},
+            {
+                onSuccess: () => {
+                    toast.success(`Kafka Connect instance "${itemToDelete.name}" deleted successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_CONNECTS]});
+                    setIsDeleteDialogOpen(false);
+                    setItemToDelete(null);
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Failed to delete Kafka Connect instance'}
+                    toast.error(error.message || 'Failed to delete Kafka Connect instance');
+                },
+            }
+        );
     };
 
     const handleTestConnection = async (id: string, name: string) => {
-        try {
-            const {data} = await testConnection({variables: {id}});
-            if (data) { // Access the correct field from the mutation result
-                toast.success(`Connection to "${name}" successful`);
-            } else {
-                toast.error(`Connection to "${name}" failed`);
+        testConnection(
+            {id},
+            {
+                onSuccess: (data) => {
+                    if (data) {
+                        toast.success(`Connection to "${name}" successful`);
+                    } else {
+                        toast.error(`Connection to "${name}" failed`);
+                    }
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_CONNECTS]});
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Connection test failed'}
+                    toast.error(error.message || 'Connection test failed');
+                },
             }
-            refetch();
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: 'Connection test failed'}
-            toast.error(error.message || 'Connection test failed');
-        }
+        );
     };
 
     if (!clusterId) {

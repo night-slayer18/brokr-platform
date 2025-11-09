@@ -1,7 +1,7 @@
-import { useQuery } from '@apollo/client/react';
 import { useParams } from 'react-router-dom';
 import { GET_KAFKA_STREAMS_APPLICATION } from '@/graphql/queries';
-import type { GetKafkaStreamsApplicationQuery, GetKafkaStreamsApplicationVariables } from '@/graphql/types';
+import type { GetKafkaStreamsApplicationQuery } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,12 @@ import { STREAMS_STATES } from '@/lib/constants';
 export default function KafkaStreamsDetailPage() {
   const { ksId } = useParams<{ clusterId: string; ksId: string }>();
 
-  const { data, loading, error } = useQuery<GetKafkaStreamsApplicationQuery, GetKafkaStreamsApplicationVariables>(GET_KAFKA_STREAMS_APPLICATION, {
-    variables: { id: ksId! },
-  });
+  const { data, isLoading: loading, error } = useGraphQLQuery<GetKafkaStreamsApplicationQuery, {id: string}>(GET_KAFKA_STREAMS_APPLICATION, 
+    ksId ? {id: ksId} : undefined,
+    {
+      enabled: !!ksId,
+    }
+  );
 
   const kafkaStreamsApp = data?.kafkaStreamsApplication;
 

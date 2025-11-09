@@ -1,7 +1,8 @@
 import {Link, useLocation} from 'react-router-dom'
 import {cn} from '@/lib/utils'
-import {LayoutDashboard, Server,} from 'lucide-react'
+import {LayoutDashboard, Server, Shield} from 'lucide-react'
 import {ScrollArea} from '@/components/ui/scroll-area'
+import {useAuth} from '@/hooks/useAuth'
 
 const navigation = [
     {
@@ -13,6 +14,19 @@ const navigation = [
         name: 'Clusters',
         href: '/clusters',
         icon: Server,
+    },
+]
+
+const adminNavigation = [
+    {
+        name: 'Admin Dashboard',
+        href: '/admin/dashboard',
+        icon: LayoutDashboard,
+    },
+    {
+        name: 'Organizations',
+        href: '/admin/organizations',
+        icon: Shield,
     },
 ]
 
@@ -43,6 +57,8 @@ function SidebarLink({href, icon: Icon, children}: SidebarLinkProps) {
 }
 
 export function Sidebar() {
+    const {isSuperAdmin} = useAuth()
+
     return (
         <aside className="w-64 border-r bg-card">
             <div className="flex h-16 items-center border-b px-6">
@@ -58,6 +74,19 @@ export function Sidebar() {
                             {item.name}
                         </SidebarLink>
                     ))}
+                    {isSuperAdmin() && (
+                        <>
+                            <div className="my-4 border-t border-border"/>
+                            <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Admin
+                            </div>
+                            {adminNavigation.map((item) => (
+                                <SidebarLink key={item.href} href={item.href} icon={item.icon}>
+                                    {item.name}
+                                </SidebarLink>
+                            ))}
+                        </>
+                    )}
                 </nav>
             </ScrollArea>
         </aside>

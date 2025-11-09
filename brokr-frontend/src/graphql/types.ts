@@ -67,6 +67,22 @@ export interface GetOrganizationsQuery {
     organizations: {
         id: string;
         name: string;
+        description?: string | null;
+        isActive: boolean;
+        users?: Array<{
+            id: string;
+            username: string;
+            email: string;
+            firstName?: string | null;
+            lastName?: string | null;
+            role: string;
+            isActive: boolean;
+        }>;
+        environments?: Array<{
+            id: string;
+            name: string;
+            type: string;
+        }>;
     }[];
 }
 
@@ -74,7 +90,41 @@ export interface GetOrganizationQuery {
     organization: {
         id: string;
         name: string;
+        description?: string | null;
+        isActive: boolean;
+        users?: Array<{
+            id: string;
+            username: string;
+            email: string;
+            firstName?: string | null;
+            lastName?: string | null;
+            role: string;
+            organizationId?: string | null;
+            accessibleEnvironmentIds?: string[];
+            isActive: boolean;
+        }>;
+        environments?: Array<{
+            id: string;
+            name: string;
+            type: string;
+            description?: string | null;
+            isActive: boolean;
+        }>;
+        clusters?: Array<{
+            id: string;
+            name: string;
+            description?: string | null;
+            isActive: boolean;
+        }>;
     };
+}
+
+export interface GetUsersQuery {
+    users: User[];
+}
+
+export interface GetUserQuery {
+    user: User;
 }
 
 export interface GetMessagesQuery {
@@ -407,4 +457,62 @@ export interface CreateKafkaStreamsApplicationMutationVariables {
 // Missing mutation result types
 export interface TestKafkaConnectConnectionMutation {
     testKafkaConnectConnection: boolean
+}
+
+// Organization mutation types
+export interface CreateOrganizationMutation {
+    createOrganization: {
+        id: string;
+        name: string;
+        description?: string | null;
+        isActive: boolean;
+    };
+}
+
+export interface UpdateOrganizationMutation {
+    updateOrganization: {
+        id: string;
+        name: string;
+        description?: string | null;
+        isActive: boolean;
+    };
+}
+
+export interface DeleteOrganizationMutation {
+    deleteOrganization: boolean;
+}
+
+// User mutation types
+export interface CreateUserMutation {
+    createUser: User;
+}
+
+export interface UpdateUserMutation {
+    updateUser: User;
+}
+
+export interface DeleteUserMutation {
+    deleteUser: boolean;
+}
+
+// Organization input types
+export interface OrganizationInput {
+    id?: string;
+    name: string;
+    description?: string;
+    isActive: boolean;
+}
+
+// User input types
+export interface UserInput {
+    id?: string;
+    username: string;
+    email: string;
+    password?: string;
+    firstName?: string;
+    lastName?: string;
+    role: 'VIEWER' | 'ADMIN' | 'SUPER_ADMIN' | 'SERVER_ADMIN';
+    organizationId?: string;
+    accessibleEnvironmentIds?: string[];
+    isActive: boolean;
 }

@@ -14,6 +14,14 @@ spring:
     username: nightslayer
     password:
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # Connection pool configuration for better performance
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
 
   jpa:
     hibernate:

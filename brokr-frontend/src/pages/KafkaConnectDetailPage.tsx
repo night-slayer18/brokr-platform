@@ -1,7 +1,7 @@
-import { useQuery } from '@apollo/client/react';
 import { useParams } from 'react-router-dom';
 import { GET_KAFKA_CONNECT } from '@/graphql/queries';
-import type { GetKafkaConnectQuery, GetKafkaConnectVariables } from '@/graphql/types';
+import type { GetKafkaConnectQuery } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +13,12 @@ import { CONNECTOR_STATES } from '@/lib/constants';
 export default function KafkaConnectDetailPage() {
   const { kcId } = useParams<{ clusterId: string; kcId: string }>();
 
-  const { data, loading, error } = useQuery<GetKafkaConnectQuery, GetKafkaConnectVariables>(GET_KAFKA_CONNECT, {
-    variables: { id: kcId! },
-  });
+  const { data, isLoading: loading, error } = useGraphQLQuery<GetKafkaConnectQuery, {id: string}>(GET_KAFKA_CONNECT, 
+    kcId ? {id: kcId} : undefined,
+    {
+      enabled: !!kcId,
+    }
+  );
 
   const kafkaConnect = data?.kafkaConnect;
 

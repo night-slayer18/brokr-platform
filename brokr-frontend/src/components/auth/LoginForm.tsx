@@ -1,4 +1,3 @@
-import {useMutation} from '@apollo/client/react'
 import {useNavigate} from 'react-router-dom'
 import {useForm} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
@@ -11,6 +10,8 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {LOGIN_MUTATION} from '@/graphql/mutations'
 import {useAuthStore} from '@/store/authStore'
 import {Loader2} from 'lucide-react'
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
+import type {LoginMutation} from '@/graphql/types'
 
 const loginSchema = z.object({
     username: z.string().min(1, 'Username is required'),
@@ -22,7 +23,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 export function LoginForm() {
     const navigate = useNavigate()
     const login = useAuthStore((state) => state.login)
-    const [loginMutation, {loading}] = useMutation(LOGIN_MUTATION)
+    const {mutate: loginMutation, isPending: loading} = useGraphQLMutation<LoginMutation, {input: {username: string; password: string}}>(LOGIN_MUTATION)
 
     const {
         register,
@@ -33,24 +34,26 @@ export function LoginForm() {
     })
 
     const onSubmit = async (data: LoginFormData) => {
-        try {
-            const result = await loginMutation({
-                variables: {
-                    input: {
-                        username: data.username,
-                        password: data.password,
-                    },
+        loginMutation(
+            {
+                input: {
+                    username: data.username,
+                    password: data.password,
                 },
-            })
-
-            // Token is now in HttpOnly cookie, not in response
-            const {user} = (result.data as { login: { user: any } }).login
-            login(user)
-            toast.success('Logged in successfully')
-            navigate('/dashboard')
-        } catch (error: any) {
-            toast.error(error.message || 'Login failed')
-        }
+            },
+            {
+                onSuccess: (result) => {
+                    // Token is now in HttpOnly cookie, not in response
+                    const {user} = result.login
+                    login(user)
+                    toast.success('Logged in successfully')
+                    navigate('/dashboard')
+                },
+                onError: (error: any) => {
+                    toast.error(error.message || 'Login failed')
+                },
+            }
+        )
     }
 
     return (

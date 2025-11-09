@@ -12,7 +12,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +46,12 @@ public class UserManagementService {
         }
 
         throw new RuntimeException("Access denied");
+    }
+
+    public Map<String, List<User>> getUsersForOrganizations(List<String> organizationIds) {
+        return userRepository.findByOrganizationIdIn(organizationIds).stream()
+                .map(UserEntity::toDomain)
+                .collect(Collectors.groupingBy(User::getOrganizationId));
     }
 
     public User createUser(User user) {

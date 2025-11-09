@@ -18,9 +18,13 @@ import KafkaStreamsDetailPage from './pages/KafkaStreamsDetailPage'
 import CreateClusterPage from './pages/CreateClusterPage'
 
 import { AdminRoute } from "./components/auth/AdminRoute";
+import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import { ClusterLayout } from './components/layout/ClusterLayout';
 import ClusterOverviewPage from './pages/ClusterOverviewPage';
 import BrokersPage from './pages/BrokersPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import OrganizationsPage from './pages/admin/OrganizationsPage';
+import OrganizationDetailPage from './pages/admin/OrganizationDetailPage';
 
 function App() {
     return (
@@ -60,6 +64,20 @@ function App() {
                     <Route path="kafka-connect/:kcId" element={<KafkaConnectDetailPage />} />
                     <Route path="kafka-streams" element={<KafkaStreamsPage />} />
                     <Route path="kafka-streams/:ksId" element={<KafkaStreamsDetailPage />} />
+                </Route>
+                <Route
+                    path="/admin"
+                    element={
+                        <ProtectedRoute>
+                            <SuperAdminRoute>
+                                <AppLayout />
+                            </SuperAdminRoute>
+                        </ProtectedRoute>
+                    }
+                >
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
+                    <Route path="organizations" element={<OrganizationsPage />} />
+                    <Route path="organizations/:orgId" element={<OrganizationDetailPage />} />
                 </Route>
             </Routes>
             <Toaster position="top-right" richColors />

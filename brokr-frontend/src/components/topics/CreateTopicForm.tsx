@@ -12,11 +12,13 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog';
-import {useMutation} from '@apollo/client/react';
 import {CREATE_TOPIC_MUTATION} from '@/graphql/mutations';
-import type {CreateTopicMutation, CreateTopicMutationVariables} from '@/graphql/types';
+import type {CreateTopicMutation} from '@/graphql/types';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
+import {GET_TOPICS} from '@/graphql/queries';
 
 const topicSchema = z.object({
     name: z.string().min(1, 'Topic name is required'),
@@ -34,7 +36,8 @@ interface CreateTopicFormProps {
 }
 
 export function CreateTopicForm({clusterId, isOpen, onOpenChange, onTopicCreated}: CreateTopicFormProps) {
-    const [createTopic, {loading}] = useMutation<CreateTopicMutation, CreateTopicMutationVariables>(CREATE_TOPIC_MUTATION);
+    const queryClient = useQueryClient();
+    const {mutate: createTopic, isPending: loading} = useGraphQLMutation<CreateTopicMutation, {clusterId: string; input: {name: string; partitions: number; replicationFactor: number}}>(CREATE_TOPIC_MUTATION);
 
     const {
         register,
@@ -50,25 +53,29 @@ export function CreateTopicForm({clusterId, isOpen, onOpenChange, onTopicCreated
     });
 
     const onSubmit = async (data: TopicFormData) => {
-        try {
-            await createTopic({
-                variables: {
-                    clusterId,
-                    input: {
-                        name: data.name,
-                        partitions: data.partitions,
-                        replicationFactor: data.replicationFactor,
-                    },
+        createTopic(
+            {
+                clusterId,
+                input: {
+                    name: data.name,
+                    partitions: data.partitions,
+                    replicationFactor: data.replicationFactor,
                 },
-            });
-            toast.success(`Topic "${data.name}" created successfully`);
-            onTopicCreated();
-            onOpenChange(false);
-            reset();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to create topic'}
-            toast.error(err.message || 'Failed to create topic');
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Topic "${data.name}" created successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_TOPICS]});
+                    onTopicCreated();
+                    onOpenChange(false);
+                    reset();
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to create topic'}
+                    toast.error(err.message || 'Failed to create topic');
+                },
+            }
+        );
     };
 
     return (

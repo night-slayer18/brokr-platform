@@ -12,11 +12,13 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog';
-import {useMutation} from '@apollo/client/react';
 import {CREATE_SCHEMA_REGISTRY_MUTATION} from '@/graphql/mutations';
-import type {CreateSchemaRegistryMutation, CreateSchemaRegistryMutationVariables} from '@/graphql/types';
+import type {CreateSchemaRegistryMutation} from '@/graphql/types';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
+import {GET_SCHEMA_REGISTRIES} from '@/graphql/queries';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {SECURITY_PROTOCOLS} from '@/lib/constants';
 
@@ -44,7 +46,8 @@ export function CreateSchemaRegistryForm({
                                              onOpenChange,
                                              onSchemaRegistryCreated
                                          }: CreateSchemaRegistryFormProps) {
-    const [createSchemaRegistry, {loading}] = useMutation<CreateSchemaRegistryMutation, CreateSchemaRegistryMutationVariables>(CREATE_SCHEMA_REGISTRY_MUTATION);
+    const queryClient = useQueryClient();
+    const {mutate: createSchemaRegistry, isPending: loading} = useGraphQLMutation<CreateSchemaRegistryMutation, {input: any}>(CREATE_SCHEMA_REGISTRY_MUTATION);
 
     const {
         register,
@@ -68,28 +71,32 @@ export function CreateSchemaRegistryForm({
     const securityProtocol = watch('securityProtocol');
 
     const onSubmit = async (data: SchemaRegistryFormData) => {
-        try {
-            await createSchemaRegistry({
-                variables: {
-                    input: {
-                        clusterId,
-                        name: data.name,
-                        url: data.url,
-                        securityProtocol: data.securityProtocol,
-                        username: data.username,
-                        password: data.password,
-                        isActive: data.isActive,
-                    },
+        createSchemaRegistry(
+            {
+                input: {
+                    clusterId,
+                    name: data.name,
+                    url: data.url,
+                    securityProtocol: data.securityProtocol,
+                    username: data.username,
+                    password: data.password,
+                    isActive: data.isActive,
                 },
-            });
-            toast.success(`Schema Registry "${data.name}" created successfully`);
-            onSchemaRegistryCreated();
-            onOpenChange(false);
-            reset();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to create schema registry'}
-            toast.error(err.message || 'Failed to create schema registry');
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Schema Registry "${data.name}" created successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_SCHEMA_REGISTRIES]});
+                    onSchemaRegistryCreated();
+                    onOpenChange(false);
+                    reset();
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to create schema registry'}
+                    toast.error(err.message || 'Failed to create schema registry');
+                },
+            }
+        );
     };
 
     return (

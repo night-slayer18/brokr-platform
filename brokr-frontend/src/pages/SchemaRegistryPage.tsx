@@ -1,15 +1,15 @@
 import {useState} from 'react';
-import {useMutation, useQuery} from '@apollo/client/react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_SCHEMA_REGISTRIES} from '@/graphql/queries';
 import {DELETE_SCHEMA_REGISTRY_MUTATION, TEST_SCHEMA_REGISTRY_CONNECTION_MUTATION} from '@/graphql/mutations';
 import type {
     DeleteSchemaRegistryMutation,
-    DeleteSchemaRegistryMutationVariables,
     GetSchemaRegistriesQuery,
-    TestSchemaRegistryConnectionMutation,
-    TestSchemaRegistryConnectionMutationVariables
+    TestSchemaRegistryConnectionMutation
 } from '@/graphql/types';
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
@@ -37,13 +37,16 @@ export default function SchemaRegistryPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
-    const {data, loading, error, refetch} = useQuery<GetSchemaRegistriesQuery>(GET_SCHEMA_REGISTRIES, {
-        variables: {clusterId: clusterId!},
-        skip: !clusterId,
-    });
+    const queryClient = useQueryClient();
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetSchemaRegistriesQuery, {clusterId: string}>(GET_SCHEMA_REGISTRIES, 
+        clusterId ? {clusterId} : undefined,
+        {
+            enabled: !!clusterId,
+        }
+    );
 
-    const [deleteSchemaRegistry] = useMutation<DeleteSchemaRegistryMutation, DeleteSchemaRegistryMutationVariables>(DELETE_SCHEMA_REGISTRY_MUTATION);
-    const [testConnection] = useMutation<TestSchemaRegistryConnectionMutation, TestSchemaRegistryConnectionMutationVariables>(TEST_SCHEMA_REGISTRY_CONNECTION_MUTATION);
+    const {mutate: deleteSchemaRegistry} = useGraphQLMutation<DeleteSchemaRegistryMutation, {id: string}>(DELETE_SCHEMA_REGISTRY_MUTATION);
+    const {mutate: testConnection} = useGraphQLMutation<TestSchemaRegistryConnectionMutation, {id: string}>(TEST_SCHEMA_REGISTRY_CONNECTION_MUTATION);
 
     const openDeleteDialog = (id: string, name: string) => {
         setItemToDelete({id, name});
@@ -53,32 +56,41 @@ export default function SchemaRegistryPage() {
     const handleDelete = async () => {
         if (!itemToDelete) return;
 
-        try {
-            await deleteSchemaRegistry({variables: {id: itemToDelete.id}});
-            toast.success(`Schema Registry "${itemToDelete.name}" deleted successfully`);
-            refetch();
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: 'Failed to delete schema registry'}
-            toast.error(error.message || 'Failed to delete schema registry');
-        } finally {
-            setIsDeleteDialogOpen(false);
-            setItemToDelete(null);
-        }
+        deleteSchemaRegistry(
+            {id: itemToDelete.id},
+            {
+                onSuccess: () => {
+                    toast.success(`Schema Registry "${itemToDelete.name}" deleted successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_SCHEMA_REGISTRIES]});
+                    setIsDeleteDialogOpen(false);
+                    setItemToDelete(null);
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Failed to delete schema registry'}
+                    toast.error(error.message || 'Failed to delete schema registry');
+                },
+            }
+        );
     };
 
     const handleTestConnection = async (id: string, name: string) => {
-        try {
-            const {data} = await testConnection({variables: {id}});
-            if (data) { // Access the correct field from the mutation result
-                toast.success(`Connection to "${name}" successful`);
-            } else {
-                toast.error(`Connection to "${name}" failed`);
+        testConnection(
+            {id},
+            {
+                onSuccess: (data) => {
+                    if (data) {
+                        toast.success(`Connection to "${name}" successful`);
+                    } else {
+                        toast.error(`Connection to "${name}" failed`);
+                    }
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_SCHEMA_REGISTRIES]});
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Connection test failed'}
+                    toast.error(error.message || 'Connection test failed');
+                },
             }
-            refetch();
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: 'Connection test failed'}
-            toast.error(error.message || 'Connection test failed');
-        }
+        );
     };
 
     if (!clusterId) {

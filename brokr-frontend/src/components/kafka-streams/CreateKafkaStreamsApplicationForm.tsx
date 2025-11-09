@@ -12,15 +12,16 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog';
-import {useMutation} from '@apollo/client/react';
 import {CREATE_KAFKA_STREAMS_APPLICATION_MUTATION} from '@/graphql/mutations';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
 import {Textarea} from '@/components/ui/textarea';
 import type {
-    CreateKafkaStreamsApplicationMutation,
-    CreateKafkaStreamsApplicationMutationVariables
+    CreateKafkaStreamsApplicationMutation
 } from "@/graphql/types";
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {useQueryClient} from '@tanstack/react-query';
+import {GET_KAFKA_STREAMS} from '@/graphql/queries';
 
 const kafkaStreamsApplicationSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -45,7 +46,8 @@ export function CreateKafkaStreamsApplicationForm({
                                                       onOpenChange,
                                                       onKafkaStreamsApplicationCreated
                                                   }: CreateKafkaStreamsApplicationFormProps) {
-    const [createKafkaStreamsApplication, {loading}] = useMutation<CreateKafkaStreamsApplicationMutation, CreateKafkaStreamsApplicationMutationVariables>(CREATE_KAFKA_STREAMS_APPLICATION_MUTATION);
+    const queryClient = useQueryClient();
+    const {mutate: createKafkaStreamsApplication, isPending: loading} = useGraphQLMutation<CreateKafkaStreamsApplicationMutation, {input: any}>(CREATE_KAFKA_STREAMS_APPLICATION_MUTATION);
 
     const {
         register,
@@ -64,30 +66,34 @@ export function CreateKafkaStreamsApplicationForm({
     });
 
     const onSubmit = async (data: KafkaStreamsApplicationFormData) => {
-        try {
-            const topicsArray = data.topics ? data.topics.split(',').map(s => s.trim()) : [];
-            const configurationObject = data.configuration ? JSON.parse(data.configuration) : {};
+        const topicsArray = data.topics ? data.topics.split(',').map(s => s.trim()) : [];
+        const configurationObject = data.configuration ? JSON.parse(data.configuration) : {};
 
-            await createKafkaStreamsApplication({
-                variables: {
-                    input: {
-                        clusterId,
-                        name: data.name,
-                        applicationId: data.applicationId,
-                        topics: topicsArray,
-                        configuration: configurationObject,
-                        isActive: data.isActive,
-                    },
+        createKafkaStreamsApplication(
+            {
+                input: {
+                    clusterId,
+                    name: data.name,
+                    applicationId: data.applicationId,
+                    topics: topicsArray,
+                    configuration: configurationObject,
+                    isActive: data.isActive,
                 },
-            });
-            toast.success(`Kafka Streams Application "${data.name}" created successfully`);
-            onKafkaStreamsApplicationCreated();
-            onOpenChange(false);
-            reset();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : {message: 'Failed to create Kafka Streams Application'}
-            toast.error(err.message || 'Failed to create Kafka Streams Application');
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Kafka Streams Application "${data.name}" created successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_STREAMS]});
+                    onKafkaStreamsApplicationCreated();
+                    onOpenChange(false);
+                    reset();
+                },
+                onError: (error: unknown) => {
+                    const err = error instanceof Error ? error : {message: 'Failed to create Kafka Streams Application'}
+                    toast.error(err.message || 'Failed to create Kafka Streams Application');
+                },
+            }
+        );
     };
 
     return (

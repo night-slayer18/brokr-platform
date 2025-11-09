@@ -10,6 +10,7 @@ import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,16 +23,19 @@ public class ClusterApiService {
     private final KafkaConnectionService kafkaConnectionService;
     private final ClusterDataService clusterDataService;
 
+    @Transactional(readOnly = true)
     public List<KafkaCluster> listAuthorizedClusters(String organizationId, String environmentId) {
         return clusterDataService.getAuthorizedClusters(organizationId, environmentId);
     }
 
+    @Transactional(readOnly = true)
     public KafkaCluster getClusterById(String id) {
         return clusterRepository.findById(id)
                 .map(KafkaClusterEntity::toDomain)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
     }
 
+    @Transactional
     public KafkaCluster createCluster(KafkaClusterInput input) {
         if (clusterRepository.existsByNameAndOrganizationId(input.getName(), input.getOrganizationId())) {
             throw new ValidationException("Cluster with this name already exists in the organization");
@@ -66,6 +70,7 @@ public class ClusterApiService {
         return clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
     }
 
+    @Transactional
     public KafkaCluster updateCluster(String id, KafkaClusterInput input) {
         KafkaClusterEntity entity = clusterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
@@ -97,6 +102,7 @@ public class ClusterApiService {
         return clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
     }
 
+    @Transactional
     public boolean deleteCluster(String id) {
         if (!clusterRepository.existsById(id)) {
             throw new ResourceNotFoundException("Cluster not found with id: " + id);
@@ -105,6 +111,7 @@ public class ClusterApiService {
         return true;
     }
 
+    @Transactional
     public boolean testClusterConnection(String id) {
         KafkaClusterEntity entity = clusterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
