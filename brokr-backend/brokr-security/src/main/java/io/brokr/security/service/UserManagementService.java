@@ -1,5 +1,6 @@
 package io.brokr.security.service;
 
+import io.brokr.core.exception.AccessDeniedException;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.Role;
@@ -47,7 +48,7 @@ public class UserManagementService {
                     .toList();
         }
 
-        throw new RuntimeException("Access denied");
+        throw new AccessDeniedException("Access denied");
     }
 
     public Map<String, List<User>> getUsersForOrganizations(List<String> organizationIds) {
@@ -62,12 +63,12 @@ public class UserManagementService {
         // ADMIN can only create users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
             if (!currentUser.getOrganizationId().equals(user.getOrganizationId())) {
-                throw new RuntimeException("ADMIN can only create users in their own organization");
+                throw new AccessDeniedException("ADMIN can only create users in their own organization");
             }
             
             // ADMIN cannot create SUPER_ADMIN or SERVER_ADMIN users
             if (user.getRole() == Role.SUPER_ADMIN || user.getRole() == Role.SERVER_ADMIN) {
-                throw new RuntimeException("ADMIN cannot create users with SUPER_ADMIN or SERVER_ADMIN roles");
+                throw new AccessDeniedException("ADMIN cannot create users with SUPER_ADMIN or SERVER_ADMIN roles");
             }
         }
         
@@ -103,22 +104,22 @@ public class UserManagementService {
         // ADMIN can only update users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
             if (!currentUser.getOrganizationId().equals(existingUser.getOrganizationId())) {
-                throw new RuntimeException("ADMIN can only update users in their own organization");
+                throw new AccessDeniedException("ADMIN can only update users in their own organization");
             }
             
             // ADMIN cannot change organizationId
             if (!userUpdates.getOrganizationId().equals(existingUser.getOrganizationId())) {
-                throw new RuntimeException("ADMIN cannot change user's organization");
+                throw new AccessDeniedException("ADMIN cannot change user's organization");
             }
             
             // ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles
             if (userUpdates.getRole() == Role.SUPER_ADMIN || userUpdates.getRole() == Role.SERVER_ADMIN) {
-                throw new RuntimeException("ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles");
+                throw new AccessDeniedException("ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles");
             }
             
             // ADMIN cannot change existing SUPER_ADMIN or SERVER_ADMIN users
             if (existingUser.getRole() == Role.SUPER_ADMIN || existingUser.getRole() == Role.SERVER_ADMIN) {
-                throw new RuntimeException("ADMIN cannot modify SUPER_ADMIN or SERVER_ADMIN users");
+                throw new AccessDeniedException("ADMIN cannot modify SUPER_ADMIN or SERVER_ADMIN users");
             }
         }
 
@@ -164,17 +165,17 @@ public class UserManagementService {
         // ADMIN can only delete users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
             if (!currentUser.getOrganizationId().equals(userToDelete.getOrganizationId())) {
-                throw new RuntimeException("ADMIN can only delete users in their own organization");
+                throw new AccessDeniedException("ADMIN can only delete users in their own organization");
             }
             
             // ADMIN cannot delete SUPER_ADMIN or SERVER_ADMIN users
             if (userToDelete.getRole() == Role.SUPER_ADMIN || userToDelete.getRole() == Role.SERVER_ADMIN) {
-                throw new RuntimeException("ADMIN cannot delete SUPER_ADMIN or SERVER_ADMIN users");
+                throw new AccessDeniedException("ADMIN cannot delete SUPER_ADMIN or SERVER_ADMIN users");
             }
             
             // ADMIN cannot delete themselves
             if (currentUser.getId().equals(id)) {
-                throw new RuntimeException("ADMIN cannot delete themselves");
+                throw new AccessDeniedException("ADMIN cannot delete themselves");
             }
         }
         

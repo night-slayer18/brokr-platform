@@ -3,6 +3,7 @@ package io.brokr.api.service;
 import io.brokr.api.input.OrganizationInput;
 import io.brokr.core.dto.EnvironmentDto;
 import io.brokr.core.dto.OrganizationDto;
+import io.brokr.core.exception.AccessDeniedException;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.Organization;
@@ -122,7 +123,7 @@ public class OrganizationApiService {
         // ADMIN can only update their own organization
         if (currentUser.getRole() == Role.ADMIN) {
             if (!currentUser.getOrganizationId().equals(id)) {
-                throw new RuntimeException("ADMIN can only update their own organization");
+                throw new AccessDeniedException("ADMIN can only update their own organization");
             }
         }
         

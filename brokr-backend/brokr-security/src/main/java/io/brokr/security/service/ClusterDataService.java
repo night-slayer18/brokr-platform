@@ -1,5 +1,6 @@
 package io.brokr.security.service;
 
+import io.brokr.core.exception.AccessDeniedException;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.User;
 import io.brokr.storage.entity.KafkaClusterEntity;
@@ -33,7 +34,7 @@ public class ClusterDataService {
         if (!authorizationService.hasAccessToOrganization(organizationId)) {
             // This check is also in the resolver/controller, but it's good practice
             // to have it in the service layer as a hard-stop.
-            throw new RuntimeException("Access denied to this organization");
+            throw new AccessDeniedException("Access denied to this organization");
         }
 
         List<KafkaClusterEntity> clusters;

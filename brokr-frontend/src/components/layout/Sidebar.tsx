@@ -46,7 +46,7 @@ function SidebarLink({href, icon: Icon, children}: SidebarLinkProps) {
             className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                    ? 'bg-gradient-to-r from-primary/10 to-primary/20 text-primary'
+                    ? 'bg-linear-to-r from-primary/10 to-primary/20 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
         >
@@ -64,7 +64,7 @@ export function Sidebar() {
             <div className="flex h-16 items-center border-b px-6">
                 <Link to="/dashboard" className="flex items-center gap-2">
                     <img src="/brokr-icon.svg" alt="Brokr Logo" className="h-8 w-8"/>
-                    <span className="text-lg font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Brokr</span>
+                    <span className="text-lg font-bold bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">Brokr</span>
                 </Link>
             </div>
             <ScrollArea className="flex-1 p-4">

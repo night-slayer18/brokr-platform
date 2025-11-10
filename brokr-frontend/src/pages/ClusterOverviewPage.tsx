@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, FileText, Server, Users } from 'lucide-react';
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 
-function StatCard({ title, value, description, icon: Icon, to }: { title: string, value: string | number, description: string, icon: React.ElementType, to: string }) {
+const StatCard = memo(function StatCard({ title, value, description, icon: Icon, to }: { title: string, value: string | number, description: string, icon: React.ElementType, to: string }) {
     return (
         <Card className="hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -24,9 +24,9 @@ function StatCard({ title, value, description, icon: Icon, to }: { title: string
             </CardContent>
         </Card>
     );
-}
+});
 
-export default function ClusterOverviewPage() {
+function ClusterOverviewPage() {
     const { clusterId } = useParams<{ clusterId: string }>();
 
     const { data, isLoading: loading, error } = useGraphQLQuery<GetClusterOverviewQuery, {id: string}>(GET_CLUSTER_OVERVIEW, 
@@ -55,9 +55,9 @@ export default function ClusterOverviewPage() {
 
     const cluster = data?.cluster;
     // Handle null values from backend - if null, treat as empty array
-    const topicsCount = cluster?.topics ? cluster.topics.length : 0;
-    const consumerGroupsCount = cluster?.consumerGroups ? cluster.consumerGroups.length : 0;
-    const brokersCount = cluster?.brokers ? cluster.brokers.length : 0;
+    const topicsCount = useMemo(() => cluster?.topics ? cluster.topics.length : 0, [cluster?.topics]);
+    const consumerGroupsCount = useMemo(() => cluster?.consumerGroups ? cluster.consumerGroups.length : 0, [cluster?.consumerGroups]);
+    const brokersCount = useMemo(() => cluster?.brokers ? cluster.brokers.length : 0, [cluster?.brokers]);
 
     return (
         <div className="space-y-6">
@@ -79,3 +79,5 @@ export default function ClusterOverviewPage() {
         </div>
     );
 }
+
+export default memo(ClusterOverviewPage);

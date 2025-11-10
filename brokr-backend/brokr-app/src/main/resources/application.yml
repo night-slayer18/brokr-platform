@@ -51,8 +51,8 @@ spring:
       - kafkaMessages
 
 jwt:
-  secret: YnJva3ItcGxhdGZvcm0tc2VjdXJlLWp3dC1zaWduaW5nLWtleS0yNTYtYml0cy1taW5pbXVtLXNlY3VyaXR5LXN0YW5kYXJk
-  expiration: 86400
+  secret: ${JWT_SECRET:YnJva3ItcGxhdGZvcm0tc2VjdXJlLWp3dC1zaWduaW5nLWtleS0yNTYtYml0cy1taW5pbXVtLXNlY3VyaXR5LXN0YW5kYXJk}
+  expiration: ${JWT_EXPIRATION:86400}
 
 logging:
   level:

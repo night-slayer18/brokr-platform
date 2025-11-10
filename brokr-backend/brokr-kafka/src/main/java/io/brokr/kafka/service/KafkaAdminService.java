@@ -1,11 +1,17 @@
 package io.brokr.kafka.service;
 
+import io.brokr.core.model.PartitionInfo;
+import io.brokr.core.model.TopicPartition;
 import io.brokr.core.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.errors.*;
 import org.apache.kafka.common.config.ConfigResource;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -20,6 +26,11 @@ public class KafkaAdminService {
 
     private final KafkaConnectionService kafkaConnectionService;
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public List<Topic> listTopics(KafkaCluster cluster) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -66,6 +77,11 @@ public class KafkaAdminService {
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public Topic createTopic(KafkaCluster cluster, String topicName, int partitions, int replicationFactor, Map<String, String> configs) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -79,12 +95,43 @@ public class KafkaAdminService {
 
             return getTopic(cluster, topicName);
         } catch (InterruptedException | ExecutionException e) {
-            log.error("Failed to create topic: {} for cluster: {}", topicName, cluster.getName(), e);
+            // Check if the error is a permanent error (like topic already exists)
+            // These should NOT be retried - handle them immediately
+            Throwable cause = e.getCause();
+            if (cause instanceof TopicExistsException) {
+                log.warn("Topic {} already exists in cluster: {} - returning existing topic", topicName, cluster.getName());
+                // If topic exists, return it instead of throwing error (idempotent behavior)
+                try {
+                    return getTopic(cluster, topicName);
+                } catch (Exception ex) {
+                    log.error("Failed to get existing topic: {} for cluster: {}", topicName, cluster.getName(), ex);
+                    throw new RuntimeException("Topic already exists but failed to retrieve it", e);
+                }
+            }
+            
+            // Check for other permanent errors that shouldn't be retried
+            if (cause instanceof InvalidTopicException || 
+                cause instanceof InvalidRequestException ||
+                cause instanceof InvalidConfigurationException) {
+                log.error("Invalid request for topic: {} in cluster: {} - {}", topicName, cluster.getName(), cause.getMessage());
+                kafkaConnectionService.removeAdminClient(cluster.getId());
+                // Throw a RuntimeException that won't be retried (not in retryable list)
+                throw new RuntimeException("Invalid topic creation request: " + cause.getMessage(), e);
+            }
+            
+            // For transient errors (network issues, timeouts, etc.), let retry logic handle it
+            // These will be retried up to 3 times with exponential backoff
+            log.error("Transient error creating topic: {} for cluster: {} - will retry", topicName, cluster.getName(), e);
             kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to create topic", e);
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public Topic getTopic(KafkaCluster cluster, String topicName) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -131,7 +178,7 @@ public class KafkaAdminService {
                     ));
 
             // Build partition info list
-            List<io.brokr.core.model.PartitionInfo> partitionsInfo = new ArrayList<>();
+            List<PartitionInfo> partitionsInfo = new ArrayList<>();
             for (var partition : description.partitions()) {
                 org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
                 ListOffsetsResult.ListOffsetsResultInfo earliestInfo = earliestOffsets.get(tp);
@@ -144,11 +191,11 @@ public class KafkaAdminService {
                 long latestOffset = latestInfo.offset();
                 long size = latestOffset - earliestOffset;
 
-                partitionsInfo.add(io.brokr.core.model.PartitionInfo.builder()
+                partitionsInfo.add(PartitionInfo.builder()
                         .id(partition.partition())
                         .leader(partition.leader().id())
-                        .replicas(partition.replicas().stream().map(org.apache.kafka.common.Node::id).collect(Collectors.toList()))
-                        .isr(partition.isr().stream().map(org.apache.kafka.common.Node::id).collect(Collectors.toList()))
+                        .replicas(partition.replicas().stream().map(Node::id).collect(Collectors.toList()))
+                        .isr(partition.isr().stream().map(Node::id).collect(Collectors.toList()))
                         .earliestOffset(earliestOffset)
                         .latestOffset(latestOffset)
                         .size(size)
@@ -170,7 +217,11 @@ public class KafkaAdminService {
         }
     }
 
-    // <<< FIX: Implemented updateTopicConfig >>>
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public void updateTopicConfig(KafkaCluster cluster, String topicName, Map<String, String> configs) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -192,18 +243,38 @@ public class KafkaAdminService {
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public void deleteTopic(KafkaCluster cluster, String topicName) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(topicName));
             result.all().get();
         } catch (InterruptedException | ExecutionException e) {
-            log.error("Failed to delete topic: {} for cluster: {}", topicName, cluster.getName(), e);
+            // Check if the error is a permanent error (like topic doesn't exist)
+            // These should NOT be retried - handle them immediately
+            Throwable cause = e.getCause();
+            if (cause instanceof UnknownTopicOrPartitionException) {
+                log.warn("Topic {} does not exist in cluster: {} - considering it already deleted", topicName, cluster.getName());
+                // Topic doesn't exist, consider it already deleted (idempotent behavior)
+                return;
+            }
+            
+            // For transient errors (network issues, timeouts, etc.), let retry logic handle it
+            log.error("Transient error deleting topic: {} for cluster: {} - will retry", topicName, cluster.getName(), e);
             kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to delete topic", e);
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public List<BrokerNode> getClusterNodes(KafkaCluster cluster) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -223,6 +294,11 @@ public class KafkaAdminService {
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public List<ConsumerGroup> listConsumerGroups(KafkaCluster cluster) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
@@ -271,6 +347,11 @@ public class KafkaAdminService {
         }
     }
 
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
     public Optional<ConsumerGroup> getConsumerGroup(KafkaCluster cluster, String groupId) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);

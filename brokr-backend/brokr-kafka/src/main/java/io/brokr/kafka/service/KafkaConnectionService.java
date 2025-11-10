@@ -1,5 +1,7 @@
 package io.brokr.kafka.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.SecurityProtocol;
 import jakarta.annotation.PreDestroy;
@@ -11,17 +13,29 @@ import org.apache.kafka.common.config.SslConfigs;
 import org.springframework.stereotype.Service;
 
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.Map;
 
 @Service
 @Slf4j
 public class KafkaConnectionService {
 
-    private final Map<String, AdminClient> adminClientCache = new ConcurrentHashMap<>();
+    // Use Caffeine cache with size limit and TTL to prevent unbounded growth
+    private final Cache<String, AdminClient> adminClientCache = Caffeine.newBuilder()
+            .maximumSize(100) // Limit to 100 clusters
+            .expireAfterAccess(30, TimeUnit.MINUTES) // Evict idle clients after 30 minutes
+            .removalListener((key, value, cause) -> {
+                if (value != null && value instanceof AdminClient) {
+                    try {
+                        ((AdminClient) value).close();
+                        log.debug("Closed and evicted AdminClient for cluster: {}", key);
+                    } catch (Exception e) {
+                        log.warn("Error closing AdminClient for cluster {}: {}", key, e.getMessage());
+                    }
+                }
+            })
+            .build();
 
     public boolean testConnection(KafkaCluster cluster) {
         try {
@@ -50,7 +64,7 @@ public class KafkaConnectionService {
      * @return A cached or newly created AdminClient
      */
     public AdminClient getOrCreateAdminClient(KafkaCluster cluster) {
-        return adminClientCache.computeIfAbsent(cluster.getId(), id -> {
+        return adminClientCache.get(cluster.getId(), id -> {
             log.info("Creating new AdminClient for cluster: {}", cluster.getName());
             return createAdminClient(cluster);
         });
@@ -63,8 +77,9 @@ public class KafkaConnectionService {
      * @param clusterId The cluster ID
      */
     public void removeAdminClient(String clusterId) {
-        AdminClient client = adminClientCache.remove(clusterId);
+        AdminClient client = adminClientCache.getIfPresent(clusterId);
         if (client != null) {
+            adminClientCache.invalidate(clusterId);
             try {
                 client.close();
                 log.info("Closed and removed AdminClient for cluster: {}", clusterId);
@@ -138,8 +153,8 @@ public class KafkaConnectionService {
 
     @PreDestroy
     public void destroy() {
-        log.info("Shutting down KafkaConnectionService, closing {} AdminClient instances", adminClientCache.size());
-        adminClientCache.forEach((clusterId, client) -> {
+        log.info("Shutting down KafkaConnectionService, closing {} AdminClient instances", adminClientCache.estimatedSize());
+        adminClientCache.asMap().forEach((clusterId, client) -> {
             try {
                 client.close();
                 log.debug("Closed AdminClient for cluster: {}", clusterId);
@@ -147,6 +162,6 @@ public class KafkaConnectionService {
                 log.warn("Error closing AdminClient for cluster {}: {}", clusterId, e.getMessage());
             }
         });
-        adminClientCache.clear();
+        adminClientCache.invalidateAll();
     }
 }

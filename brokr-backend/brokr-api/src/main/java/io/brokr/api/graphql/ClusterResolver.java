@@ -80,28 +80,49 @@ public class ClusterResolver {
 
     @BatchMapping(typeName = "KafkaCluster", field = "brokers")
     public Map<KafkaCluster, List<BrokerNode>> getBrokers(List<KafkaCluster> clusters) {
-        return clusters.stream()
-                .collect(Collectors.toMap(
+        return clusters.parallelStream()
+                .collect(Collectors.toConcurrentMap(
                         Function.identity(),
-                        kafkaAdminService::getClusterNodes
+                        cluster -> {
+                            try {
+                                return kafkaAdminService.getClusterNodes(cluster);
+                            } catch (Exception e) {
+                                log.error("Failed to get brokers for cluster {}: {}", cluster.getId(), e.getMessage());
+                                return List.of(); // Return empty instead of failing entire batch
+                            }
+                        }
                 ));
     }
 
     @BatchMapping(typeName = "KafkaCluster", field = "topics")
     public Map<KafkaCluster, List<Topic>> getTopics(List<KafkaCluster> clusters) {
-        return clusters.stream()
-                .collect(Collectors.toMap(
+        return clusters.parallelStream()
+                .collect(Collectors.toConcurrentMap(
                         Function.identity(),
-                        kafkaAdminService::listTopics
+                        cluster -> {
+                            try {
+                                return kafkaAdminService.listTopics(cluster);
+                            } catch (Exception e) {
+                                log.error("Failed to list topics for cluster {}: {}", cluster.getId(), e.getMessage());
+                                return List.of(); // Return empty instead of failing entire batch
+                            }
+                        }
                 ));
     }
 
     @BatchMapping(typeName = "KafkaCluster", field = "consumerGroups")
     public Map<KafkaCluster, List<ConsumerGroup>> getConsumerGroups(List<KafkaCluster> clusters) {
-        return clusters.stream()
-                .collect(Collectors.toMap(
+        return clusters.parallelStream()
+                .collect(Collectors.toConcurrentMap(
                         Function.identity(),
-                        kafkaAdminService::listConsumerGroups
+                        cluster -> {
+                            try {
+                                return kafkaAdminService.listConsumerGroups(cluster);
+                            } catch (Exception e) {
+                                log.error("Failed to list consumer groups for cluster {}: {}", cluster.getId(), e.getMessage());
+                                return List.of(); // Return empty instead of failing entire batch
+                            }
+                        }
                 ));
     }
 
