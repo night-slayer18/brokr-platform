@@ -10,9 +10,9 @@ spring:
     name: brokr-platform
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/brokr
-    username: nightslayer
-    password:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/brokr}
+    username: ${SPRING_DATASOURCE_USERNAME:nightslayer}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       # Connection pool configuration for better performance
@@ -51,7 +51,7 @@ spring:
       - kafkaMessages
 
 jwt:
-  secret: ${JWT_SECRET:YnJva3ItcGxhdGZvcm0tc2VjdXJlLWp3dC1zaWduaW5nLWtleS0yNTYtYml0cy1taW5pbXVtLXNlY3VyaXR5LXN0YW5kYXJk}
+  secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}
   expiration: ${JWT_EXPIRATION:86400}
 
 logging:
