@@ -8,12 +8,14 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Switch} from '@/components/ui/switch'
+import {Checkbox} from '@/components/ui/checkbox'
 import {toast} from 'sonner'
 import {UPDATE_USER_MUTATION} from '@/graphql/mutations'
-import type {UpdateUserMutation, GetOrganizationQuery} from '@/graphql/types'
+import type {UpdateUserMutation, GetOrganizationQuery, GetEnvironmentsByOrganizationQuery} from '@/graphql/types'
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {useQueryClient} from '@tanstack/react-query'
-import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS, GET_USER} from '@/graphql/queries'
+import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS, GET_USER, GET_ENVIRONMENTS_BY_ORGANIZATION} from '@/graphql/queries'
 import {ROLE_LABELS} from '@/lib/constants'
 import {useAuth} from '@/hooks/useAuth'
 
@@ -44,6 +46,19 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
     const {hasRole} = useAuth()
     const isAdmin = hasRole('ADMIN')
     const isSuperAdminOrServerAdmin = user.role === 'SUPER_ADMIN' || user.role === 'SERVER_ADMIN'
+    const userOrgId = user.organizationId || organizationId
+    
+    // Fetch environments for the organization
+    const {data: environmentsData} = useGraphQLQuery<GetEnvironmentsByOrganizationQuery, {organizationId: string}>(
+        GET_ENVIRONMENTS_BY_ORGANIZATION,
+        userOrgId ? {organizationId: userOrgId} : undefined,
+        {
+            enabled: !!userOrgId && open,
+        }
+    )
+    
+    const environments = environmentsData?.environments || []
+    
     const {mutate: updateUser} = useGraphQLMutation<UpdateUserMutation, {id: string; input: UserFormData}>(
         UPDATE_USER_MUTATION,
         {
@@ -106,6 +121,16 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
     }, [open, user?.id, organizationId, reset]) // Only reset when user ID changes, not when user object changes
 
     const role = watch('role')
+    const accessibleEnvironmentIds = watch('accessibleEnvironmentIds') || []
+
+    const handleEnvironmentToggle = (environmentId: string, checked: boolean) => {
+        const currentIds = accessibleEnvironmentIds
+        if (checked) {
+            setValue('accessibleEnvironmentIds', [...currentIds, environmentId])
+        } else {
+            setValue('accessibleEnvironmentIds', currentIds.filter(id => id !== environmentId))
+        }
+    }
 
     const onSubmit = (data: UserFormData) => {
         setIsSubmitting(true)
@@ -211,6 +236,36 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
                             <p className="text-sm text-muted-foreground">ADMIN cannot modify SUPER_ADMIN or SERVER_ADMIN users</p>
                         )}
                     </div>
+                    {userOrgId && (
+                        <div className="space-y-2">
+                            <Label>Accessible Environments *</Label>
+                            <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
+                                {environments.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No environments available for this organization</p>
+                                ) : (
+                                    environments.map((env) => (
+                                        <div key={env.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`env-${env.id}`}
+                                                checked={accessibleEnvironmentIds.includes(env.id)}
+                                                onCheckedChange={(checked) => handleEnvironmentToggle(env.id, checked as boolean)}
+                                                disabled={isSubmitting}
+                                            />
+                                            <Label
+                                                htmlFor={`env-${env.id}`}
+                                                className="text-sm font-normal cursor-pointer flex-1"
+                                            >
+                                                {env.name} ({env.type})
+                                            </Label>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Select which environments this user can access. Users can only see clusters in environments they have access to.
+                            </p>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between">
                         <Label htmlFor="isActive">Active</Label>
                         <Controller

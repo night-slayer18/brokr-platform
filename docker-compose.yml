@@ -19,7 +19,7 @@ services:
   # The Brokr platform connects to EXTERNAL Kafka clusters via bootstrap servers
   # configured by admins in the UI. These Kafka clusters are just for local testing.
   kafka-hotfix:
-    image: confluentinc/cp-kafka:7.8.0
+    image: confluentinc/cp-kafka:8.1.0
     ports:
       - "9092:9092"
       - "19092:19092"
@@ -37,7 +37,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'xmUzu3UQSlOUE--4N4a0sA'
+      CLUSTER_ID: 'j4dxG69GS1K8-SdMJVMhOg'
     command: >
       bash -c "
         mkdir -p /tmp/kraft-combined-logs &&
@@ -50,7 +50,7 @@ services:
       retries: 5
 
   kafka-minor:
-    image: confluentinc/cp-kafka:7.8.0
+    image: confluentinc/cp-kafka:8.1.0
     ports:
       - "9093:9093"
       - "19093:19093"
@@ -68,7 +68,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'DnMSPDk0RzG-Sbo9X3nWUg'
+      CLUSTER_ID: 'v77usK6rTc-amojQsMoTXw'
     command: >
       bash -c "
         mkdir -p /tmp/kraft-combined-logs &&
@@ -81,7 +81,7 @@ services:
       retries: 5
 
   kafka-major:
-    image: confluentinc/cp-kafka:7.8.0
+    image: confluentinc/cp-kafka:8.1.0
     ports:
       - "9094:9094"
       - "19094:19094"
@@ -99,7 +99,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'gHy9P8bpTP6hylERfnZ4Bw'
+      CLUSTER_ID: 'O8ey3ASpRtmGRBmwCWixMA'
     command: >
       bash -c "
         mkdir -p /tmp/kraft-combined-logs &&
@@ -112,7 +112,7 @@ services:
       retries: 5
 
   kafka-prod:
-    image: confluentinc/cp-kafka:7.8.0
+    image: confluentinc/cp-kafka:8.1.0
     ports:
       - "9095:9095"
       - "19095:19095"
@@ -130,7 +130,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'C1rGujKGR-aVswN-MvfEJw'
+      CLUSTER_ID: 'kl67hFJBQyqFljyYZ2kppA'
     command: >
       bash -c "
         mkdir -p /tmp/kraft-combined-logs &&
@@ -143,7 +143,7 @@ services:
       retries: 5
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.8.0
+    image: confluentinc/cp-schema-registry:8.1.0
     depends_on:
       kafka-hotfix:
         condition: service_healthy
@@ -160,7 +160,7 @@ services:
       retries: 5
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.8.0
+    image: confluentinc/cp-kafka-connect:8.1.0
     depends_on:
       kafka-hotfix:
         condition: service_healthy

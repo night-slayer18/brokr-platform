@@ -25,6 +25,7 @@ import BrokersPage from './pages/BrokersPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import OrganizationsPage from './pages/admin/OrganizationsPage';
 import OrganizationDetailPage from './pages/admin/OrganizationDetailPage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
     return (
@@ -41,6 +42,7 @@ function App() {
                 >
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="profile" element={<ProfilePage />} />
                     <Route path="clusters" element={<ClustersPage />} />
                     <Route path="clusters/new" element={<AdminRoute><CreateClusterPage /></AdminRoute>} />
                 </Route>

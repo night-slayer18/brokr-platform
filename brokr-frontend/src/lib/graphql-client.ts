@@ -1,6 +1,7 @@
 import {GraphQLClient} from 'graphql-request';
 import type {DocumentNode} from 'graphql';
 import {print} from 'graphql';
+import {extractErrorMessage} from './error-utils';
 
 // Get GraphQL endpoint URL - handle both dev and production environments
 function getGraphQLEndpoint(): string {
@@ -162,17 +163,24 @@ async function executeRequest<TData = any, TVariables = any>(
                 );
 
                 // Handle unauthorized errors
-                if (err.message.includes('Unauthorized') || err.message.includes('401')) {
+                if (err.message.includes('Unauthorized') || err.message.includes('401') || err.message.includes('authentication')) {
                     // Clear auth state and redirect to login
-                    window.location.href = '/login';
-                    return;
+                    if (typeof window !== 'undefined') {
+                        window.location.href = '/login';
+                    }
+                    throw new Error('Unauthorized. Please log in again.');
                 }
             });
         } else if (error.message) {
             console.error(`[Network error]: ${error.message}`);
         }
 
-        throw error;
+        // Create a new error with extracted message for better error handling
+        const errorMessage = extractErrorMessage(error);
+        const enhancedError = new Error(errorMessage);
+        // Preserve original error for debugging
+        (enhancedError as any).originalError = error;
+        throw enhancedError;
     }
 }
 

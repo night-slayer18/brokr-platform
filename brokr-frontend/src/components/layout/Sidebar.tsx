@@ -62,10 +62,10 @@ export function Sidebar() {
     return (
         <aside className="w-64 border-r bg-card">
             <div className="flex h-16 items-center border-b px-6">
-                <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70"/>
-                    <span className="text-lg font-bold conduktor-gradient-text">Brokr</span>
-                </div>
+                <Link to="/dashboard" className="flex items-center gap-2">
+                    <img src="/brokr-icon.svg" alt="Brokr Logo" className="h-8 w-8"/>
+                    <span className="text-lg font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Brokr</span>
+                </Link>
             </div>
             <ScrollArea className="flex-1 p-4">
                 <nav className="space-y-1">

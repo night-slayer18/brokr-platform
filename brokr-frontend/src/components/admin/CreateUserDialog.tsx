@@ -8,12 +8,14 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Switch} from '@/components/ui/switch'
+import {Checkbox} from '@/components/ui/checkbox'
 import {toast} from 'sonner'
 import {CREATE_USER_MUTATION} from '@/graphql/mutations'
-import type {CreateUserMutation} from '@/graphql/types'
+import type {CreateUserMutation, GetEnvironmentsByOrganizationQuery} from '@/graphql/types'
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
+import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {useQueryClient} from '@tanstack/react-query'
-import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS} from '@/graphql/queries'
+import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS, GET_ENVIRONMENTS_BY_ORGANIZATION} from '@/graphql/queries'
 import {ROLE_LABELS} from '@/lib/constants'
 import {useAuth} from '@/hooks/useAuth'
 
@@ -42,6 +44,18 @@ export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUse
     const queryClient = useQueryClient()
     const {hasRole} = useAuth()
     const isAdmin = hasRole('ADMIN')
+    
+    // Fetch environments for the organization
+    const {data: environmentsData} = useGraphQLQuery<GetEnvironmentsByOrganizationQuery, {organizationId: string}>(
+        GET_ENVIRONMENTS_BY_ORGANIZATION,
+        organizationId ? {organizationId} : undefined,
+        {
+            enabled: !!organizationId && open,
+        }
+    )
+    
+    const environments = environmentsData?.environments || []
+    
     const {mutate: createUser} = useGraphQLMutation<CreateUserMutation, {input: UserFormData}>(
         CREATE_USER_MUTATION,
         {
@@ -85,6 +99,16 @@ export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUse
 
     const isActive = watch('isActive')
     const role = watch('role')
+    const accessibleEnvironmentIds = watch('accessibleEnvironmentIds') || []
+
+    const handleEnvironmentToggle = (environmentId: string, checked: boolean) => {
+        const currentIds = accessibleEnvironmentIds
+        if (checked) {
+            setValue('accessibleEnvironmentIds', [...currentIds, environmentId])
+        } else {
+            setValue('accessibleEnvironmentIds', currentIds.filter(id => id !== environmentId))
+        }
+    }
 
     const onSubmit = (data: UserFormData) => {
         setIsSubmitting(true)
@@ -98,7 +122,7 @@ export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUse
                     <DialogTitle>Create User</DialogTitle>
                     <DialogDescription>Create a new user for this organization</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="username">Username *</Label>
@@ -180,6 +204,34 @@ export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUse
                             </SelectContent>
                         </Select>
                         {errors.role && <p className="text-sm text-destructive">{errors.role.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Accessible Environments *</Label>
+                        <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
+                            {environments.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No environments available for this organization</p>
+                            ) : (
+                                environments.map((env) => (
+                                    <div key={env.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`env-${env.id}`}
+                                            checked={accessibleEnvironmentIds.includes(env.id)}
+                                            onCheckedChange={(checked) => handleEnvironmentToggle(env.id, checked as boolean)}
+                                            disabled={isSubmitting}
+                                        />
+                                        <Label
+                                            htmlFor={`env-${env.id}`}
+                                            className="text-sm font-normal cursor-pointer flex-1"
+                                        >
+                                            {env.name} ({env.type})
+                                        </Label>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Select which environments this user can access. Users can only see clusters in environments they have access to.
+                        </p>
                     </div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="isActive">Active</Label>

@@ -5,7 +5,6 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Button} from '@/components/ui/button'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Building2, Users, Server, Plus, ArrowRight} from 'lucide-react'
-import {toast} from 'sonner'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {useState} from 'react'
 import {CreateOrganizationDialog} from '@/components/admin/CreateOrganizationDialog'
@@ -18,7 +17,6 @@ export default function AdminDashboardPage() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
     if (error) {
-        toast.error('Failed to load dashboard data')
         return null
     }
 
@@ -32,7 +30,7 @@ export default function AdminDashboardPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                    <h1 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">Admin Dashboard</h1>
                     <p className="text-muted-foreground">Overview of all organizations and resources</p>
                 </div>
                 {canManageOrganizations() && (
@@ -91,7 +89,7 @@ export default function AdminDashboardPage() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Active Organizations</CardTitle>
-                            <Building2 className="h-4 w-4 text-green-500"/>
+                            <Building2 className="h-4 w-4 text-muted-foreground"/>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{activeOrganizations}</div>

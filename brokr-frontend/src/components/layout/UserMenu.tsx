@@ -23,11 +23,22 @@ export function UserMenu() {
         navigate('/login')
     }
 
+    const handleProfile = () => {
+        navigate('/profile')
+    }
+
     const getUserInitials = () => {
         if (user?.firstName && user?.lastName) {
             return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
         }
         return user?.username.substring(0, 2).toUpperCase() || 'U'
+    }
+
+    const getDisplayName = () => {
+        if (user?.firstName && user?.lastName) {
+            return `${user.firstName} ${user.lastName}`
+        }
+        return user?.username || 'User'
     }
 
     return (
@@ -36,31 +47,40 @@ export function UserMenu() {
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar>
                         <AvatarFallback
-                            className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
+                            className="bg-linear-to-br from-primary to-primary/70 text-primary-foreground font-semibold">
                             {getUserInitials()}
                         </AvatarFallback>
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.username}</p>
-                        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                        <p className="text-xs leading-none text-muted-foreground capitalize">{user?.role}</p>
+            <DropdownMenuContent className="w-64" align="end" forceMount>
+                <DropdownMenuLabel className="p-4">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                            <AvatarFallback
+                                className="bg-linear-to-br from-primary to-primary/70 text-primary-foreground text-lg font-semibold">
+                                {getUserInitials()}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col space-y-0.5 flex-1 min-w-0">
+                            <p className="text-sm font-semibold leading-none truncate">{getDisplayName()}</p>
+                            <p className="text-xs leading-none text-muted-foreground truncate">{user?.email}</p>
+                            <p className="text-xs leading-none text-muted-foreground capitalize mt-1">{user?.role?.replace('_', ' ')}</p>
+                        </div>
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator/>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleProfile} className="cursor-pointer">
                     <User className="mr-2 h-4 w-4"/>
                     <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
                     <Settings className="mr-2 h-4 w-4"/>
                     <span>Settings</span>
+                    <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator/>
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-foreground hover:text-foreground focus:text-foreground">
                     <LogOut className="mr-2 h-4 w-4"/>
                     <span>Log out</span>
                 </DropdownMenuItem>

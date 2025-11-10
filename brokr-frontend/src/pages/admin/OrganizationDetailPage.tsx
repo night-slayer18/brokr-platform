@@ -5,7 +5,6 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Button} from '@/components/ui/button'
 import {Skeleton} from '@/components/ui/skeleton'
 import {ArrowLeft, Building2, Users, Server, Edit, Trash2, Plus} from 'lucide-react'
-import {toast} from 'sonner'
 import {useState, useEffect} from 'react'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {ROLES} from '@/lib/constants'
@@ -34,7 +33,6 @@ export default function OrganizationDetailPage() {
     const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false)
 
     if (error) {
-        toast.error('Failed to load organization')
         return null
     }
 
@@ -94,7 +92,7 @@ export default function OrganizationDetailPage() {
                     {isLoading ? (
                         <Skeleton className="h-8 w-64 mb-2"/>
                     ) : (
-                        <h1 className="text-3xl font-bold tracking-tight">{organization?.name}</h1>
+                        <h1 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">{organization?.name}</h1>
                     )}
                     {isLoading ? (
                         <Skeleton className="h-4 w-96"/>

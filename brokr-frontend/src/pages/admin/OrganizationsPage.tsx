@@ -6,7 +6,6 @@ import {Button} from '@/components/ui/button'
 import {Badge} from '@/components/ui/badge'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Building2, Plus, Users, Server, Eye} from 'lucide-react'
-import {toast} from 'sonner'
 import {useState} from 'react'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {CreateOrganizationDialog} from '@/components/admin/CreateOrganizationDialog'
@@ -24,7 +23,6 @@ export default function OrganizationsPage() {
     const [selectedOrg, setSelectedOrg] = useState<GetOrganizationsQuery['organizations'][0] | null>(null)
 
     if (error) {
-        toast.error('Failed to load organizations')
         return null
     }
 
@@ -46,7 +44,7 @@ export default function OrganizationsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
+                    <h1 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">Organizations</h1>
                     <p className="text-muted-foreground">Manage all organizations and their users</p>
                 </div>
                 {canManageOrganizations() && (

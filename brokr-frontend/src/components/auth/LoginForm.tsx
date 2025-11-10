@@ -11,6 +11,7 @@ import {LOGIN_MUTATION} from '@/graphql/mutations'
 import {useAuthStore} from '@/store/authStore'
 import {Loader2} from 'lucide-react'
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
+import {extractErrorMessage} from '@/lib/error-utils'
 import type {LoginMutation} from '@/graphql/types'
 
 const loginSchema = z.object({
@@ -49,8 +50,9 @@ export function LoginForm() {
                     toast.success('Logged in successfully')
                     navigate('/dashboard')
                 },
-                onError: (error: any) => {
-                    toast.error(error.message || 'Login failed')
+                onError: (error: Error) => {
+                    const errorMessage = extractErrorMessage(error)
+                    toast.error(errorMessage || 'Login failed. Please check your credentials and try again.')
                 },
             }
         )
@@ -61,21 +63,10 @@ export function LoginForm() {
             className="w-full min-w-[400px] max-w-lg mx-auto backdrop-blur-xl bg-card/50 border-2 border-primary/20 shadow-2xl shadow-primary/20">
             <CardHeader className="space-y-1 pb-6">
                 <div className="flex items-center justify-center mb-6">
-                    <div className="relative">
-                        <div
-                            className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary to-primary/70 blur-lg opacity-75 animate-pulse"></div>
-                        <div
-                            className="relative h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5}
-                                 stroke="currentColor" className="w-10 h-10 text-white">
-                                <path strokeLinecap="round" strokeLinejoin="round"
-                                      d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <img src="/brokr-icon.svg" alt="Brokr Logo" className="h-16 w-16"/>
                 </div>
                 <CardTitle
-                    className="text-3xl font-bold text-center bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                    className="text-3xl font-bold text-center bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     Welcome to Brokr
                 </CardTitle>
                 <CardDescription className="text-center text-base">
@@ -113,7 +104,7 @@ export function LoginForm() {
                         )}
                     </div>
                     <Button type="submit"
-                            className="w-full h-11 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold shadow-lg shadow-primary/50 transition-all"
+                            className="w-full h-11 bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold shadow-lg shadow-primary/50 transition-all"
                             disabled={loading}>
                         {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
                         {loading ? 'Signing In...' : 'Sign In'}

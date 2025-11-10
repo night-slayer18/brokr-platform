@@ -5,7 +5,7 @@ export default function LoginPage() {
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
             {/* Animated gradient background */}
             <div
-                className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-primary/20 animate-gradient"></div>
+                className="absolute inset-0 bg-linear-to-br from-primary/20 via-primary/10 to-primary/20 animate-gradient"></div>
 
             {/* Animated orbs */}
             <div
@@ -15,7 +15,7 @@ export default function LoginPage() {
 
             {/* Grid pattern overlay */}
             <div
-                className="absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20"></div>
+                className="absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-size-[4rem_4rem] opacity-20"></div>
 
             <div className="relative z-10 w-full max-w-lg">
                 <LoginForm/>

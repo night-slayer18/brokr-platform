@@ -20,7 +20,7 @@ interface StatCardProps {
 function StatCard({title, value, description, icon: Icon, trend}: StatCardProps) {
     return (
         <Card
-            className={`bg-gradient-to-br from-primary/20 to-primary/10 border-primary/30 border backdrop-blur-sm hover:shadow-lg transition-all duration-300`}>
+            className={`bg-linear-to-br from-primary/20 to-primary/10 border-primary/30 border backdrop-blur-sm hover:shadow-lg transition-all duration-300`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-foreground/80">{title}</CardTitle>
                 <div className={`p-2 rounded-lg bg-background/50`}>
@@ -72,7 +72,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     Dashboard
                 </h2>
                 <p className="text-muted-foreground mt-2 text-lg">
