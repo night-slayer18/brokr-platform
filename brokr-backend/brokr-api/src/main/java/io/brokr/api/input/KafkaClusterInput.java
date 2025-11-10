@@ -12,7 +12,7 @@ public class KafkaClusterInput {
     private String name;
     private String bootstrapServers;
     private Map<String, Object> properties;
-    private boolean isActive;
+    private Boolean isActive;
     private String description;
     private String organizationId;
     private String environmentId;

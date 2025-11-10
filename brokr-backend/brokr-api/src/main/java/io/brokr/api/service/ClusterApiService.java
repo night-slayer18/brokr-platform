@@ -74,7 +74,7 @@ public class ClusterApiService {
                 .name(input.getName())
                 .bootstrapServers(input.getBootstrapServers())
                 .properties(input.getProperties())
-                .isActive(input.isActive())
+                .isActive(input.getIsActive() != null ? input.getIsActive() : true)
                 .description(input.getDescription())
                 .organizationId(input.getOrganizationId())
                 .environmentId(input.getEnvironmentId())
@@ -111,7 +111,7 @@ public class ClusterApiService {
         entity.setName(input.getName());
         entity.setBootstrapServers(input.getBootstrapServers());
         entity.setProperties(input.getProperties());
-        entity.setActive(input.isActive());
+        entity.setActive(input.getIsActive() != null ? input.getIsActive() : entity.isActive()); // Keep existing value if not provided
         entity.setDescription(input.getDescription());
         entity.setSecurityProtocol(input.getSecurityProtocol());
         entity.setSaslMechanism(input.getSaslMechanism());

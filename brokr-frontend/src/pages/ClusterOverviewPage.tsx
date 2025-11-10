@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, FileText, Server, Users } from 'lucide-react';
-import React, { memo, useMemo } from 'react';
+import React, { memo } from 'react';
 
 const StatCard = memo(function StatCard({ title, value, description, icon: Icon, to }: { title: string, value: string | number, description: string, icon: React.ElementType, to: string }) {
     return (
@@ -55,9 +55,9 @@ function ClusterOverviewPage() {
 
     const cluster = data?.cluster;
     // Handle null values from backend - if null, treat as empty array
-    const topicsCount = useMemo(() => cluster?.topics ? cluster.topics.length : 0, [cluster?.topics]);
-    const consumerGroupsCount = useMemo(() => cluster?.consumerGroups ? cluster.consumerGroups.length : 0, [cluster?.consumerGroups]);
-    const brokersCount = useMemo(() => cluster?.brokers ? cluster.brokers.length : 0, [cluster?.brokers]);
+    const topicsCount = cluster?.topics ? cluster.topics.length : 0;
+    const consumerGroupsCount = cluster?.consumerGroups ? cluster.consumerGroups.length : 0;
+    const brokersCount = cluster?.brokers ? cluster.brokers.length : 0;
 
     return (
         <div className="space-y-6">

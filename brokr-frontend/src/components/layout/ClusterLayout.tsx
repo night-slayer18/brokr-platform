@@ -21,14 +21,41 @@ export function ClusterLayout() {
     const { clusterId } = useParams<{ clusterId: string }>();
     const location = useLocation();
 
-    const { data, isLoading: loading } = useGraphQLQuery<GetClusterQuery, {id: string}>(GET_CLUSTER, 
+    const { data, isLoading: loading, error } = useGraphQLQuery<GetClusterQuery, {id: string}>(GET_CLUSTER, 
         clusterId ? {id: clusterId} : undefined,
         {
             enabled: !!clusterId,
+            disableErrorNotification: true, // We'll handle error display in the component
         }
     );
 
     const clusterName = data?.cluster?.name || '...';
+
+    // Handle error state
+    if (error) {
+        return (
+            <div className="flex h-screen bg-background items-center justify-center">
+                <div className="text-center space-y-4 max-w-md">
+                    <h2 className="text-2xl font-bold text-destructive">Error Loading Cluster</h2>
+                    <p className="text-muted-foreground">{error.message || 'Failed to load cluster details'}</p>
+                    <Link to="/clusters" className="inline-block text-primary hover:underline">Go back to clusters</Link>
+                </div>
+            </div>
+        );
+    }
+
+    // Handle case where cluster is not found (data exists but cluster is null)
+    if (!loading && data && !data.cluster) {
+        return (
+            <div className="flex h-screen bg-background items-center justify-center">
+                <div className="text-center space-y-4 max-w-md">
+                    <h2 className="text-2xl font-bold text-destructive">Cluster Not Found</h2>
+                    <p className="text-muted-foreground">The cluster you're looking for doesn't exist or you don't have access to it.</p>
+                    <Link to="/clusters" className="inline-block text-primary hover:underline">Go back to clusters</Link>
+                </div>
+            </div>
+        );
+    }
 
     const navigation = [
         { name: 'Overview', href: `/clusters/${clusterId}`, icon: LayoutDashboard },

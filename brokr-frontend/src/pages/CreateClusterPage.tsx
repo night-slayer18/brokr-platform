@@ -1,6 +1,6 @@
 import {useQueryClient} from '@tanstack/react-query'
 import {useNavigate} from 'react-router-dom'
-import {useForm} from 'react-hook-form'
+import {useForm, Controller} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import {toast} from 'sonner'
@@ -58,6 +58,7 @@ export default function CreateClusterPage() {
         setValue,
         watch,
         reset,
+        control,
     } = useForm<KafkaClusterFormData>({
         resolver: zodResolver(kafkaClusterSchema),
         defaultValues: {
@@ -247,11 +248,17 @@ export default function CreateClusterPage() {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                            <Switch
-                                id="isActive"
-                                checked={watch('isActive')}
-                                onCheckedChange={(checked) => setValue('isActive', checked)}
-                                disabled={loading}
+                            <Controller
+                                name="isActive"
+                                control={control}
+                                render={({field}) => (
+                                    <Switch
+                                        id="isActive"
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        disabled={loading}
+                                    />
+                                )}
                             />
                             <Label htmlFor="isActive">Active</Label>
                         </div>
