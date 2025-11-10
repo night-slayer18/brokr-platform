@@ -56,7 +56,7 @@ WORKDIR /app
 
 # Copy the built application (Spring Boot creates repackaged JAR without -original suffix)
 # The repackaged JAR is the executable one with all dependencies
-COPY --from=backend-builder /app/brokr-backend/brokr-app/target/brokr-app-1.0.0.jar app.jar
+COPY --from=backend-builder /app/brokr-backend/brokr-app/target/brokr-app-1.0.1-SNAPSHOT.jar app.jar
 
 # Change ownership
 RUN chown -R brokr:brokr /app
