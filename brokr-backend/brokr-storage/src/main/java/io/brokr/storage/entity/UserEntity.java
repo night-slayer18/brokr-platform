@@ -46,6 +46,7 @@ public class UserEntity {
     @ElementCollection
     @CollectionTable(name = "user_accessible_environments", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "environment_id")
+    @Builder.Default
     private List<String> accessibleEnvironmentIds = new ArrayList<>();
 
     @Column(nullable = false)

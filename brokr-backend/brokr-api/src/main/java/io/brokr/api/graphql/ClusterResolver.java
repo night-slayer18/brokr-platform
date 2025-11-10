@@ -5,6 +5,7 @@ import io.brokr.api.service.*;
 import io.brokr.core.model.*;
 import io.brokr.kafka.service.KafkaAdminService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class ClusterResolver {
@@ -30,7 +32,7 @@ public class ClusterResolver {
     private final KafkaAdminService kafkaAdminService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToOrganization(#organizationId)")
+    @PreAuthorize("#organizationId == null or @authorizationService.hasAccessToOrganization(#organizationId)")
     public List<KafkaCluster> clusters(@Argument String organizationId, @Argument String environmentId) {
         return clusterApiService.listAuthorizedClusters(organizationId, environmentId);
     }
@@ -82,6 +84,24 @@ public class ClusterResolver {
                 .collect(Collectors.toMap(
                         Function.identity(),
                         kafkaAdminService::getClusterNodes
+                ));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "topics")
+    public Map<KafkaCluster, List<Topic>> getTopics(List<KafkaCluster> clusters) {
+        return clusters.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        kafkaAdminService::listTopics
+                ));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "consumerGroups")
+    public Map<KafkaCluster, List<ConsumerGroup>> getConsumerGroups(List<KafkaCluster> clusters) {
+        return clusters.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        kafkaAdminService::listConsumerGroups
                 ));
     }
 

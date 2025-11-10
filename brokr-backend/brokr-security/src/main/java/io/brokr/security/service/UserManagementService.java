@@ -8,6 +8,7 @@ import io.brokr.security.utils.PasswordValidator;
 import io.brokr.storage.entity.UserEntity;
 import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserManagementService {
@@ -55,6 +57,20 @@ public class UserManagementService {
     }
 
     public User createUser(User user) {
+        User currentUser = authorizationService.getCurrentUser();
+        
+        // ADMIN can only create users in their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            if (!currentUser.getOrganizationId().equals(user.getOrganizationId())) {
+                throw new RuntimeException("ADMIN can only create users in their own organization");
+            }
+            
+            // ADMIN cannot create SUPER_ADMIN or SERVER_ADMIN users
+            if (user.getRole() == Role.SUPER_ADMIN || user.getRole() == Role.SERVER_ADMIN) {
+                throw new RuntimeException("ADMIN cannot create users with SUPER_ADMIN or SERVER_ADMIN roles");
+            }
+        }
+        
         if (userRepository.existsByUsername(user.getUsername())) {
             throw new ValidationException("Username already exists");
         }
@@ -78,8 +94,33 @@ public class UserManagementService {
     }
 
     public User updateUser(String id, User userUpdates) {
+        User currentUser = authorizationService.getCurrentUser();
         UserEntity entity = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        
+        User existingUser = entity.toDomain();
+        
+        // ADMIN can only update users in their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            if (!currentUser.getOrganizationId().equals(existingUser.getOrganizationId())) {
+                throw new RuntimeException("ADMIN can only update users in their own organization");
+            }
+            
+            // ADMIN cannot change organizationId
+            if (!userUpdates.getOrganizationId().equals(existingUser.getOrganizationId())) {
+                throw new RuntimeException("ADMIN cannot change user's organization");
+            }
+            
+            // ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles
+            if (userUpdates.getRole() == Role.SUPER_ADMIN || userUpdates.getRole() == Role.SERVER_ADMIN) {
+                throw new RuntimeException("ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles");
+            }
+            
+            // ADMIN cannot change existing SUPER_ADMIN or SERVER_ADMIN users
+            if (existingUser.getRole() == Role.SUPER_ADMIN || existingUser.getRole() == Role.SERVER_ADMIN) {
+                throw new RuntimeException("ADMIN cannot modify SUPER_ADMIN or SERVER_ADMIN users");
+            }
+        }
 
         // Check for username/email conflicts if they are being changed
         if (!entity.getUsername().equals(userUpdates.getUsername()) && userRepository.existsByUsername(userUpdates.getUsername())) {
@@ -112,10 +153,32 @@ public class UserManagementService {
     }
 
     public boolean deleteUser(String id) {
-        if (userRepository.existsById(id)) {
-            userRepository.deleteById(id);
-            return true;
+        User currentUser = authorizationService.getCurrentUser();
+        
+        if (!userRepository.existsById(id)) {
+            return false;
         }
-        return false;
+        
+        User userToDelete = getUserById(id);
+        
+        // ADMIN can only delete users in their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            if (!currentUser.getOrganizationId().equals(userToDelete.getOrganizationId())) {
+                throw new RuntimeException("ADMIN can only delete users in their own organization");
+            }
+            
+            // ADMIN cannot delete SUPER_ADMIN or SERVER_ADMIN users
+            if (userToDelete.getRole() == Role.SUPER_ADMIN || userToDelete.getRole() == Role.SERVER_ADMIN) {
+                throw new RuntimeException("ADMIN cannot delete SUPER_ADMIN or SERVER_ADMIN users");
+            }
+            
+            // ADMIN cannot delete themselves
+            if (currentUser.getId().equals(id)) {
+                throw new RuntimeException("ADMIN cannot delete themselves");
+            }
+        }
+        
+        userRepository.deleteById(id);
+        return true;
     }
 }

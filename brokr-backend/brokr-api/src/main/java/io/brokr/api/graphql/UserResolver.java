@@ -40,18 +40,21 @@ public class UserResolver {
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
     public UserDto createUser(@Argument UserInput input) {
+        // Service layer will validate ADMIN can only create users in their own organization
         return UserDto.fromDomain(userApiService.createUser(input));
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
     public UserDto updateUser(@Argument String id, @Argument UserInput input) {
+        // Service layer will validate ADMIN can only update users in their own organization
         return UserDto.fromDomain(userApiService.updateUser(id, input));
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
     public boolean deleteUser(@Argument String id) {
+        // Service layer will validate ADMIN can only delete users in their own organization
         return userApiService.deleteUser(id);
     }
 }

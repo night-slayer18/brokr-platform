@@ -54,20 +54,21 @@ export default function ClusterOverviewPage() {
     }
 
     const cluster = data?.cluster;
-    const topicsCount = cluster?.topics?.length || 0;
-    const consumerGroupsCount = cluster?.consumerGroups?.length || 0;
-    const brokersCount = cluster?.brokers?.length || 0;
+    // Handle null values from backend - if null, treat as empty array
+    const topicsCount = cluster?.topics ? cluster.topics.length : 0;
+    const consumerGroupsCount = cluster?.consumerGroups ? cluster.consumerGroups.length : 0;
+    const brokersCount = cluster?.brokers ? cluster.brokers.length : 0;
 
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent flex items-center gap-2">
                     {cluster?.name} Overview
                     <Badge variant={cluster?.isReachable ? 'default' : 'destructive'}>
                         {cluster?.isReachable ? 'Online' : 'Offline'}
                     </Badge>
                 </h2>
-                <p className="text-muted-foreground">High-level view of your Kafka cluster.</p>
+                <p className="text-muted-foreground mt-2">High-level view of your Kafka cluster.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">

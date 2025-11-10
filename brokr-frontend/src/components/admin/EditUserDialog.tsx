@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {useForm} from 'react-hook-form'
+import {useForm, Controller} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
@@ -15,6 +15,7 @@ import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
 import {useQueryClient} from '@tanstack/react-query'
 import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS, GET_USER} from '@/graphql/queries'
 import {ROLE_LABELS} from '@/lib/constants'
+import {useAuth} from '@/hooks/useAuth'
 
 const userSchema = z.object({
     username: z.string().min(1, 'Username is required'),
@@ -40,6 +41,9 @@ interface EditUserDialogProps {
 export function EditUserDialog({open, onOpenChange, user, organizationId}: EditUserDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const queryClient = useQueryClient()
+    const {hasRole} = useAuth()
+    const isAdmin = hasRole('ADMIN')
+    const isSuperAdminOrServerAdmin = user.role === 'SUPER_ADMIN' || user.role === 'SERVER_ADMIN'
     const {mutate: updateUser} = useGraphQLMutation<UpdateUserMutation, {id: string; input: UserFormData}>(
         UPDATE_USER_MUTATION,
         {
@@ -49,6 +53,7 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
                 queryClient.invalidateQueries({queryKey: ['graphql', GET_ORGANIZATIONS]})
                 queryClient.invalidateQueries({queryKey: ['graphql', GET_USERS]})
                 queryClient.invalidateQueries({queryKey: ['graphql', GET_USER]})
+                setIsSubmitting(false)
                 onOpenChange(false)
             },
             onError: (error) => {
@@ -65,6 +70,7 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
         formState: {errors},
         watch,
         setValue,
+        control,
     } = useForm<UserFormData>({
         resolver: zodResolver(userSchema),
         defaultValues: {
@@ -83,6 +89,7 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
 
     useEffect(() => {
         if (open && user) {
+            setIsSubmitting(false) // Reset submitting state when dialog opens
             reset({
                 username: user.username,
                 email: user.email,
@@ -92,12 +99,12 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
                 role: user.role as 'VIEWER' | 'ADMIN' | 'SERVER_ADMIN' | 'SUPER_ADMIN',
                 organizationId: user.organizationId || organizationId,
                 accessibleEnvironmentIds: user.accessibleEnvironmentIds || [],
-                isActive: user.isActive,
+                isActive: user.isActive ?? true, // Default to true if undefined
             })
         }
-    }, [open, user, organizationId, reset])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, user?.id, organizationId, reset]) // Only reset when user ID changes, not when user object changes
 
-    const isActive = watch('isActive')
     const role = watch('role')
 
     const onSubmit = (data: UserFormData) => {
@@ -107,6 +114,7 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
         if (!input.password || input.password.trim() === '') {
             delete input.password
         }
+        // isActive is now properly registered via Controller, so it will be in data
         updateUser({id: user.id, input})
     }
 
@@ -117,7 +125,7 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
                     <DialogTitle>Edit User</DialogTitle>
                     <DialogDescription>Update user details</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="username">Username *</Label>
@@ -177,28 +185,45 @@ export function EditUserDialog({open, onOpenChange, user, organizationId}: EditU
                         <Select
                             value={role}
                             onValueChange={(value) => setValue('role', value as UserFormData['role'])}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || (isAdmin && isSuperAdminOrServerAdmin)}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select role"/>
                             </SelectTrigger>
                             <SelectContent>
-                                {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                                    <SelectItem key={key} value={key}>
-                                        {label}
-                                    </SelectItem>
-                                ))}
+                                {Object.entries(ROLE_LABELS)
+                                    .filter(([key]) => {
+                                        // ADMIN cannot assign SUPER_ADMIN or SERVER_ADMIN roles
+                                        if (isAdmin && (key === 'SUPER_ADMIN' || key === 'SERVER_ADMIN')) {
+                                            return false
+                                        }
+                                        return true
+                                    })
+                                    .map(([key, label]) => (
+                                        <SelectItem key={key} value={key}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
                             </SelectContent>
                         </Select>
                         {errors.role && <p className="text-sm text-destructive">{errors.role.message}</p>}
+                        {isAdmin && isSuperAdminOrServerAdmin && (
+                            <p className="text-sm text-muted-foreground">ADMIN cannot modify SUPER_ADMIN or SERVER_ADMIN users</p>
+                        )}
                     </div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="isActive">Active</Label>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={(checked) => setValue('isActive', checked)}
-                            disabled={isSubmitting}
+                        <Controller
+                            name="isActive"
+                            control={control}
+                            render={({field}) => (
+                                <Switch
+                                    id="isActive"
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isSubmitting}
+                                />
+                            )}
                         />
                     </div>
                     <DialogFooter>

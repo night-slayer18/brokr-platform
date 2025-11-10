@@ -30,6 +30,7 @@ public class KafkaClusterEntity {
     private String bootstrapServers;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Builder.Default
     private Map<String, Object> properties = new HashMap<>();
 
     @Column(nullable = false)

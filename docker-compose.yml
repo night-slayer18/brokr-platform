@@ -15,8 +15,11 @@ services:
       timeout: 5s
       retries: 5
 
+  # NOTE: Kafka services are OPTIONAL - only for testing/demo purposes
+  # The Brokr platform connects to EXTERNAL Kafka clusters via bootstrap servers
+  # configured by admins in the UI. These Kafka clusters are just for local testing.
   kafka-hotfix:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.8.0
     ports:
       - "9092:9092"
       - "19092:19092"
@@ -47,7 +50,7 @@ services:
       retries: 5
 
   kafka-minor:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.8.0
     ports:
       - "9093:9093"
       - "19093:19093"
@@ -78,7 +81,7 @@ services:
       retries: 5
 
   kafka-major:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.8.0
     ports:
       - "9094:9094"
       - "19094:19094"
@@ -109,7 +112,7 @@ services:
       retries: 5
 
   kafka-prod:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.8.0
     ports:
       - "9095:9095"
       - "19095:19095"
@@ -140,7 +143,7 @@ services:
       retries: 5
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
+    image: confluentinc/cp-schema-registry:7.8.0
     depends_on:
       kafka-hotfix:
         condition: service_healthy
@@ -157,7 +160,7 @@ services:
       retries: 5
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.0
+    image: confluentinc/cp-kafka-connect:7.8.0
     depends_on:
       kafka-hotfix:
         condition: service_healthy
@@ -196,13 +199,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka-hotfix:
-        condition: service_healthy
+      # NOTE: Kafka services are NOT required - Brokr platform connects to external Kafka clusters
+      # via bootstrap servers configured by admins in the UI. Kafka services above are only for local testing.
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokr
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: password
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka-hotfix:29092
+      # NOTE: SPRING_KAFKA_BOOTSTRAP_SERVERS is NOT needed - platform connects to external clusters
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health" ]
       interval: 10s

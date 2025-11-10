@@ -21,7 +21,17 @@ export function useAuth() {
     }
 
     const canManageUsers = () => {
-        return hasRole(['SERVER_ADMIN', 'SUPER_ADMIN'])
+        return hasRole(['ADMIN', 'SERVER_ADMIN', 'SUPER_ADMIN'])
+    }
+
+    const canManageUsersInOrganization = (organizationId?: string) => {
+        if (!user) return false
+        if (hasRole(['SERVER_ADMIN', 'SUPER_ADMIN'])) return true
+        if (hasRole('ADMIN')) {
+            // ADMIN can manage users in their own organization
+            return !organizationId || user.organizationId === organizationId
+        }
+        return false
     }
 
     const canManageClusters = () => {
@@ -30,6 +40,16 @@ export function useAuth() {
 
     const canManageOrganizations = () => {
         return hasRole('SUPER_ADMIN')
+    }
+
+    const canManageOwnOrganization = (organizationId?: string) => {
+        if (!user) return false
+        if (hasRole('SUPER_ADMIN')) return true
+        if (hasRole('ADMIN')) {
+            // ADMIN can manage their own organization
+            return !organizationId || user.organizationId === organizationId
+        }
+        return false
     }
 
     const isSuperAdmin = () => {
@@ -50,8 +70,10 @@ export function useAuth() {
         hasRole,
         canManageTopics,
         canManageUsers,
+        canManageUsersInOrganization,
         canManageClusters,
         canManageOrganizations,
+        canManageOwnOrganization,
         isSuperAdmin,
         canAccessEnvironment,
     }

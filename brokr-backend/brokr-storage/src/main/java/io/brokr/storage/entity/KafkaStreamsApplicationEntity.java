@@ -51,6 +51,7 @@ public class KafkaStreamsApplicationEntity {
     private Map<String, Object> configuration;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private boolean isActive = true;
 
     @Enumerated(EnumType.STRING)

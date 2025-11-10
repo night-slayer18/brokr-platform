@@ -35,8 +35,9 @@ public class AuthorizationService {
         }
 
         // Fallback for any other principal type (should not happen in normal flow)
-        String username = authentication.getName();
-        return userRepository.findByUsername(username)
+        // Note: authentication.getName() returns email since we use email for authentication
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
                 .map(entity -> {
                     // Explicitly initialize lazy collection
                     Hibernate.initialize(entity.getAccessibleEnvironmentIds());
@@ -134,7 +135,51 @@ public class AuthorizationService {
 
     public boolean canManageUsers() {
         User user = getCurrentUser();
-        return user.getRole() == Role.SERVER_ADMIN || user.getRole() == Role.SUPER_ADMIN;
+        return user.getRole() == Role.SERVER_ADMIN 
+            || user.getRole() == Role.SUPER_ADMIN
+            || user.getRole() == Role.ADMIN;
+    }
+
+    /**
+     * Check if user can manage users in a specific organization.
+     * ADMIN can only manage users in their own organization.
+     * SERVER_ADMIN and SUPER_ADMIN can manage users in any organization.
+     */
+    public boolean canManageUsersInOrganization(String organizationId) {
+        User user = getCurrentUser();
+        
+        // SUPER_ADMIN and SERVER_ADMIN can manage all users
+        if (user.getRole() == Role.SUPER_ADMIN || user.getRole() == Role.SERVER_ADMIN) {
+            return true;
+        }
+        
+        // ADMIN can manage users in their own organization
+        if (user.getRole() == Role.ADMIN) {
+            return hasAccessToOrganization(organizationId);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if user can manage their own organization (view and update, not create/delete).
+     * ADMIN can manage their own organization.
+     * SUPER_ADMIN can manage all organizations.
+     */
+    public boolean canManageOwnOrganization(String organizationId) {
+        User user = getCurrentUser();
+        
+        // SUPER_ADMIN can manage all organizations
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            return true;
+        }
+        
+        // ADMIN can manage their own organization
+        if (user.getRole() == Role.ADMIN) {
+            return hasAccessToOrganization(organizationId);
+        }
+        
+        return false;
     }
 
     public boolean canManageOrganizations() {

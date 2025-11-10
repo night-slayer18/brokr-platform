@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ConsumerGroupDescription;
-import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.errors.GroupIdNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +32,7 @@ public class KafkaStreamsService {
             if (groupDesc == null) {
                 return StreamsState.NOT_RUNNING;
             }
-            return mapKafkaStateToStreamsState(groupDesc.state());
+            return mapKafkaStateToStreamsState(groupDesc.groupState() != null ? groupDesc.groupState().name() : null);
         } catch (Exception e) {
             log.warn("Could not get state for streams app [{}]: {}", app.getApplicationId(), e.getMessage());
             connectionService.removeAdminClient(cluster.getId());
@@ -63,7 +62,7 @@ public class KafkaStreamsService {
             }
 
             // Get the overall state to apply to threads and tasks
-            String groupStateName = mapKafkaStateToStreamsState(groupDesc.state()).name();
+            String groupStateName = mapKafkaStateToStreamsState(groupDesc.groupState() != null ? groupDesc.groupState().name() : null).name();
 
             // Map each consumer group member (a "thread") to our ThreadMetadata model
             return groupDesc.members().stream()
@@ -107,18 +106,18 @@ public class KafkaStreamsService {
      * Maps the internal Kafka consumer group state to our application's
      * StreamsState enum.
      */
-    private StreamsState mapKafkaStateToStreamsState(ConsumerGroupState state) {
-        if (state == null) {
+    private StreamsState mapKafkaStateToStreamsState(String state) {
+        if (state == null || state.isEmpty()) {
             return StreamsState.ERROR;
         }
         switch (state) {
-            case STABLE:
+            case "Stable":
                 return StreamsState.RUNNING;
-            case PREPARING_REBALANCE:
-            case COMPLETING_REBALANCE:
+            case "PreparingRebalance":
+            case "CompletingRebalance":
                 return StreamsState.REBALANCING;
-            case EMPTY:
-            case DEAD:
+            case "Empty":
+            case "Dead":
                 return StreamsState.NOT_RUNNING;
             default:
                 return StreamsState.ERROR;

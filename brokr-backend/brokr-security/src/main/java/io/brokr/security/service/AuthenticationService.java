@@ -35,12 +35,13 @@ public class AuthenticationService {
         return response;
     }
 
-    public Map<String, Object> authenticate(String username, String password) {
+    public Map<String, Object> authenticate(String email, String password) {
+        // Note: The parameter is named 'email' but API field remains 'username' for backward compatibility
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, password)
+                new UsernamePasswordAuthenticationToken(email, password)
         );
 
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByEmail(email)
                 .map(UserEntity::toDomain)
                 .orElseThrow();
 

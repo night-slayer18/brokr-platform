@@ -57,7 +57,7 @@ function SidebarLink({href, icon: Icon, children}: SidebarLinkProps) {
 }
 
 export function Sidebar() {
-    const {isSuperAdmin} = useAuth()
+    const {isSuperAdmin, canManageUsers} = useAuth()
 
     return (
         <aside className="w-64 border-r bg-card">
@@ -74,7 +74,7 @@ export function Sidebar() {
                             {item.name}
                         </SidebarLink>
                     ))}
-                    {isSuperAdmin() && (
+                    {(isSuperAdmin() || canManageUsers()) && (
                         <>
                             <div className="my-4 border-t border-border"/>
                             <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">

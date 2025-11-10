@@ -14,7 +14,7 @@ import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
 import type {LoginMutation} from '@/graphql/types'
 
 const loginSchema = z.object({
-    username: z.string().min(1, 'Username is required'),
+    username: z.string().email('Please enter a valid email address'),
     password: z.string().min(1, 'Password is required'),
 })
 
@@ -58,7 +58,7 @@ export function LoginForm() {
 
     return (
         <Card
-            className="w-full max-w-md backdrop-blur-xl bg-card/50 border-2 border-primary/20 shadow-2xl shadow-primary/20">
+            className="w-full min-w-[400px] max-w-lg mx-auto backdrop-blur-xl bg-card/50 border-2 border-primary/20 shadow-2xl shadow-primary/20">
             <CardHeader className="space-y-1 pb-6">
                 <div className="flex items-center justify-center mb-6">
                     <div className="relative">
@@ -82,12 +82,13 @@ export function LoginForm() {
                     Manage your Kafka clusters with ease
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-6">
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                     <div className="space-y-2">
                         <Label htmlFor="username" className="text-foreground/90">Username</Label>
                         <Input
                             id="username"
+                            type="email"
                             {...register('username')}
                             placeholder="Enter your username"
                             disabled={loading}
@@ -118,17 +119,6 @@ export function LoginForm() {
                         {loading ? 'Signing In...' : 'Sign In'}
                     </Button>
                 </form>
-                <div className="mt-6 text-center">
-                    <p className="text-sm text-muted-foreground mb-2">Demo Credentials</p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                        <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">admin/admin123</span>
-                        <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-secondary/10 text-secondary-foreground border-secondary/20">orgadmin/orgadmin123</span>
-                        <span
-                            className="text-xs px-3 py-1.5 rounded-full bg-muted/10 text-muted-foreground border-muted/20">developer/developer123</span>
-                    </div>
-                </div>
             </CardContent>
         </Card>
     )

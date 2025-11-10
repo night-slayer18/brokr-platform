@@ -12,9 +12,11 @@ import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {CreateOrganizationDialog} from '@/components/admin/CreateOrganizationDialog'
 import {EditOrganizationDialog} from '@/components/admin/EditOrganizationDialog'
 import {DeleteOrganizationDialog} from '@/components/admin/DeleteOrganizationDialog'
+import {useAuth} from '@/hooks/useAuth'
 
 export default function OrganizationsPage() {
     const navigate = useNavigate()
+    const {canManageOrganizations, canManageOwnOrganization} = useAuth()
     const {data, isLoading, error} = useGraphQLQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS)
     const [createDialogOpen, setCreateDialogOpen] = useState(false)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -47,10 +49,12 @@ export default function OrganizationsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
                     <p className="text-muted-foreground">Manage all organizations and their users</p>
                 </div>
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4"/>
-                    Create Organization
-                </Button>
+                {canManageOrganizations() && (
+                    <Button onClick={() => setCreateDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4"/>
+                        Create Organization
+                    </Button>
+                )}
             </div>
 
             {isLoading ? (
@@ -105,20 +109,26 @@ export default function OrganizationsPage() {
                                             <Eye className="mr-2 h-4 w-4"/>
                                             View
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleEdit(org)}
-                                        >
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => handleDelete(org)}
-                                        >
-                                            Delete
-                                        </Button>
+                                        {canManageOwnOrganization(org.id) && (
+                                            <>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleEdit(org)}
+                                                >
+                                                    Edit
+                                                </Button>
+                                                {canManageOrganizations() && (
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={() => handleDelete(org)}
+                                                    >
+                                                        Delete
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -133,10 +143,12 @@ export default function OrganizationsPage() {
                         <Building2 className="h-12 w-12 text-muted-foreground mb-4"/>
                         <h3 className="text-lg font-semibold mb-2">No organizations found</h3>
                         <p className="text-muted-foreground mb-4">Get started by creating your first organization</p>
-                        <Button onClick={() => setCreateDialogOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4"/>
-                            Create Organization
-                        </Button>
+                        {canManageOrganizations() && (
+                            <Button onClick={() => setCreateDialogOpen(true)}>
+                                <Plus className="mr-2 h-4 w-4"/>
+                                Create Organization
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
             )}

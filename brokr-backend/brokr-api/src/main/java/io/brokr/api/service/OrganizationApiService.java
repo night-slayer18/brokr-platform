@@ -6,6 +6,8 @@ import io.brokr.core.dto.OrganizationDto;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.Organization;
+import io.brokr.core.model.Role;
+import io.brokr.security.service.AuthorizationService;
 import io.brokr.storage.entity.EnvironmentEntity;
 import io.brokr.storage.entity.OrganizationEntity;
 import io.brokr.storage.repository.EnvironmentRepository;
@@ -25,6 +27,7 @@ public class OrganizationApiService {
 
     private final OrganizationRepository organizationRepository;
     private final EnvironmentRepository environmentRepository;
+    private final AuthorizationService authorizationService;
 
     @Transactional(readOnly = true)
     public List<Organization> listOrganizations() {
@@ -114,6 +117,15 @@ public class OrganizationApiService {
 
     @Transactional
     public Organization updateOrganization(String id, OrganizationInput input) {
+        var currentUser = authorizationService.getCurrentUser();
+        
+        // ADMIN can only update their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            if (!currentUser.getOrganizationId().equals(id)) {
+                throw new RuntimeException("ADMIN can only update their own organization");
+            }
+        }
+        
         OrganizationEntity entity = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
 

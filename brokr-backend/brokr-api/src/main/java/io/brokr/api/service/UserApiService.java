@@ -57,6 +57,8 @@ public class UserApiService {
 
     // Helper to convert DTO to Model, keeping the API layer responsible for the DTO
     private User convertInputToModel(UserInput input) {
+        // Use Boolean wrapper and default to true if null (for backward compatibility)
+        boolean isActive = input.getIsActive() != null ? input.getIsActive() : true;
         return User.builder()
                 .username(input.getUsername())
                 .email(input.getEmail())
@@ -66,7 +68,7 @@ public class UserApiService {
                 .role(input.getRole())
                 .organizationId(input.getOrganizationId())
                 .accessibleEnvironmentIds(input.getAccessibleEnvironmentIds())
-                .isActive(input.isActive())
+                .isActive(isActive)
                 .build();
     }
 }

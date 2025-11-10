@@ -74,7 +74,7 @@ public class AuthController {
                 .role(input.getRole())
                 .organizationId(input.getOrganizationId())
                 .accessibleEnvironmentIds(input.getAccessibleEnvironmentIds())
-                .isActive(input.isActive()) // UserManagementService will handle default
+                .isActive(input.getIsActive() != null ? input.getIsActive() : true) // UserManagementService will handle default
                 .build();
 
         Map<String, Object> authResult = authenticationService.register(user);

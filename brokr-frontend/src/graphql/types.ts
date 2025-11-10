@@ -29,9 +29,9 @@ export interface GetClusterOverviewQuery {
         id: string
         name: string
         isReachable: boolean
-        brokers: Array<{ id: number }>
-        topics: Array<{ name: string }>
-        consumerGroups: Array<{ groupId: string }>
+        brokers: Array<{ id: number }> | null
+        topics: Array<{ name: string }> | null
+        consumerGroups: Array<{ groupId: string }> | null
     }
 }
 

@@ -16,5 +16,5 @@ public class UserInput {
     private Role role;
     private String organizationId;
     private List<String> accessibleEnvironmentIds;
-    private boolean isActive;
+    private Boolean isActive; // Use Boolean wrapper instead of primitive boolean to allow proper GraphQL deserialization
 }

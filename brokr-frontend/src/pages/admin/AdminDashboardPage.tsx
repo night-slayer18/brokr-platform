@@ -9,9 +9,11 @@ import {toast} from 'sonner'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {useState} from 'react'
 import {CreateOrganizationDialog} from '@/components/admin/CreateOrganizationDialog'
+import {useAuth} from '@/hooks/useAuth'
 
 export default function AdminDashboardPage() {
     const navigate = useNavigate()
+    const {canManageOrganizations} = useAuth()
     const {data, isLoading, error} = useGraphQLQuery<GetOrganizationsQuery>(GET_ORGANIZATIONS)
     const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
@@ -33,10 +35,12 @@ export default function AdminDashboardPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
                     <p className="text-muted-foreground">Overview of all organizations and resources</p>
                 </div>
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4"/>
-                    Create Organization
-                </Button>
+                {canManageOrganizations() && (
+                    <Button onClick={() => setCreateDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4"/>
+                        Create Organization
+                    </Button>
+                )}
             </div>
 
             {isLoading ? (
@@ -155,10 +159,12 @@ export default function AdminDashboardPage() {
                         <div className="text-center py-8 text-muted-foreground">
                             <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50"/>
                             <p>No organizations found</p>
-                            <Button onClick={() => setCreateDialogOpen(true)} className="mt-4">
-                                <Plus className="mr-2 h-4 w-4"/>
-                                Create First Organization
-                            </Button>
+                            {canManageOrganizations() && (
+                                <Button onClick={() => setCreateDialogOpen(true)} className="mt-4">
+                                    <Plus className="mr-2 h-4 w-4"/>
+                                    Create First Organization
+                                </Button>
+                            )}
                         </div>
                     )}
                 </CardContent>

@@ -8,6 +8,7 @@ import {ROLE_LABELS} from '@/lib/constants'
 import type {GetOrganizationQuery} from '@/graphql/types'
 import {EditUserDialog} from './EditUserDialog'
 import {DeleteUserDialog} from './DeleteUserDialog'
+import {useAuth} from '@/hooks/useAuth'
 
 interface UserDetailDrawerProps {
     open: boolean
@@ -19,6 +20,8 @@ interface UserDetailDrawerProps {
 export function UserDetailDrawer({open, onOpenChange, user, organizationId}: UserDetailDrawerProps) {
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const {canManageUsers, canManageUsersInOrganization, user: currentUser} = useAuth()
+    const canManageThisUser = canManageUsers() && (canManageUsersInOrganization(user.organizationId || undefined) || currentUser?.id === user.id)
 
     const getUserInitials = () => {
         if (user.firstName && user.lastName) {
@@ -48,24 +51,28 @@ export function UserDetailDrawer({open, onOpenChange, user, organizationId}: Use
                                 <SheetDescription className="text-base">{user.email}</SheetDescription>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <Button 
-                                variant="outline" 
-                                onClick={() => setEditDialogOpen(true)} 
-                                className="flex-1 shadow-sm hover:shadow-md transition-shadow"
-                            >
-                                <Edit className="mr-2 h-4 w-4"/>
-                                Edit User
-                            </Button>
-                            <Button 
-                                variant="destructive" 
-                                onClick={() => setDeleteDialogOpen(true)} 
-                                className="flex-1 shadow-sm hover:shadow-md transition-shadow"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4"/>
-                                Delete User
-                            </Button>
-                        </div>
+                        {canManageThisUser && (
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => setEditDialogOpen(true)} 
+                                    className="flex-1 shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                    <Edit className="mr-2 h-4 w-4"/>
+                                    Edit User
+                                </Button>
+                                {currentUser?.id !== user.id && (
+                                    <Button 
+                                        variant="destructive" 
+                                        onClick={() => setDeleteDialogOpen(true)} 
+                                        className="flex-1 shadow-sm hover:shadow-md transition-shadow"
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4"/>
+                                        Delete User
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Section */}

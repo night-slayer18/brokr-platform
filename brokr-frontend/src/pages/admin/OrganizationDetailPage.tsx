@@ -6,7 +6,7 @@ import {Button} from '@/components/ui/button'
 import {Skeleton} from '@/components/ui/skeleton'
 import {ArrowLeft, Building2, Users, Server, Edit, Trash2, Plus} from 'lucide-react'
 import {toast} from 'sonner'
-import {useState} from 'react'
+import {useState, useEffect} from 'react'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {ROLES} from '@/lib/constants'
 import {UserHierarchyTree} from '@/components/admin/UserHierarchyTree'
@@ -14,11 +14,13 @@ import {UserDetailDrawer} from '@/components/admin/UserDetailDrawer'
 import {EditOrganizationDialog} from '@/components/admin/EditOrganizationDialog'
 import {DeleteOrganizationDialog} from '@/components/admin/DeleteOrganizationDialog'
 import {CreateUserDialog} from '@/components/admin/CreateUserDialog'
+import {useAuth} from '@/hooks/useAuth'
 import type {GetOrganizationQuery as OrgQuery} from '@/graphql/types'
 
 export default function OrganizationDetailPage() {
     const {orgId} = useParams<{orgId: string}>()
     const navigate = useNavigate()
+    const {canManageUsers, canManageOwnOrganization, canManageOrganizations} = useAuth()
     const {data, isLoading, error} = useGraphQLQuery<GetOrganizationQuery, {id: string}>(GET_ORGANIZATION, 
         orgId ? {id: orgId} : undefined,
         {
@@ -41,6 +43,16 @@ export default function OrganizationDetailPage() {
     }
 
     const organization = data?.organization
+
+    // Update selectedUser when organization data changes to ensure we have fresh data
+    useEffect(() => {
+        if (selectedUser && organization?.users) {
+            const updatedUser = organization.users.find(u => u.id === selectedUser.id)
+            if (updatedUser) {
+                setSelectedUser(updatedUser)
+            }
+        }
+    }, [organization?.users, selectedUser?.id])
 
     const handleUserClick = (user: NonNullable<OrgQuery['organization']['users']>[0]) => {
         setSelectedUser(user)
@@ -92,14 +104,18 @@ export default function OrganizationDetailPage() {
                 </div>
                 {!isLoading && organization && (
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleEdit}>
-                            <Edit className="mr-2 h-4 w-4"/>
-                            Edit
-                        </Button>
-                        <Button variant="destructive" onClick={handleDelete}>
-                            <Trash2 className="mr-2 h-4 w-4"/>
-                            Delete
-                        </Button>
+                        {canManageOwnOrganization(organization.id) && (
+                            <Button variant="outline" onClick={handleEdit}>
+                                <Edit className="mr-2 h-4 w-4"/>
+                                Edit
+                            </Button>
+                        )}
+                        {canManageOrganizations() && (
+                            <Button variant="destructive" onClick={handleDelete}>
+                                <Trash2 className="mr-2 h-4 w-4"/>
+                                Delete
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>
@@ -159,10 +175,12 @@ export default function OrganizationDetailPage() {
                             <CardTitle>User Hierarchy</CardTitle>
                             <CardDescription>Organization structure showing users by role</CardDescription>
                         </div>
-                        <Button onClick={() => setCreateUserDialogOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4"/>
-                            Add User
-                        </Button>
+                        {canManageUsers() && (
+                            <Button onClick={() => setCreateUserDialogOpen(true)}>
+                                <Plus className="mr-2 h-4 w-4"/>
+                                Add User
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -177,10 +195,12 @@ export default function OrganizationDetailPage() {
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Users className="h-12 w-12 mx-auto mb-4 opacity-50"/>
                                     <p>No users in this organization</p>
-                                    <Button onClick={() => setCreateUserDialogOpen(true)} className="mt-4">
-                                        <Plus className="mr-2 h-4 w-4"/>
-                                        Add First User
-                                    </Button>
+                                    {canManageUsers() && (
+                                        <Button onClick={() => setCreateUserDialogOpen(true)} className="mt-4">
+                                            <Plus className="mr-2 h-4 w-4"/>
+                                            Add First User
+                                        </Button>
+                                    )}
                                 </div>
                             ) : (
                                 <UserHierarchyTree

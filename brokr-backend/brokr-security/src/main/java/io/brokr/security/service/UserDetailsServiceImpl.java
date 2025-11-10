@@ -19,13 +19,14 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     @Transactional(readOnly = true) // Add this annotation
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        // Note: Spring Security's loadUserByUsername method is used with email for authentication
+        User user = userRepository.findByEmail(email)
                 .map(entity -> {
                     Hibernate.initialize(entity.getAccessibleEnvironmentIds());
                     return entity.toDomain();
                 })
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
 
         return new BrokrUserDetails(user);
     }

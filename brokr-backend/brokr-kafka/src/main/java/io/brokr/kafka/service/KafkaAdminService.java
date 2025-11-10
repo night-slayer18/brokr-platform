@@ -134,8 +134,14 @@ public class KafkaAdminService {
             List<io.brokr.core.model.PartitionInfo> partitionsInfo = new ArrayList<>();
             for (var partition : description.partitions()) {
                 org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
-                long earliestOffset = earliestOffsets.get(tp).offset();
-                long latestOffset = latestOffsets.get(tp).offset();
+                ListOffsetsResult.ListOffsetsResultInfo earliestInfo = earliestOffsets.get(tp);
+                ListOffsetsResult.ListOffsetsResultInfo latestInfo = latestOffsets.get(tp);
+                if (earliestInfo == null || latestInfo == null) {
+                    log.warn("Missing offset info for partition {}:{}", topicName, partition.partition());
+                    continue;
+                }
+                long earliestOffset = earliestInfo.offset();
+                long latestOffset = latestInfo.offset();
                 long size = latestOffset - earliestOffset;
 
                 partitionsInfo.add(io.brokr.core.model.PartitionInfo.builder()
@@ -252,7 +258,7 @@ public class KafkaAdminService {
 
                         return ConsumerGroup.builder()
                                 .groupId(groupId)
-                                .state(description.state().toString())
+                                .state(description.groupState() != null ? description.groupState().name() : "Unknown")
                                 .members(members)
                                 .coordinator(description.coordinator().host())
                                 .build();
@@ -294,7 +300,7 @@ public class KafkaAdminService {
 
             ConsumerGroup group = ConsumerGroup.builder()
                     .groupId(groupId)
-                    .state(description.state().toString())
+                    .state(description.groupState() != null ? description.groupState().name() : "Unknown")
                     .members(members)
                     .coordinator(description.coordinator().host())
                     .build();
@@ -337,7 +343,12 @@ public class KafkaAdminService {
             for (Map.Entry<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
                 org.apache.kafka.common.TopicPartition tp = entry.getKey();
                 long currentOffset = entry.getValue().offset();
-                long endOffset = latestOffsets.get(tp).offset();
+                ListOffsetsResult.ListOffsetsResultInfo latestInfo = latestOffsets.get(tp);
+                if (latestInfo == null) {
+                    log.warn("Missing latest offset info for partition {}:{}", tp.topic(), tp.partition());
+                    continue;
+                }
+                long endOffset = latestInfo.offset();
                 long lag = endOffset - currentOffset;
 
                 lagByTopic.merge(tp.topic(), lag, Long::sum);
@@ -368,7 +379,6 @@ public class KafkaAdminService {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
 
             // Step 1: Get offsets for all groups in parallel
-            @SuppressWarnings("unchecked")
             List<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>> groupOffsetFutures =
                     groupIds.stream()
                             .<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>>map(groupId -> 

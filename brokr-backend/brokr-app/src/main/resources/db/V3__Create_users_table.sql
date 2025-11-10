@@ -23,6 +23,10 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_organization_id ON users(organization_id);
 
+-- Indexes on username and email for faster lookups (UNIQUE constraints already create indexes, but explicit for clarity)
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
+
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW

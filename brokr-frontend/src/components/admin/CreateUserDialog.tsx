@@ -15,6 +15,7 @@ import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
 import {useQueryClient} from '@tanstack/react-query'
 import {GET_ORGANIZATION, GET_ORGANIZATIONS, GET_USERS} from '@/graphql/queries'
 import {ROLE_LABELS} from '@/lib/constants'
+import {useAuth} from '@/hooks/useAuth'
 
 const userSchema = z.object({
     username: z.string().min(1, 'Username is required'),
@@ -39,6 +40,8 @@ interface CreateUserDialogProps {
 export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUserDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const queryClient = useQueryClient()
+    const {hasRole} = useAuth()
+    const isAdmin = hasRole('ADMIN')
     const {mutate: createUser} = useGraphQLMutation<CreateUserMutation, {input: UserFormData}>(
         CREATE_USER_MUTATION,
         {
@@ -161,11 +164,19 @@ export function CreateUserDialog({open, onOpenChange, organizationId}: CreateUse
                                 <SelectValue placeholder="Select role"/>
                             </SelectTrigger>
                             <SelectContent>
-                                {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                                    <SelectItem key={key} value={key}>
-                                        {label}
-                                    </SelectItem>
-                                ))}
+                                {Object.entries(ROLE_LABELS)
+                                    .filter(([key]) => {
+                                        // ADMIN cannot create SUPER_ADMIN or SERVER_ADMIN users
+                                        if (isAdmin && (key === 'SUPER_ADMIN' || key === 'SERVER_ADMIN')) {
+                                            return false
+                                        }
+                                        return true
+                                    })
+                                    .map(([key, label]) => (
+                                        <SelectItem key={key} value={key}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
                             </SelectContent>
                         </Select>
                         {errors.role && <p className="text-sm text-destructive">{errors.role.message}</p>}

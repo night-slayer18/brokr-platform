@@ -4,6 +4,7 @@ import io.brokr.api.input.OrganizationInput;
 import io.brokr.api.service.OrganizationApiService;
 import io.brokr.core.dto.OrganizationDto;
 import io.brokr.core.model.Organization;
+import io.brokr.security.service.AuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +19,17 @@ import java.util.List;
 public class OrganizationController {
 
     private final OrganizationApiService organizationApiService;
+    private final AuthorizationService authorizationService;
 
     @GetMapping
-    @PreAuthorize("@authorizationService.canManageOrganizations()")
+    @PreAuthorize("@authorizationService.canManageOrganizations() or @authorizationService.getCurrentUser().role == T(io.brokr.core.model.Role).ADMIN")
     public List<OrganizationDto> getOrganizations() {
+        // ADMIN can only see their own organization
+        // SUPER_ADMIN can see all organizations
+        var currentUser = authorizationService.getCurrentUser();
+        if (currentUser.getRole() == io.brokr.core.model.Role.ADMIN) {
+            return List.of(organizationApiService.getOrganizationDtoById(currentUser.getOrganizationId()));
+        }
         // This service method is optimized for the N+1 problem
         return organizationApiService.listOrganizationsWithEnvironments();
     }
@@ -42,8 +50,9 @@ public class OrganizationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@authorizationService.hasAccessToOrganization(#id)")
+    @PreAuthorize("@authorizationService.canManageOwnOrganization(#id)")
     public OrganizationDto updateOrganization(@PathVariable String id, @RequestBody OrganizationInput input) {
+        // Service layer will validate ADMIN can only update their own organization
         // This service method is optimized for the N+1 problem
         return organizationApiService.updateAndGetOrganizationDto(id, input);
     }

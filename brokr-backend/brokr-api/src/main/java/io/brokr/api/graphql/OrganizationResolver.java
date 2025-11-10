@@ -1,12 +1,16 @@
 package io.brokr.api.graphql;
 
 import io.brokr.api.input.OrganizationInput;
+import io.brokr.api.service.ClusterApiService;
 import io.brokr.api.service.EnvironmentApiService;
 import io.brokr.api.service.OrganizationApiService;
 import io.brokr.api.service.UserApiService;
 import io.brokr.core.model.Environment;
+import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Organization;
+import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
+import io.brokr.security.service.AuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
@@ -26,10 +30,20 @@ public class OrganizationResolver {
     private final OrganizationApiService organizationApiService;
     private final EnvironmentApiService environmentApiService;
     private final UserApiService userApiService;
+    private final ClusterApiService clusterApiService;
+    private final AuthorizationService authorizationService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.canManageOrganizations()")
+    @PreAuthorize("@authorizationService.canManageOrganizations() or @authorizationService.getCurrentUser().role == T(io.brokr.core.model.Role).ADMIN")
     public List<Organization> organizations() {
+        User currentUser = authorizationService.getCurrentUser();
+        
+        // ADMIN can only see their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            return List.of(organizationApiService.getOrganizationById(currentUser.getOrganizationId()));
+        }
+        
+        // SUPER_ADMIN can see all organizations
         return organizationApiService.listOrganizations();
     }
 
@@ -69,6 +83,21 @@ public class OrganizationResolver {
                 ));
     }
 
+    @BatchMapping(typeName = "Organization", field = "clusters")
+    public Map<Organization, List<KafkaCluster>> getClusters(List<Organization> organizations) {
+        List<String> organizationIds = organizations.stream()
+                .map(Organization::getId)
+                .toList();
+
+        Map<String, List<KafkaCluster>> clustersByOrgId = clusterApiService.getClustersForOrganizations(organizationIds);
+
+        return organizations.stream()
+                .collect(Collectors.toMap(
+                        java.util.function.Function.identity(),
+                        org -> clustersByOrgId.getOrDefault(org.getId(), List.of())
+                ));
+    }
+
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageOrganizations()")
     public Organization createOrganization(@Argument OrganizationInput input) {
@@ -76,8 +105,9 @@ public class OrganizationResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToOrganization(#id)")
+    @PreAuthorize("@authorizationService.canManageOwnOrganization(#id)")
     public Organization updateOrganization(@Argument String id, @Argument OrganizationInput input) {
+        // Service layer will validate ADMIN can only update their own organization
         return organizationApiService.updateOrganization(id, input);
     }
 

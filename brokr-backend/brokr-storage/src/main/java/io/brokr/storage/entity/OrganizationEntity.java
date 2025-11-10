@@ -29,6 +29,7 @@ public class OrganizationEntity {
     private boolean isActive;
 
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<EnvironmentEntity> environments = new ArrayList<>();
 
     public Organization toDomain() {
@@ -37,8 +38,6 @@ public class OrganizationEntity {
                 .name(name)
                 .description(description)
                 .isActive(isActive)
-                // FIX: REMOVED this line. This was causing the N+1 query.
-                // .environments(environments.stream().map(EnvironmentEntity::toDomain).toList())
                 .build();
     }
 

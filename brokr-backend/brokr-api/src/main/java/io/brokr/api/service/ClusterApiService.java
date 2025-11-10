@@ -4,7 +4,10 @@ import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.KafkaCluster;
+import io.brokr.core.model.Role;
+import io.brokr.core.model.User;
 import io.brokr.kafka.service.KafkaConnectionService;
+import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.service.ClusterDataService;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
@@ -13,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +27,7 @@ public class ClusterApiService {
     private final KafkaClusterRepository clusterRepository;
     private final KafkaConnectionService kafkaConnectionService;
     private final ClusterDataService clusterDataService;
+    private final AuthorizationService authorizationService;
 
     @Transactional(readOnly = true)
     public List<KafkaCluster> listAuthorizedClusters(String organizationId, String environmentId) {
@@ -33,6 +39,28 @@ public class ClusterApiService {
         return clusterRepository.findById(id)
                 .map(KafkaClusterEntity::toDomain)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<KafkaCluster>> getClustersForOrganizations(List<String> organizationIds) {
+        User currentUser = authorizationService.getCurrentUser();
+        List<KafkaClusterEntity> allClusters = clusterRepository.findByOrganizationIdIn(organizationIds);
+        
+        // Filter clusters based on user's role and permissions
+        List<KafkaCluster> filteredClusters = allClusters.stream()
+                .map(KafkaClusterEntity::toDomain)
+                .filter(cluster -> {
+                    // SUPER_ADMIN can see all clusters
+                    if (currentUser.getRole() == Role.SUPER_ADMIN) {
+                        return true;
+                    }
+                    // For other roles, filter by accessible environments
+                    return currentUser.getAccessibleEnvironmentIds().contains(cluster.getEnvironmentId());
+                })
+                .collect(Collectors.toList());
+        
+        return filteredClusters.stream()
+                .collect(Collectors.groupingBy(KafkaCluster::getOrganizationId));
     }
 
     @Transactional
