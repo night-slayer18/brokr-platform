@@ -151,7 +151,7 @@ export default function CreateClusterPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     Create New Kafka Cluster
                 </h2>
                 <p className="text-muted-foreground mt-2">

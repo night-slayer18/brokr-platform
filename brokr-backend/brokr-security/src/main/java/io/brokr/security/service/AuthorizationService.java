@@ -6,6 +6,7 @@ import io.brokr.security.model.BrokrUserDetails;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.entity.KafkaConnectEntity;
 import io.brokr.storage.entity.KafkaStreamsApplicationEntity;
+import io.brokr.storage.entity.KsqlDBEntity;
 import io.brokr.storage.entity.SchemaRegistryEntity;
 import io.brokr.storage.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class AuthorizationService {
     private final SchemaRegistryRepository schemaRegistryRepository;
     private final KafkaConnectRepository kafkaConnectRepository;
     private final KafkaStreamsApplicationRepository kafkaStreamsApplicationRepository;
+    private final KsqlDBRepository ksqlDBRepository;
 
 
     public User getCurrentUser() {
@@ -123,6 +125,19 @@ public class AuthorizationService {
         String clusterId = kafkaStreamsApplicationRepository.findById(kafkaStreamsApplicationId)
                 .map(KafkaStreamsApplicationEntity::getClusterId)
                 .orElseThrow(() -> new RuntimeException("Kafka Streams Application not found for auth check"));
+
+        return hasAccessToCluster(clusterId);
+    }
+
+    public boolean hasAccessToKsqlDB(String ksqlDBId) {
+        User user = getCurrentUser();
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            return true;
+        }
+
+        String clusterId = ksqlDBRepository.findById(ksqlDBId)
+                .map(KsqlDBEntity::getClusterId)
+                .orElseThrow(() -> new RuntimeException("ksqlDB instance not found for auth check"));
 
         return hasAccessToCluster(clusterId);
     }

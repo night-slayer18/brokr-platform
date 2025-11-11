@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatRelativeTime } from '@/lib/formatters';
-import Editor from '@monaco-editor/react';
 import { CONNECTOR_STATES } from '@/lib/constants';
 
 export default function KafkaConnectDetailPage() {
@@ -112,7 +111,7 @@ export default function KafkaConnectDetailPage() {
                   let formattedConfig = '{}';
                   try {
                     formattedConfig = JSON.stringify(JSON.parse(connector.config || '{}'), null, 2);
-                  } catch (e) {
+                  } catch {
                     // Ignore parsing errors, use raw string
                     formattedConfig = connector.config || '{}';
                   }
@@ -142,22 +141,11 @@ export default function KafkaConnectDetailPage() {
                         ))}
                       </TableCell>
                       <TableCell>
-                        <Editor
-                          height="100px"
-                          language="json"
-                          value={formattedConfig}
-                          options={{
-                            readOnly: true,
-                            minimap: { enabled: false },
-                            wordWrap: "on",
-                            lineNumbers: "off",
-                            folding: false,
-                            scrollBeyondLastLine: false,
-                            overviewRulerLanes: 0,
-                            scrollbar: { vertical: "hidden", horizontal: "hidden" },
-                            padding: { top: 0, bottom: 0 },
-                          }}
-                        />
+                        <div className="border rounded-lg overflow-auto max-h-[100px] bg-muted/30">
+                          <pre className="p-2 font-mono text-xs">
+                            {formattedConfig}
+                          </pre>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

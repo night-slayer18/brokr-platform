@@ -10,11 +10,13 @@ import ConsumerGroupsPage from './pages/ConsumerGroupsPage'
 import SchemaRegistryPage from './pages/SchemaRegistryPage'
 import KafkaConnectPage from './pages/KafkaConnectPage'
 import KafkaStreamsPage from './pages/KafkaStreamsPage'
+import KsqlDBPage from './pages/KsqlDBPage'
 import TopicDetailPage from './pages/TopicDetailPage'
 import ConsumerGroupDetailPage from './pages/ConsumerGroupDetailPage'
 import SchemaRegistryDetailPage from './pages/SchemaRegistryDetailPage'
 import KafkaConnectDetailPage from './pages/KafkaConnectDetailPage'
 import KafkaStreamsDetailPage from './pages/KafkaStreamsDetailPage'
+import KsqlDBDetailPage from './pages/KsqlDBDetailPage'
 import CreateClusterPage from './pages/CreateClusterPage'
 
 import { AdminRoute } from "./components/auth/AdminRoute";
@@ -66,6 +68,8 @@ function App() {
                     <Route path="kafka-connect/:kcId" element={<KafkaConnectDetailPage />} />
                     <Route path="kafka-streams" element={<KafkaStreamsPage />} />
                     <Route path="kafka-streams/:ksId" element={<KafkaStreamsDetailPage />} />
+                    <Route path="ksqldb" element={<KsqlDBPage />} />
+                    <Route path="ksqldb/:ksqlDBId" element={<KsqlDBDetailPage />} />
                 </Route>
                 <Route
                     path="/admin"

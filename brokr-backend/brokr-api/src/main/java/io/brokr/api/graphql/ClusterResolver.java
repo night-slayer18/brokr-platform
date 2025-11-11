@@ -29,6 +29,7 @@ public class ClusterResolver {
     private final SchemaRegistryApiService schemaRegistryApiService;
     private final KafkaConnectApiService kafkaConnectApiService;
     private final KafkaStreamsApiService kafkaStreamsApiService;
+    private final KsqlDBApiService ksqlDBApiService;
     private final KafkaAdminService kafkaAdminService;
 
     @QueryMapping
@@ -76,6 +77,13 @@ public class ClusterResolver {
         List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
         Map<String, List<KafkaStreamsApplication>> streamsByClusterId = kafkaStreamsApiService.getKafkaStreamsApplicationsForClusters(clusterIds);
         return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> streamsByClusterId.getOrDefault(c.getId(), List.of())));
+    }
+
+    @BatchMapping(typeName = "KafkaCluster", field = "ksqlDBs")
+    public Map<KafkaCluster, List<KsqlDB>> getKsqlDBs(List<KafkaCluster> clusters) {
+        List<String> clusterIds = clusters.stream().map(KafkaCluster::getId).toList();
+        Map<String, List<KsqlDB>> ksqlDBsByClusterId = ksqlDBApiService.getKsqlDBsForClusters(clusterIds);
+        return clusters.stream().collect(Collectors.toMap(Function.identity(), c -> ksqlDBsByClusterId.getOrDefault(c.getId(), List.of())));
     }
 
     @BatchMapping(typeName = "KafkaCluster", field = "brokers")

@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import Editor from '@monaco-editor/react';
 import { STREAMS_STATES } from '@/lib/constants';
 
 export default function KafkaStreamsDetailPage() {
@@ -106,16 +105,11 @@ export default function KafkaStreamsDetailPage() {
           <CardDescription>Kafka Streams application configuration.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Editor
-            height="200px"
-            language="json"
-            value={JSON.stringify(kafkaStreamsApp.configuration, null, 2) || '{}'}
-            options={{
-              readOnly: true,
-              minimap: { enabled: false },
-              wordWrap: "on",
-            }}
-          />
+          <div className="border rounded-lg overflow-auto max-h-[600px] bg-muted/30">
+            <pre className="p-4 font-mono text-sm">
+              {JSON.stringify(kafkaStreamsApp.configuration || {}, null, 2)}
+            </pre>
+          </div>
         </CardContent>
       </Card>
 

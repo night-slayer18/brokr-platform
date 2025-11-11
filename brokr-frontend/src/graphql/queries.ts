@@ -243,6 +243,40 @@ export const GET_SCHEMA_REGISTRY = gql`
     }
 `
 
+export const GET_KSQLDBS = gql`
+    query GetKsqlDBs($clusterId: ID!) {
+        ksqlDBs(clusterId: $clusterId) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+        }
+    }
+`
+
+export const GET_KSQLDB = gql`
+    query GetKsqlDB($id: ID!) {
+        ksqlDB(id: $id) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+        }
+    }
+`
+
+export const GET_KSQLDB_SERVER_INFO = gql`
+    query GetKsqlDBServerInfo($ksqlDBId: ID!) {
+        ksqlDBServerInfo(ksqlDBId: $ksqlDBId)
+    }
+`
+
 export const GET_SCHEMA_REGISTRY_SUBJECTS = gql`
     query GetSchemaRegistrySubjects($schemaRegistryId: ID!) {
         schemaRegistrySubjects(schemaRegistryId: $schemaRegistryId)

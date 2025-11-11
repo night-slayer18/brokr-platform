@@ -19,7 +19,6 @@ import {Badge} from '@/components/ui/badge';
 import {formatRelativeTime} from '@/lib/formatters';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {useEffect, useState} from 'react';
-import Editor from '@monaco-editor/react';
 import {toast} from "sonner";
 
 export default function SchemaRegistryDetailPage() {
@@ -210,16 +209,11 @@ export default function SchemaRegistryDetailPage() {
                                             {schemaLoading ? (
                                                 <Skeleton className="h-64 w-full"/>
                                             ) : (
-                                                <Editor
-                                                    height="400px"
-                                                    language="json"
-                                                    value={latestSchema || '// No schema found'}
-                                                    options={{
-                                                        readOnly: true,
-                                                        minimap: {enabled: false},
-                                                        wordWrap: "on",
-                                                    }}
-                                                />
+                                                <div className="border rounded-lg overflow-auto max-h-[600px] bg-muted/30">
+                                                  <pre className="p-4 font-mono text-sm">
+                                                    {latestSchema || '{}'}
+                                                  </pre>
+                                                </div>
                                             )}
                                             <div className="mt-4">
                                                 <h4 className="font-semibold">Versions:</h4>

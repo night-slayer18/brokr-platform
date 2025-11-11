@@ -101,6 +101,7 @@ type KafkaCluster {
     schemaRegistries: [SchemaRegistry!]
     kafkaConnects: [KafkaConnect!]
     kafkaStreamsApplications: [KafkaStreamsApplication!]
+    ksqlDBs: [KsqlDB!]
 
     # Connection settings
     securityProtocol: SecurityProtocol
@@ -219,6 +220,20 @@ type KafkaStreamsApplication {
     threads: [ThreadMetadata!]
 }
 
+type KsqlDB {
+    id: ID!
+    name: String!
+    url: String!
+    cluster: KafkaCluster!
+    securityProtocol: SecurityProtocol
+    username: String
+    # Note: Passwords are not returned in queries for security
+    isActive: Boolean!
+    isReachable: Boolean!
+    lastConnectionError: String
+    lastConnectionCheck: Long!
+}
+
 type ThreadMetadata {
     threadName: String!
     threadState: String!
@@ -327,6 +342,17 @@ input KafkaStreamsApplicationInput {
     isActive: Boolean!
 }
 
+input KsqlDBInput {
+    id: ID
+    name: String!
+    url: String!
+    clusterId: String!
+    securityProtocol: SecurityProtocol
+    username: String
+    password: String
+    isActive: Boolean!
+}
+
 input LoginInput {
     username: String!
     password: String!
@@ -388,6 +414,11 @@ type Query {
     kafkaStreamsApplications(clusterId: ID!): [KafkaStreamsApplication!]!
     kafkaStreamsApplication(id: ID!): KafkaStreamsApplication
 
+    # ksqlDB queries
+    ksqlDBs(clusterId: ID!): [KsqlDB!]!
+    ksqlDB(id: ID!): KsqlDB
+    ksqlDBServerInfo(ksqlDBId: ID!): String
+
     # Message queries
     messages(clusterId: ID!, input: MessageInput!): [Message!]!
 }
@@ -442,4 +473,10 @@ type Mutation {
     createKafkaStreamsApplication(input: KafkaStreamsApplicationInput!): KafkaStreamsApplication!
     updateKafkaStreamsApplication(id: ID!, input: KafkaStreamsApplicationInput!): KafkaStreamsApplication!
     deleteKafkaStreamsApplication(id: ID!): Boolean!
+
+    # ksqlDB mutations
+    createKsqlDB(input: KsqlDBInput!): KsqlDB!
+    updateKsqlDB(id: ID!, input: KsqlDBInput!): KsqlDB!
+    deleteKsqlDB(id: ID!): Boolean!
+    testKsqlDBConnection(id: ID!): Boolean!
 }

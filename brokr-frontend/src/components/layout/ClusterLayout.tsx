@@ -1,7 +1,7 @@
 import { Link, Outlet, useParams, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { LayoutDashboard, Server, Users, FileText, Database, PlugZap, Zap } from 'lucide-react';
+import { LayoutDashboard, Server, Users, FileText, Database, PlugZap, Zap, Code } from 'lucide-react';
 import { GET_CLUSTER } from '@/graphql/queries';
 import type { GetClusterQuery } from '@/graphql/types';
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
@@ -65,6 +65,7 @@ export function ClusterLayout() {
         { name: 'Schema Registry', href: `/clusters/${clusterId}/schema-registry`, icon: Database },
         { name: 'Kafka Connect', href: `/clusters/${clusterId}/kafka-connect`, icon: PlugZap },
         { name: 'Kafka Streams', href: `/clusters/${clusterId}/kafka-streams`, icon: Zap },
+        { name: 'ksqlDB', href: `/clusters/${clusterId}/ksqldb`, icon: Code },
     ];
 
     const pathSegments = location.pathname.split('/').filter(Boolean);

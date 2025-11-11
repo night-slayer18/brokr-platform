@@ -1,11 +1,7 @@
 import {useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
-import {GET_KAFKA_STREAMS} from '@/graphql/queries';
-import {DELETE_KAFKA_STREAMS_APPLICATION_MUTATION} from '@/graphql/mutations';
-import type {
-    DeleteKafkaStreamsApplicationMutation,
-    GetKafkaStreamsQuery
-} from '@/graphql/types';
+import {GET_KSQLDBS} from '@/graphql/queries';
+import {DELETE_KSQLDB_MUTATION, TEST_KSQLDB_CONNECTION_MUTATION} from '@/graphql/mutations';
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
 import {useQueryClient} from '@tanstack/react-query';
@@ -13,12 +9,12 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 import {Skeleton} from '@/components/ui/skeleton';
-import {Eye, Plus, Trash2, Zap} from 'lucide-react';
+import {Database, Eye, Plus, RefreshCw, Trash2} from 'lucide-react';
 import {toast} from 'sonner';
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table';
-import {CreateKafkaStreamsApplicationForm} from '@/components/kafka-streams/CreateKafkaStreamsApplicationForm';
+import {CreateKsqlDBForm} from '@/components/ksqldb/CreateKsqlDBForm';
 import {useAuth} from '@/hooks/useAuth';
-import {STREAMS_STATES} from '@/lib/constants';
+import {formatRelativeTime} from '@/lib/formatters';
 import {
     Dialog,
     DialogContent,
@@ -28,7 +24,28 @@ import {
     DialogTitle
 } from "@/components/ui/dialog";
 
-export default function KafkaStreamsPage() {
+// Temporary types until GraphQL types are generated
+type GetKsqlDBsQuery = {
+    ksqlDBs?: Array<{
+        id: string;
+        name: string;
+        url: string;
+        isActive: boolean;
+        isReachable: boolean;
+        lastConnectionError?: string | null;
+        lastConnectionCheck: number;
+    }>;
+};
+
+type DeleteKsqlDBMutation = {
+    deleteKsqlDB: boolean;
+};
+
+type TestKsqlDBConnectionMutation = {
+    testKsqlDBConnection: boolean;
+};
+
+export default function KsqlDBPage() {
     const {clusterId} = useParams<{ clusterId: string }>();
     const navigate = useNavigate();
     const {canManageClusters} = useAuth();
@@ -37,14 +54,15 @@ export default function KafkaStreamsPage() {
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
 
     const queryClient = useQueryClient();
-    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetKafkaStreamsQuery, {clusterId: string}>(GET_KAFKA_STREAMS, 
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetKsqlDBsQuery, {clusterId: string}>(GET_KSQLDBS, 
         clusterId ? {clusterId} : undefined,
         {
             enabled: !!clusterId,
         }
     );
 
-    const {mutate: deleteKafkaStreamsApplication} = useGraphQLMutation<DeleteKafkaStreamsApplicationMutation, {id: string}>(DELETE_KAFKA_STREAMS_APPLICATION_MUTATION);
+    const {mutate: deleteKsqlDB} = useGraphQLMutation<DeleteKsqlDBMutation, {id: string}>(DELETE_KSQLDB_MUTATION);
+    const {mutate: testConnection} = useGraphQLMutation<TestKsqlDBConnectionMutation, {id: string}>(TEST_KSQLDB_CONNECTION_MUTATION);
 
     const openDeleteDialog = (id: string, name: string) => {
         setItemToDelete({id, name});
@@ -54,18 +72,38 @@ export default function KafkaStreamsPage() {
     const handleDelete = async () => {
         if (!itemToDelete) return;
 
-        deleteKafkaStreamsApplication(
+        deleteKsqlDB(
             {id: itemToDelete.id},
             {
                 onSuccess: () => {
-                    toast.success(`Kafka Streams Application "${itemToDelete.name}" deleted successfully`);
-                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KAFKA_STREAMS]});
+                    toast.success(`ksqlDB instance "${itemToDelete.name}" deleted successfully`);
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KSQLDBS]});
                     setIsDeleteDialogOpen(false);
                     setItemToDelete(null);
                 },
                 onError: (err: unknown) => {
-                    const error = err instanceof Error ? err : {message: 'Failed to delete Kafka Streams Application'}
-                    toast.error(error.message || 'Failed to delete Kafka Streams Application');
+                    const error = err instanceof Error ? err : {message: 'Failed to delete ksqlDB instance'}
+                    toast.error(error.message || 'Failed to delete ksqlDB instance');
+                },
+            }
+        );
+    };
+
+    const handleTestConnection = async (id: string, name: string) => {
+        testConnection(
+            {id},
+            {
+                onSuccess: (data) => {
+                    if (data) {
+                        toast.success(`Connection to "${name}" successful`);
+                    } else {
+                        toast.error(`Connection to "${name}" failed`);
+                    }
+                    queryClient.invalidateQueries({queryKey: ['graphql', GET_KSQLDBS]});
+                },
+                onError: (err: unknown) => {
+                    const error = err instanceof Error ? err : {message: 'Connection test failed'}
+                    toast.error(error.message || 'Connection test failed');
                 },
             }
         );
@@ -74,7 +112,6 @@ export default function KafkaStreamsPage() {
     if (!clusterId) {
         return <div className="text-destructive">Cluster ID is missing. Please select a cluster.</div>;
     }
-
     if (loading) {
         return (
             <div className="space-y-6">
@@ -90,20 +127,20 @@ export default function KafkaStreamsPage() {
     }
 
     if (error) {
-        return <div className="text-destructive">Error loading Kafka Streams applications: {error.message}</div>;
+        return <div className="text-destructive">Error loading ksqlDB instances: {error.message}</div>;
     }
 
-    const kafkaStreamsApplications = data?.kafkaStreamsApplications || [];
+    const ksqlDBs = data?.ksqlDBs || [];
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        Kafka Streams
+                        ksqlDB Instances
                     </h2>
                     <p className="text-muted-foreground mt-2">
-                        Manage Kafka Streams Applications for cluster <span className="font-mono">{clusterId}</span>
+                        Manage ksqlDB instances for cluster <span className="font-mono">{clusterId}</span>
                     </p>
                 </div>
                 {canManageClusters() && (
@@ -112,22 +149,21 @@ export default function KafkaStreamsPage() {
                         className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                     >
                         <Plus className="mr-2 h-4 w-4"/>
-                        Add Application
+                        Add ksqlDB Instance
                     </Button>
                 )}
             </div>
 
-            {kafkaStreamsApplications.length === 0 ? (
+            {ksqlDBs.length === 0 ? (
                 <Card className="border-dashed border-2 border-primary/30 bg-card/30">
                     <CardContent className="flex flex-col items-center justify-center py-16">
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl"></div>
-                            <Zap className="relative h-16 w-16 text-primary"/>
+                            <Database className="relative h-16 w-16 text-primary"/>
                         </div>
-                        <h3 className="text-xl font-semibold mb-2 text-foreground">No Kafka Streams Applications
-                            found</h3>
+                        <h3 className="text-xl font-semibold mb-2 text-foreground">No ksqlDB instances found</h3>
                         <p className="text-muted-foreground text-center max-w-md mb-6">
-                            Get started by adding your first Kafka Streams Application to this Kafka cluster.
+                            Get started by adding your first ksqlDB instance to this Kafka cluster.
                         </p>
                         {canManageClusters() && (
                             <Button
@@ -135,7 +171,7 @@ export default function KafkaStreamsPage() {
                                 className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                             >
                                 <Plus className="mr-2 h-4 w-4"/>
-                                Add Your First Application
+                                Add Your First ksqlDB Instance
                             </Button>
                         )}
                     </CardContent>
@@ -143,66 +179,57 @@ export default function KafkaStreamsPage() {
             ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>All Kafka Streams Applications</CardTitle>
-                        <CardDescription>A list of all configured Kafka Streams Applications.</CardDescription>
+                        <CardTitle>All ksqlDB Instances</CardTitle>
+                        <CardDescription>A list of all configured ksqlDB instances.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Application ID</TableHead>
+                                    <TableHead>URL</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Topics</TableHead>
+                                    <TableHead>Last Checked</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {kafkaStreamsApplications.map((app) => (
-                                    <TableRow key={app.id}>
-                                        <TableCell className="font-medium">{app.name}</TableCell>
-                                        <TableCell className="font-mono text-xs">{app.applicationId}</TableCell>
+                                {ksqlDBs.map((ksqlDB: {id: string; name: string; url: string; isReachable: boolean; lastConnectionCheck: number}) => (
+                                    <TableRow key={ksqlDB.id}>
+                                        <TableCell className="font-medium">{ksqlDB.name}</TableCell>
+                                        <TableCell className="font-mono text-xs">{ksqlDB.url}</TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant={
-                                                    app.state === STREAMS_STATES.RUNNING
-                                                        ? "default"
-                                                        : app.state === STREAMS_STATES.ERROR
-                                                            ? "destructive"
-                                                            : "secondary"
-                                                }
-                                            >
-                                                {app.state}
+                                            <Badge variant={ksqlDB.isReachable ? "default" : "destructive"}>
+                                                {ksqlDB.isReachable ? "Online" : "Offline"}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>
-                                            {app.topics.length > 0 ? (
-                                                <div className="flex flex-wrap gap-1">
-                                                    {app.topics.map(topic => (
-                                                        <Badge key={topic} variant="secondary">{topic}</Badge>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                "N/A"
-                                            )}
-                                        </TableCell>
+                                        <TableCell>{formatRelativeTime(ksqlDB.lastConnectionCheck)}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => navigate(`/clusters/${clusterId}/kafka-streams/${app.id}`)}
+                                                    onClick={() => navigate(`/clusters/${clusterId}/ksqldb/${ksqlDB.id}`)}
                                                 >
                                                     <Eye className="h-4 w-4"/>
                                                 </Button>
                                                 {canManageClusters() && (
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() => openDeleteDialog(app.id, app.name)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4"/>
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleTestConnection(ksqlDB.id, ksqlDB.name)}
+                                                        >
+                                                            <RefreshCw className="h-4 w-4"/>
+                                                        </Button>
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            onClick={() => openDeleteDialog(ksqlDB.id, ksqlDB.name)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4"/>
+                                                        </Button>
+                                                    </>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -214,11 +241,11 @@ export default function KafkaStreamsPage() {
                 </Card>
             )}
 
-            <CreateKafkaStreamsApplicationForm
+            <CreateKsqlDBForm
                 clusterId={clusterId!}
                 isOpen={isCreateFormOpen}
                 onOpenChange={setIsCreateFormOpen}
-                onKafkaStreamsApplicationCreated={refetch}
+                onKsqlDBCreated={refetch}
             />
 
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -226,7 +253,7 @@ export default function KafkaStreamsPage() {
                     <DialogHeader>
                         <DialogTitle>Delete {itemToDelete?.name}?</DialogTitle>
                         <DialogDescription>
-                            This action cannot be undone. This will permanently delete the Kafka Streams Application.
+                            This action cannot be undone. This will permanently delete the ksqlDB instance.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -242,3 +269,4 @@ export default function KafkaStreamsPage() {
         </div>
     );
 }
+

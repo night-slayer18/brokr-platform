@@ -210,6 +210,46 @@ export const DELETE_KAFKA_STREAMS_APPLICATION_MUTATION = gql`
     }
 `
 
+export const CREATE_KSQLDB_MUTATION = gql`
+    mutation CreateKsqlDB($input: KsqlDBInput!) {
+        createKsqlDB(input: $input) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+        }
+    }
+`
+
+export const UPDATE_KSQLDB_MUTATION = gql`
+    mutation UpdateKsqlDB($id: ID!, $input: KsqlDBInput!) {
+        updateKsqlDB(id: $id, input: $input) {
+            id
+            name
+            url
+            isActive
+            isReachable
+            lastConnectionError
+            lastConnectionCheck
+        }
+    }
+`
+
+export const DELETE_KSQLDB_MUTATION = gql`
+    mutation DeleteKsqlDB($id: ID!) {
+        deleteKsqlDB(id: $id)
+    }
+`
+
+export const TEST_KSQLDB_CONNECTION_MUTATION = gql`
+    mutation TestKsqlDBConnection($id: ID!) {
+        testKsqlDBConnection(id: $id)
+    }
+`
+
 export const CREATE_ORGANIZATION_MUTATION = gql`
     mutation CreateOrganization($input: OrganizationInput!) {
         createOrganization(input: $input) {

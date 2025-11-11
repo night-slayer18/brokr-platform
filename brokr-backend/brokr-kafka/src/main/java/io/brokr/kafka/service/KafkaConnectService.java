@@ -59,8 +59,9 @@ public class KafkaConnectService {
      * @return CompletableFuture that completes with list of connectors
      */
     public CompletableFuture<List<Connector>> getConnectors(KafkaConnect kafkaConnect) {
-        // FIX: Use ?expand=status and ?expand=info to get all data in one call
-        String url = kafkaConnect.getUrl() + "/connectors?expand=status&expand=info";
+        // Use expand parameter to get both status and info in one call
+        // Format: expand=status,info (comma-separated) or make separate calls if needed
+        String url = kafkaConnect.getUrl() + "/connectors?expand=status,info";
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
