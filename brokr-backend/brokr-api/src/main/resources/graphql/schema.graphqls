@@ -248,6 +248,144 @@ type TaskMetadata {
     taskState: String!
 }
 
+type AuditLog {
+    id: ID!
+    timestamp: Long!
+    userId: String
+    userEmail: String
+    userRole: String
+    actionType: AuditActionType!
+    resourceType: AuditResourceType!
+    resourceId: String
+    resourceName: String
+    organizationId: String
+    environmentId: String
+    clusterId: String
+    ipAddress: String
+    userAgent: String
+    requestId: String
+    oldValues: Map
+    newValues: Map
+    changedFields: [String!]
+    status: AuditStatus!
+    errorMessage: String
+    metadata: Map
+    severity: AuditSeverity!
+    isSensitive: Boolean!
+}
+
+enum AuditActionType {
+    CREATE
+    UPDATE
+    DELETE
+    READ
+    LOGIN
+    LOGOUT
+    LOGIN_FAILED
+    AUTHORIZATION_DENIED
+    AUTHORIZATION_GRANTED
+    CONNECTION_TEST
+    CONFIGURATION_CHANGE
+    BULK_OPERATION
+    EXPORT
+    IMPORT
+}
+
+enum AuditResourceType {
+    USER
+    ORGANIZATION
+    ENVIRONMENT
+    CLUSTER
+    TOPIC
+    CONSUMER_GROUP
+    SCHEMA_REGISTRY
+    KAFKA_CONNECT
+    KAFKA_STREAMS
+    KSQLDB
+    MESSAGE
+    SCHEMA
+    CONNECTOR
+}
+
+enum AuditStatus {
+    SUCCESS
+    FAILURE
+    PARTIAL
+}
+
+enum AuditSeverity {
+    INFO
+    WARNING
+    ERROR
+    CRITICAL
+}
+
+input AuditLogFilter {
+    userId: String
+    actionType: AuditActionType
+    resourceType: AuditResourceType
+    resourceId: String
+    organizationId: String
+    clusterId: String
+    status: AuditStatus
+    severity: AuditSeverity
+    startTime: Long
+    endTime: Long
+    searchText: String
+}
+
+input AuditLogPagination {
+    page: Int = 0
+    size: Int = 50
+    sortBy: String = "timestamp"
+    sortDirection: String = "DESC"
+}
+
+type AuditLogPage {
+    content: [AuditLog!]!
+    totalElements: Long!
+    totalPages: Int!
+    currentPage: Int!
+    pageSize: Int!
+}
+
+type ActionTypeCount {
+    actionType: AuditActionType!
+    count: Long!
+}
+
+type ResourceTypeCount {
+    resourceType: AuditResourceType!
+    count: Long!
+}
+
+type StatusCount {
+    status: AuditStatus!
+    count: Long!
+}
+
+type SeverityCount {
+    severity: AuditSeverity!
+    count: Long!
+}
+
+type RecentActivity {
+    timestamp: Long!
+    actionType: AuditActionType!
+    resourceType: AuditResourceType!
+    resourceName: String!
+    userEmail: String!
+}
+
+type AuditLogStatistics {
+    totalCount: Long!
+    byActionType: [ActionTypeCount!]!
+    byResourceType: [ResourceTypeCount!]!
+    byStatus: [StatusCount!]!
+    bySeverity: [SeverityCount!]!
+    recentActivity: [RecentActivity!]!
+}
+
 type AuthResponse {
     token: String!
     user: UserDto!
@@ -421,6 +559,13 @@ type Query {
 
     # Message queries
     messages(clusterId: ID!, input: MessageInput!): [Message!]!
+
+    # Audit Log queries
+    auditLogs(filter: AuditLogFilter, pagination: AuditLogPagination): AuditLogPage!
+    auditLog(id: ID!): AuditLog
+    auditLogsByUser(userId: String!, pagination: AuditLogPagination): AuditLogPage!
+    auditLogsByResource(resourceType: AuditResourceType!, resourceId: String!, pagination: AuditLogPagination): AuditLogPage!
+    auditLogStatistics(filter: AuditLogFilter): AuditLogStatistics!
 }
 
 type Mutation {

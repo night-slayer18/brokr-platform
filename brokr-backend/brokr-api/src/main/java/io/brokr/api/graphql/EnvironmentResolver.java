@@ -1,8 +1,11 @@
 package io.brokr.api.graphql;
 
+import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.input.EnvironmentInput;
 import io.brokr.api.service.EnvironmentApiService;
 import io.brokr.api.service.OrganizationApiService;
+import io.brokr.core.model.AuditActionType;
+import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.Environment;
 import io.brokr.core.model.Organization;
 import lombok.RequiredArgsConstructor;
@@ -55,18 +58,21 @@ public class EnvironmentResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToOrganization(#input.organizationId)")
+    @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.ENVIRONMENT, resourceNameParam = "input.name", logResult = true)
     public Environment createEnvironment(@Argument EnvironmentInput input) {
         return environmentApiService.createEnvironment(input);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.ENVIRONMENT, resourceIdParam = "id", resourceNameParam = "input.name", logResult = true)
     public Environment updateEnvironment(@Argument String id, @Argument EnvironmentInput input) {
         return environmentApiService.updateEnvironment(id, input);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToEnvironment(#id)")
+    @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.ENVIRONMENT, resourceIdParam = "id")
     public boolean deleteEnvironment(@Argument String id) {
         return environmentApiService.deleteEnvironment(id);
     }

@@ -106,11 +106,14 @@ public class OrganizationApiService {
             throw new ValidationException("Organization with this name already exists");
         }
 
+        // Use Boolean wrapper and default to true if null (for backward compatibility)
+        boolean isActive = input.getIsActive() != null ? input.getIsActive() : true;
+
         Organization org = Organization.builder()
                 .id(UUID.randomUUID().toString())
                 .name(input.getName())
                 .description(input.getDescription())
-                .isActive(input.isActive())
+                .isActive(isActive)
                 .build();
 
         return organizationRepository.save(OrganizationEntity.fromDomain(org)).toDomain();
@@ -132,7 +135,10 @@ public class OrganizationApiService {
 
         entity.setName(input.getName());
         entity.setDescription(input.getDescription());
-        entity.setActive(input.isActive());
+        
+        // Use Boolean wrapper and default to current value if null (for backward compatibility)
+        boolean isActive = input.getIsActive() != null ? input.getIsActive() : entity.isActive();
+        entity.setActive(isActive);
 
         return organizationRepository.save(entity).toDomain();
     }

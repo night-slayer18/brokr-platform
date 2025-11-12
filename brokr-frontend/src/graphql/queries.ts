@@ -464,3 +464,172 @@ export const GET_USER = gql`
         }
     }
 `
+
+export const GET_AUDIT_LOGS = gql`
+    query GetAuditLogs($filter: AuditLogFilter, $pagination: AuditLogPagination) {
+        auditLogs(filter: $filter, pagination: $pagination) {
+            content {
+                id
+                timestamp
+                userId
+                userEmail
+                userRole
+                actionType
+                resourceType
+                resourceId
+                resourceName
+                organizationId
+                environmentId
+                clusterId
+                ipAddress
+                userAgent
+                requestId
+                oldValues
+                newValues
+                changedFields
+                status
+                errorMessage
+                metadata
+                severity
+                isSensitive
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
+        }
+    }
+`
+
+export const GET_AUDIT_LOG = gql`
+    query GetAuditLog($id: ID!) {
+        auditLog(id: $id) {
+            id
+            timestamp
+            userId
+            userEmail
+            userRole
+            actionType
+            resourceType
+            resourceId
+            resourceName
+            organizationId
+            environmentId
+            clusterId
+            ipAddress
+            userAgent
+            requestId
+            oldValues
+            newValues
+            changedFields
+            status
+            errorMessage
+            metadata
+            severity
+            isSensitive
+        }
+    }
+`
+
+export const GET_AUDIT_LOGS_BY_USER = gql`
+    query GetAuditLogsByUser($userId: String!, $pagination: AuditLogPagination) {
+        auditLogsByUser(userId: $userId, pagination: $pagination) {
+            content {
+                id
+                timestamp
+                userId
+                userEmail
+                userRole
+                actionType
+                resourceType
+                resourceId
+                resourceName
+                organizationId
+                environmentId
+                clusterId
+                ipAddress
+                userAgent
+                requestId
+                oldValues
+                newValues
+                changedFields
+                status
+                errorMessage
+                metadata
+                severity
+                isSensitive
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
+        }
+    }
+`
+
+export const GET_AUDIT_LOGS_BY_RESOURCE = gql`
+    query GetAuditLogsByResource($resourceType: AuditResourceType!, $resourceId: String!, $pagination: AuditLogPagination) {
+        auditLogsByResource(resourceType: $resourceType, resourceId: $resourceId, pagination: $pagination) {
+            content {
+                id
+                timestamp
+                userId
+                userEmail
+                userRole
+                actionType
+                resourceType
+                resourceId
+                resourceName
+                organizationId
+                environmentId
+                clusterId
+                ipAddress
+                userAgent
+                requestId
+                oldValues
+                newValues
+                changedFields
+                status
+                errorMessage
+                metadata
+                severity
+                isSensitive
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
+        }
+    }
+`
+
+export const GET_AUDIT_LOG_STATISTICS = gql`
+    query GetAuditLogStatistics($filter: AuditLogFilter) {
+        auditLogStatistics(filter: $filter) {
+            totalCount
+            byActionType {
+                actionType
+                count
+            }
+            byResourceType {
+                resourceType
+                count
+            }
+            byStatus {
+                status
+                count
+            }
+            bySeverity {
+                severity
+                count
+            }
+            recentActivity {
+                timestamp
+                actionType
+                resourceType
+                resourceName
+                userEmail
+            }
+        }
+    }
+`

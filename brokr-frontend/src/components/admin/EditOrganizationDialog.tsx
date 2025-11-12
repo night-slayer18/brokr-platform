@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {useForm} from 'react-hook-form'
+import {useForm, Controller} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
@@ -52,15 +52,14 @@ export function EditOrganizationDialog({open, onOpenChange, organization}: EditO
         register,
         handleSubmit,
         reset,
+        control,
         formState: {errors},
-        watch,
-        setValue,
     } = useForm<OrganizationFormData>({
         resolver: zodResolver(organizationSchema),
         defaultValues: {
             name: organization.name,
             description: organization.description || '',
-            isActive: organization.isActive,
+            isActive: organization.isActive ?? true, // Default to true if undefined
         },
         mode: 'onChange',
     })
@@ -70,15 +69,14 @@ export function EditOrganizationDialog({open, onOpenChange, organization}: EditO
             reset({
                 name: organization.name,
                 description: organization.description || '',
-                isActive: organization.isActive,
+                isActive: organization.isActive ?? true, // Default to true if undefined
             })
         }
     }, [open, organization, reset])
 
-    const isActive = watch('isActive')
-
     const onSubmit = (data: OrganizationFormData) => {
         setIsSubmitting(true)
+        // isActive is now properly registered via Controller, so it will be in data
         updateOrganization({id: organization.id, input: data})
     }
 
@@ -112,11 +110,17 @@ export function EditOrganizationDialog({open, onOpenChange, organization}: EditO
                     </div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="isActive">Active</Label>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={(checked) => setValue('isActive', checked)}
-                            disabled={isSubmitting}
+                        <Controller
+                            name="isActive"
+                            control={control}
+                            render={({field}) => (
+                                <Switch
+                                    id="isActive"
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={isSubmitting}
+                                />
+                            )}
                         />
                     </div>
                     <DialogFooter>

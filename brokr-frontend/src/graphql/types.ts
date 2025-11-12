@@ -516,3 +516,177 @@ export interface UserInput {
     accessibleEnvironmentIds?: string[];
     isActive: boolean;
 }
+
+// Audit Log Types
+export type AuditActionType = 
+    | 'CREATE' 
+    | 'UPDATE' 
+    | 'DELETE' 
+    | 'READ' 
+    | 'LOGIN' 
+    | 'LOGOUT' 
+    | 'LOGIN_FAILED' 
+    | 'AUTHORIZATION_DENIED' 
+    | 'AUTHORIZATION_GRANTED' 
+    | 'CONNECTION_TEST' 
+    | 'CONFIGURATION_CHANGE' 
+    | 'BULK_OPERATION' 
+    | 'EXPORT' 
+    | 'IMPORT'
+
+export type AuditResourceType = 
+    | 'USER' 
+    | 'ORGANIZATION' 
+    | 'ENVIRONMENT' 
+    | 'CLUSTER' 
+    | 'TOPIC' 
+    | 'CONSUMER_GROUP' 
+    | 'SCHEMA_REGISTRY' 
+    | 'KAFKA_CONNECT' 
+    | 'KAFKA_STREAMS' 
+    | 'KSQLDB' 
+    | 'MESSAGE' 
+    | 'SCHEMA' 
+    | 'CONNECTOR'
+
+export type AuditStatus = 'SUCCESS' | 'FAILURE' | 'PARTIAL'
+
+export type AuditSeverity = 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+
+export interface AuditLog {
+    id: string
+    timestamp: number
+    userId?: string | null
+    userEmail?: string | null
+    userRole?: string | null
+    actionType: AuditActionType
+    resourceType: AuditResourceType
+    resourceId?: string | null
+    resourceName?: string | null
+    organizationId?: string | null
+    environmentId?: string | null
+    clusterId?: string | null
+    ipAddress?: string | null
+    userAgent?: string | null
+    requestId?: string | null
+    oldValues?: Record<string, unknown> | null
+    newValues?: Record<string, unknown> | null
+    changedFields?: string[] | null
+    status: AuditStatus
+    errorMessage?: string | null
+    metadata?: Record<string, unknown> | null
+    severity: AuditSeverity
+    isSensitive: boolean
+}
+
+export interface AuditLogPage {
+    content: AuditLog[]
+    totalElements: number
+    totalPages: number
+    currentPage: number
+    pageSize: number
+}
+
+export interface ActionTypeCount {
+    actionType: AuditActionType
+    count: number
+}
+
+export interface ResourceTypeCount {
+    resourceType: AuditResourceType
+    count: number
+}
+
+export interface StatusCount {
+    status: AuditStatus
+    count: number
+}
+
+export interface SeverityCount {
+    severity: AuditSeverity
+    count: number
+}
+
+export interface RecentActivity {
+    timestamp: number
+    actionType: AuditActionType
+    resourceType: AuditResourceType
+    resourceName: string
+    userEmail: string
+}
+
+export interface AuditLogStatistics {
+    totalCount: number
+    byActionType: ActionTypeCount[]
+    byResourceType: ResourceTypeCount[]
+    byStatus: StatusCount[]
+    bySeverity: SeverityCount[]
+    recentActivity: RecentActivity[]
+}
+
+export interface AuditLogFilter {
+    userId?: string
+    actionType?: AuditActionType
+    resourceType?: AuditResourceType
+    resourceId?: string
+    organizationId?: string
+    clusterId?: string
+    status?: AuditStatus
+    severity?: AuditSeverity
+    startTime?: number
+    endTime?: number
+    searchText?: string
+}
+
+export interface AuditLogPagination {
+    page?: number
+    size?: number
+    sortBy?: string
+    sortDirection?: 'ASC' | 'DESC'
+}
+
+// Audit Log Query Types
+export interface GetAuditLogsQuery {
+    auditLogs: AuditLogPage
+}
+
+export interface GetAuditLogQuery {
+    auditLog: AuditLog
+}
+
+export interface GetAuditLogsByUserQuery {
+    auditLogsByUser: AuditLogPage
+}
+
+export interface GetAuditLogsByResourceQuery {
+    auditLogsByResource: AuditLogPage
+}
+
+export interface GetAuditLogStatisticsQuery {
+    auditLogStatistics: AuditLogStatistics
+}
+
+// Audit Log Query Variables
+export interface GetAuditLogsVariables {
+    filter?: AuditLogFilter | null
+    pagination?: AuditLogPagination
+}
+
+export interface GetAuditLogVariables {
+    id: string
+}
+
+export interface GetAuditLogsByUserVariables {
+    userId: string
+    pagination?: AuditLogPagination
+}
+
+export interface GetAuditLogsByResourceVariables {
+    resourceType: AuditResourceType
+    resourceId: string
+    pagination?: AuditLogPagination
+}
+
+export interface GetAuditLogStatisticsVariables {
+    filter?: AuditLogFilter | null
+}

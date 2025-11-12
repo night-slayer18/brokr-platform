@@ -27,6 +27,7 @@ import BrokersPage from './pages/BrokersPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import OrganizationsPage from './pages/admin/OrganizationsPage';
 import OrganizationDetailPage from './pages/admin/OrganizationDetailPage';
+import AuditLogsPage from './pages/admin/AuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 
 function App() {
@@ -84,6 +85,7 @@ function App() {
                     <Route path="dashboard" element={<AdminDashboardPage />} />
                     <Route path="organizations" element={<OrganizationsPage />} />
                     <Route path="organizations/:orgId" element={<OrganizationDetailPage />} />
+                    <Route path="audit-logs" element={<AuditLogsPage />} />
                 </Route>
             </Routes>
             <Toaster position="top-right" richColors />

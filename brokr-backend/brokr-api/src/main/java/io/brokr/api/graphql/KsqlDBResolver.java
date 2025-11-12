@@ -1,7 +1,10 @@
 package io.brokr.api.graphql;
 
+import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.input.KsqlDBInput;
 import io.brokr.api.service.KsqlDBApiService;
+import io.brokr.core.model.AuditActionType;
+import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.KsqlDB;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -38,24 +41,28 @@ public class KsqlDBResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
+    @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.KSQLDB, resourceNameParam = "input.name", logResult = true)
     public KsqlDB createKsqlDB(@Argument KsqlDBInput input) {
         return ksqlDBApiService.createKsqlDB(input);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToKsqlDB(#id)")
+    @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.KSQLDB, resourceIdParam = "id", resourceNameParam = "input.name", logResult = true)
     public KsqlDB updateKsqlDB(@Argument String id, @Argument KsqlDBInput input) {
         return ksqlDBApiService.updateKsqlDB(id, input);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToKsqlDB(#id)")
+    @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.KSQLDB, resourceIdParam = "id")
     public boolean deleteKsqlDB(@Argument String id) {
         return ksqlDBApiService.deleteKsqlDB(id);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.hasAccessToKsqlDB(#id)")
+    @AuditLoggable(action = AuditActionType.CONNECTION_TEST, resourceType = AuditResourceType.KSQLDB, resourceIdParam = "id", logResult = true)
     public boolean testKsqlDBConnection(@Argument String id) {
         return ksqlDBApiService.testKsqlDBConnection(id);
     }

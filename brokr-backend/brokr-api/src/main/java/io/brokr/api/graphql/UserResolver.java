@@ -1,8 +1,11 @@
 package io.brokr.api.graphql;
 
+import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.input.UserInput;
 import io.brokr.api.service.UserApiService;
 import io.brokr.core.dto.UserDto;
+import io.brokr.core.model.AuditActionType;
+import io.brokr.core.model.AuditResourceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -39,6 +42,7 @@ public class UserResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
+    @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.USER, resourceNameParam = "input.email", logResult = true)
     public UserDto createUser(@Argument UserInput input) {
         // Service layer will validate ADMIN can only create users in their own organization
         return UserDto.fromDomain(userApiService.createUser(input));
@@ -46,6 +50,7 @@ public class UserResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers() or @authorizationService.getCurrentUser().id == #id")
+    @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.USER, resourceIdParam = "id", resourceNameParam = "input.email", logResult = true)
     public UserDto updateUser(@Argument String id, @Argument UserInput input) {
         // Service layer will validate ADMIN can only update users in their own organization
         return UserDto.fromDomain(userApiService.updateUser(id, input));
@@ -53,6 +58,7 @@ public class UserResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
+    @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.USER, resourceIdParam = "id")
     public boolean deleteUser(@Argument String id) {
         // Service layer will validate ADMIN can only delete users in their own organization
         return userApiService.deleteUser(id);

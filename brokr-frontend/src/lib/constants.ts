@@ -36,6 +36,44 @@ export const ENVIRONMENT_TYPE_LABELS = {
     PROD: 'Production',
 }
 
+// Audit Log Constants
+export const AUDIT_ACTION_TYPES = [
+    'CREATE',
+    'UPDATE',
+    'DELETE',
+    'READ',
+    'LOGIN',
+    'LOGOUT',
+    'LOGIN_FAILED',
+    'AUTHORIZATION_DENIED',
+    'AUTHORIZATION_GRANTED',
+    'CONNECTION_TEST',
+    'CONFIGURATION_CHANGE',
+    'BULK_OPERATION',
+    'EXPORT',
+    'IMPORT',
+] as const
+
+export const AUDIT_RESOURCE_TYPES = [
+    'USER',
+    'ORGANIZATION',
+    'ENVIRONMENT',
+    'CLUSTER',
+    'TOPIC',
+    'CONSUMER_GROUP',
+    'SCHEMA_REGISTRY',
+    'KAFKA_CONNECT',
+    'KAFKA_STREAMS',
+    'KSQLDB',
+    'MESSAGE',
+    'SCHEMA',
+    'CONNECTOR',
+] as const
+
+export const AUDIT_STATUSES = ['SUCCESS', 'FAILURE', 'PARTIAL'] as const
+
+export const AUDIT_SEVERITIES = ['INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
+
 export const STREAMS_STATES = {
     RUNNING: 'RUNNING',
     REBALANCING: 'REBALANCING',

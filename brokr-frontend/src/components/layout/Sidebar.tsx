@@ -1,6 +1,6 @@
 import {Link, useLocation} from 'react-router-dom'
 import {cn} from '@/lib/utils'
-import {LayoutDashboard, Server, Shield} from 'lucide-react'
+import {LayoutDashboard, Server, Shield, FileText} from 'lucide-react'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {useAuth} from '@/hooks/useAuth'
 
@@ -27,6 +27,11 @@ const adminNavigation = [
         name: 'Organizations',
         href: '/admin/organizations',
         icon: Shield,
+    },
+    {
+        name: 'Audit Logs',
+        href: '/admin/audit-logs',
+        icon: FileText,
     },
 ]
 

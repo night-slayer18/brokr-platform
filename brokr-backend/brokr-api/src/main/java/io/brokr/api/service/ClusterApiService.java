@@ -3,6 +3,7 @@ package io.brokr.api.service;
 import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
+import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
@@ -12,6 +13,7 @@ import io.brokr.security.service.ClusterDataService;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClusterApiService {
@@ -28,6 +31,7 @@ public class ClusterApiService {
     private final KafkaConnectionService kafkaConnectionService;
     private final ClusterDataService clusterDataService;
     private final AuthorizationService authorizationService;
+    private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public List<KafkaCluster> listAuthorizedClusters(String organizationId, String environmentId) {
@@ -95,7 +99,16 @@ public class ClusterApiService {
         }
         cluster.setReachable(isReachable);
 
-        return clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
+        KafkaCluster savedCluster = clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
+        
+        // Log audit event
+        try {
+            auditService.logCreate(AuditResourceType.CLUSTER, savedCluster.getId(), savedCluster.getName(), savedCluster);
+        } catch (Exception e) {
+            log.warn("Failed to log audit event for cluster creation: {}", e.getMessage());
+        }
+        
+        return savedCluster;
     }
 
     @Transactional
@@ -123,24 +136,48 @@ public class ClusterApiService {
         entity.setSslKeystorePassword(input.getSslKeystorePassword());
         entity.setSslKeyPassword(input.getSslKeyPassword());
 
+        KafkaCluster oldCluster = entity.toDomain();
         KafkaCluster cluster = entity.toDomain();
         boolean isReachable = kafkaConnectionService.testConnection(cluster);
         cluster.setReachable(isReachable);
 
-        return clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
+        KafkaCluster updatedCluster = clusterRepository.save(KafkaClusterEntity.fromDomain(cluster)).toDomain();
+        
+        // Log audit event
+        try {
+            auditService.logUpdate(AuditResourceType.CLUSTER, updatedCluster.getId(), updatedCluster.getName(), oldCluster, updatedCluster);
+        } catch (Exception e) {
+            log.warn("Failed to log audit event for cluster update: {}", e.getMessage());
+        }
+        
+        return updatedCluster;
     }
 
     @Transactional
     public boolean deleteCluster(String id) {
-        if (!clusterRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Cluster not found with id: " + id);
-        }
+        KafkaClusterEntity entity = clusterRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
+        
+        KafkaCluster cluster = entity.toDomain();
         clusterRepository.deleteById(id);
+        
+        // Log audit event
+        try {
+            auditService.logDelete(AuditResourceType.CLUSTER, cluster.getId(), cluster.getName(), cluster);
+        } catch (Exception e) {
+            log.warn("Failed to log audit event for cluster deletion: {}", e.getMessage());
+        }
+        
         return true;
     }
 
     @Transactional
     public boolean testClusterConnection(String id) {
+        return testClusterConnection(id, true);
+    }
+
+    @Transactional
+    public boolean testClusterConnection(String id, boolean logAudit) {
         KafkaClusterEntity entity = clusterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + id));
 
@@ -151,6 +188,17 @@ public class ClusterApiService {
         entity.setLastConnectionCheck(System.currentTimeMillis());
         entity.setLastConnectionError(reachable ? null : "Connection failed");
         clusterRepository.save(entity);
+        
+        // Log audit event only if requested (skip for scheduled health checks)
+        if (logAudit) {
+            try {
+                auditService.logConnectionTest(AuditResourceType.CLUSTER, cluster.getId(), cluster.getName(), reachable, 
+                        reachable ? null : "Connection failed");
+            } catch (Exception e) {
+                log.warn("Failed to log audit event for connection test: {}", e.getMessage());
+            }
+        }
+        
         return reachable;
     }
 }

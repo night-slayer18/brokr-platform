@@ -1,10 +1,13 @@
 package io.brokr.api.graphql;
 
+import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.input.OrganizationInput;
 import io.brokr.api.service.ClusterApiService;
 import io.brokr.api.service.EnvironmentApiService;
 import io.brokr.api.service.OrganizationApiService;
 import io.brokr.api.service.UserApiService;
+import io.brokr.core.model.AuditActionType;
+import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.Environment;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Organization;
@@ -100,12 +103,14 @@ public class OrganizationResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageOrganizations()")
+    @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.ORGANIZATION, resourceNameParam = "input.name", logResult = true)
     public Organization createOrganization(@Argument OrganizationInput input) {
         return organizationApiService.createOrganization(input);
     }
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageOwnOrganization(#id)")
+    @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.ORGANIZATION, resourceIdParam = "id", resourceNameParam = "input.name", logResult = true)
     public Organization updateOrganization(@Argument String id, @Argument OrganizationInput input) {
         // Service layer will validate ADMIN can only update their own organization
         return organizationApiService.updateOrganization(id, input);
@@ -113,6 +118,7 @@ public class OrganizationResolver {
 
     @MutationMapping
     @PreAuthorize("@authorizationService.canManageOrganizations()")
+    @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.ORGANIZATION, resourceIdParam = "id")
     public boolean deleteOrganization(@Argument String id) {
         return organizationApiService.deleteOrganization(id);
     }

@@ -18,7 +18,8 @@ public class ClusterHealthCheckService {
         clusterRepository.findAll().forEach(clusterEntity -> {
             try {
                 log.debug("Checking health for cluster: {}", clusterEntity.getName());
-                clusterApiService.testClusterConnection(clusterEntity.getId());
+                // Skip audit logging for scheduled health checks to avoid filling audit logs
+                clusterApiService.testClusterConnection(clusterEntity.getId(), false);
             } catch (Exception e) {
                 log.error("Error during health check for cluster {}: {}", clusterEntity.getName(), e.getMessage());
             }
