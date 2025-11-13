@@ -29,15 +29,14 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Start backing services
-        run: >
-          docker compose up -d
-          postgres
-          kafka-hotfix
-          kafka-minor
-          kafka-major
-          kafka-prod
-          schema-registry
-          kafka-connect
+        run: |
+          docker compose up -d \
+            postgres \
+            kafka-broker-1 \
+            kafka-broker-2 \
+            kafka-broker-3 \
+            schema-registry \
+            kafka-connect
 
       - name: Wait for services to be healthy
         run: |
@@ -48,7 +47,7 @@ jobs:
             healthy_count=0
             all_services_running=true
           
-            for service in postgres kafka-hotfix kafka-minor kafka-major kafka-prod schema-registry kafka-connect; do
+            for service in postgres kafka-broker-1 kafka-broker-2 kafka-broker-3 schema-registry kafka-connect; do
           
               container_id=$(docker compose ps -q $service)
           
@@ -75,13 +74,13 @@ jobs:
               fi
             done
           
-            if [ "$all_services_running" = true ] && [ "$healthy_count" -eq 7 ]; then
-              echo "All 7 services are healthy!"
+            if [ "$all_services_running" = true ] && [ "$healthy_count" -eq 6 ]; then
+              echo "All 6 services are healthy!"
               docker compose ps
               exit 0
             fi
           
-            echo "Waiting... ($healthy_count/7 services healthy)"
+            echo "Waiting... ($healthy_count/6 services healthy)"
             docker compose ps
             sleep 10
           done
