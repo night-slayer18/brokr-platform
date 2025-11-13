@@ -3,7 +3,6 @@ package io.brokr.api.aspect;
 import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.service.AuditService;
 import io.brokr.core.model.AuditLog;
-import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.AuditStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,8 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @Aspect
@@ -84,8 +81,8 @@ public class AuditLoggingAspect {
         return result;
     }
 
-    private void logAuditEvent(io.brokr.api.annotation.AuditLoggable auditLogAnnotation, String resourceId, 
-                               String resourceName, Object oldValue, Object newValue, 
+    private void logAuditEvent(AuditLoggable auditLogAnnotation, String resourceId,
+                               String resourceName, Object oldValue, Object newValue,
                                AuditStatus status, String errorMessage) {
         try {
             AuditLog.AuditLogBuilder builder = AuditLog.builder()

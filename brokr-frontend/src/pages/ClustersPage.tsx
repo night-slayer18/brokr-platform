@@ -54,7 +54,7 @@ function ClusterCard({cluster, onDelete, onTest, canManage}: ClusterCardProps) {
                         <CardDescription className="text-sm">{cluster.bootstrapServers}</CardDescription>
                     </div>
                     <Badge variant={cluster.isReachable ? "default" : "destructive"}
-                           className={cluster.isReachable ? "bg-gradient-to-r from-green-500 to-emerald-600" : ""}>
+                           className={cluster.isReachable ? "bg-linear-to-r from-green-500 to-emerald-600" : ""}>
                         {cluster.isReachable ? "Online" : "Offline"}
                     </Badge>
                 </div>
@@ -191,7 +191,7 @@ export default function ClustersPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                    <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                         Kafka Clusters
                     </h2>
                     <p className="text-muted-foreground mt-2">
@@ -201,7 +201,7 @@ export default function ClustersPage() {
                 {canManageClusters() && (
                     <Button
                         onClick={() => navigate('/clusters/new')}
-                        className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
+                        className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                     >
                         <Plus className="mr-2 h-4 w-4"/>
                         Add Cluster
@@ -259,7 +259,7 @@ export default function ClustersPage() {
                             {canManageClusters() && (
                                 <Button
                                     onClick={() => navigate('/clusters/new')}
-                                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
+                                    className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                                 >
                                     <Plus className="mr-2 h-4 w-4"/>
                                     Add Cluster

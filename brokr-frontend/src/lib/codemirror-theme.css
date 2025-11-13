@@ -1,0 +1,230 @@
+/* Custom CodeMirror theme matching Brokr design system */
+
+/* Light theme */
+.cm-editor {
+    --cm-background: var(--card);
+    --cm-foreground: var(--foreground);
+    --cm-selection-background: var(--primary);
+    --cm-selection-opacity: 0.2;
+    --cm-cursor: var(--primary);
+    --cm-gutter-background: var(--muted);
+    --cm-gutter-foreground: var(--muted-foreground);
+    --cm-line-number: var(--muted-foreground);
+    --cm-active-line-background: var(--accent);
+    --cm-active-line-opacity: 0.1;
+    --cm-matching-bracket: var(--primary);
+    --cm-non-matching-bracket: var(--destructive);
+}
+
+/* Dark theme */
+.dark .cm-editor {
+    --cm-background: var(--card);
+    --cm-foreground: var(--foreground);
+    --cm-selection-background: var(--primary);
+    --cm-selection-opacity: 0.3;
+    --cm-cursor: var(--primary);
+    --cm-gutter-background: var(--muted);
+    --cm-gutter-foreground: var(--muted-foreground);
+    --cm-line-number: var(--muted-foreground);
+    --cm-active-line-background: var(--accent);
+    --cm-active-line-opacity: 0.15;
+    --cm-matching-bracket: var(--primary);
+    --cm-non-matching-bracket: var(--destructive);
+}
+
+/* Syntax highlighting colors - Light theme */
+.cm-keyword {
+    color: oklch(0.4365 0.1044 156.7556);
+    font-weight: 600;
+}
+
+.cm-string {
+    color: oklch(0.6056 0.2189 292.7172);
+}
+
+.cm-number {
+    color: oklch(0.7686 0.1647 70.0804);
+}
+
+.cm-comment {
+    color: oklch(0.5452 0 0);
+    font-style: italic;
+}
+
+.cm-operator {
+    color: oklch(0.6231 0.1880 259.8145);
+}
+
+.cm-variable {
+    color: var(--foreground);
+}
+
+.cm-function {
+    color: oklch(0.6959 0.1491 162.4796);
+}
+
+/* Syntax highlighting colors - Dark theme */
+.dark .cm-keyword {
+    color: oklch(0.8003 0.1821 151.7110);
+    font-weight: 600;
+}
+
+.dark .cm-string {
+    color: oklch(0.7090 0.1592 293.5412);
+}
+
+.dark .cm-number {
+    color: oklch(0.8369 0.1644 84.4286);
+}
+
+.dark .cm-comment {
+    color: oklch(0.6301 0 0);
+    font-style: italic;
+}
+
+.dark .cm-operator {
+    color: oklch(0.7137 0.1434 254.6240);
+}
+
+.dark .cm-variable {
+    color: var(--foreground);
+}
+
+.dark .cm-function {
+    color: oklch(0.7845 0.1325 181.9120);
+}
+
+/* Editor container enhancements */
+.cm-editor {
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.2s ease;
+}
+
+.cm-editor:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.cm-editor.cm-focused {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+
+/* Gutter styling */
+.cm-gutters {
+    border-right: 1px solid var(--border);
+    background: var(--muted) !important;
+}
+
+.cm-lineNumbers .cm-gutterElement {
+    padding: 0 0.75rem;
+    min-width: 3.5rem;
+    text-align: right;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+.cm-activeLineGutter {
+    background: var(--accent) !important;
+    color: var(--accent-foreground) !important;
+    font-weight: 600;
+}
+
+/* Active line highlight */
+.cm-activeLine {
+    background: var(--accent);
+    opacity: 0.1;
+}
+
+/* Selection */
+.cm-selectionBackground {
+    background: var(--primary);
+    opacity: 0.2;
+}
+
+/* Cursor */
+.cm-cursor {
+    border-left: 2px solid var(--primary);
+    margin-left: -1px;
+    animation: cm-blink 1s infinite;
+}
+
+@keyframes cm-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* Matching brackets */
+.cm-matchingBracket {
+    background: var(--primary);
+    opacity: 0.3;
+    border-radius: 2px;
+    font-weight: 600;
+}
+
+.cm-nonmatchingBracket {
+    background: var(--destructive);
+    opacity: 0.3;
+    border-radius: 2px;
+}
+
+/* Autocomplete dropdown */
+.cm-tooltip-autocomplete {
+    background: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.cm-tooltip-autocomplete > ul > li {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+}
+
+.cm-tooltip-autocomplete > ul > li:hover,
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.cm-tooltip-autocomplete > ul > li:last-child {
+    border-bottom: none;
+}
+
+/* Scrollbar styling */
+.cm-scroller::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+    background: var(--muted);
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 5px;
+    opacity: 0.5;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+    opacity: 0.8;
+}
+
+/* Line wrapping indicator */
+.cm-lineWrapping {
+    position: relative;
+}
+
+.cm-lineWrapping::after {
+    content: '↩';
+    position: absolute;
+    right: 0;
+    color: var(--muted-foreground);
+    opacity: 0.3;
+    font-size: 0.75rem;
+}
+

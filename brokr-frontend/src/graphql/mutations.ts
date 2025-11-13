@@ -250,6 +250,88 @@ export const TEST_KSQLDB_CONNECTION_MUTATION = gql`
     }
 `
 
+export const EXECUTE_KSQL_QUERY = gql`
+    mutation ExecuteKsqlQuery($ksqlDBId: ID!, $input: KsqlQueryInput!) {
+        executeKsqlQuery(ksqlDBId: $ksqlDBId, input: $input) {
+            queryId
+            columns
+            rows
+            executionTimeMs
+            errorMessage
+        }
+    }
+`
+
+export const EXECUTE_KSQL_STATEMENT = gql`
+    mutation ExecuteKsqlStatement($ksqlDBId: ID!, $input: KsqlQueryInput!) {
+        executeKsqlStatement(ksqlDBId: $ksqlDBId, input: $input) {
+            queryId
+            columns
+            rows
+            executionTimeMs
+            errorMessage
+        }
+    }
+`
+
+export const TERMINATE_KSQL_QUERY = gql`
+    mutation TerminateKsqlQuery($ksqlDBId: ID!, $queryId: String!) {
+        terminateKsqlQuery(ksqlDBId: $ksqlDBId, queryId: $queryId)
+    }
+`
+
+export const CREATE_KSQL_STREAM = gql`
+    mutation CreateKsqlStream($ksqlDBId: ID!, $input: KsqlQueryInput!) {
+        createKsqlStream(ksqlDBId: $ksqlDBId, input: $input) {
+            id
+            name
+            type
+            topicName
+            keyFormat
+            valueFormat
+            schema
+            queryText
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const CREATE_KSQL_TABLE = gql`
+    mutation CreateKsqlTable($ksqlDBId: ID!, $input: KsqlQueryInput!) {
+        createKsqlTable(ksqlDBId: $ksqlDBId, input: $input) {
+            id
+            name
+            type
+            topicName
+            keyFormat
+            valueFormat
+            schema
+            queryText
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const DROP_KSQL_STREAM = gql`
+    mutation DropKsqlStream($ksqlDBId: ID!, $streamName: String!) {
+        dropKsqlStream(ksqlDBId: $ksqlDBId, streamName: $streamName)
+    }
+`
+
+export const DROP_KSQL_TABLE = gql`
+    mutation DropKsqlTable($ksqlDBId: ID!, $tableName: String!) {
+        dropKsqlTable(ksqlDBId: $ksqlDBId, tableName: $tableName)
+    }
+`
+
+export const DELETE_KSQL_QUERY_HISTORY = gql`
+    mutation DeleteKsqlQueryHistory($ksqlDBId: ID!, $olderThanDays: Int!) {
+        deleteKsqlQueryHistory(ksqlDBId: $ksqlDBId, olderThanDays: $olderThanDays)
+    }
+`
+
 export const CREATE_ORGANIZATION_MUTATION = gql`
     mutation CreateOrganization($input: OrganizationInput!) {
         createOrganization(input: $input) {

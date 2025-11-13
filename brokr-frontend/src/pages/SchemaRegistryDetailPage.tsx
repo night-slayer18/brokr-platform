@@ -156,12 +156,12 @@ export default function SchemaRegistryDetailPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Status</CardTitle>
+                        <CardTitle>Connection Status</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className={schemaRegistry.isActive ? 'text-green-400 font-medium' : 'text-gray-500'}>
-                            {schemaRegistry.isActive ? 'Active' : 'Inactive'}
-                        </p>
+                        <Badge variant={schemaRegistry.isReachable ? "default" : "destructive"}>
+                            {schemaRegistry.isReachable ? "Online" : "Offline"}
+                        </Badge>
                     </CardContent>
                 </Card>
                 <Card>

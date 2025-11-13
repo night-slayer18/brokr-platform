@@ -45,7 +45,7 @@ export default function BrokersPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Brokers</h2>
+                <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">Brokers</h2>
                 <p className="text-muted-foreground mt-2">List of brokers in the cluster.</p>
             </div>
             <Card>

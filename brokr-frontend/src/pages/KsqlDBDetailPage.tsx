@@ -1,13 +1,20 @@
 import {useParams} from 'react-router-dom';
-import {GET_KSQLDB, GET_KSQLDB_SERVER_INFO} from '@/graphql/queries';
+import {GET_KSQLDB} from '@/graphql/queries';
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
-import {executeGraphQL} from '@/lib/graphql-client';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {formatRelativeTime} from '@/lib/formatters';
-import {useEffect, useState, useCallback} from 'react';
+import {KsqlQueryEditor} from '@/components/ksqldb/KsqlQueryEditor';
+import {KsqlQueryResultViewer} from '@/components/ksqldb/KsqlQueryResultViewer';
+import {KsqlQueryHistory} from '@/components/ksqldb/KsqlQueryHistory';
+import {KsqlStreamsTablesManagement} from '@/components/ksqldb/KsqlStreamsTablesManagement';
+import {useState, useCallback} from 'react';
 import {toast} from "sonner";
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
+import {EXECUTE_KSQL_QUERY, EXECUTE_KSQL_STATEMENT} from '@/graphql/mutations';
+import {Code, History, Database} from 'lucide-react';
 
 // Temporary types until GraphQL types are generated
 type GetKsqlDBQuery = {
@@ -22,12 +29,18 @@ type GetKsqlDBQuery = {
     };
 };
 
-type GetKsqlDBServerInfoQuery = {
-    ksqlDBServerInfo?: string;
-};
+interface KsqlQueryResult {
+    queryId?: string;
+    columns: string[];
+    rows: string[][];
+    executionTimeMs?: number;
+    errorMessage?: string;
+}
 
 export default function KsqlDBDetailPage() {
     const {ksqlDBId} = useParams<{ clusterId: string; ksqlDBId: string }>();
+    const [queryResult, setQueryResult] = useState<KsqlQueryResult | null>(null);
+    const [isExecuting, setIsExecuting] = useState(false);
 
     const {
         data: ksqlDBData,
@@ -40,43 +53,99 @@ export default function KsqlDBDetailPage() {
         }
     );
 
-    const [serverInfo, setServerInfo] = useState<string | null>(null);
-    const [serverInfoLoading, setServerInfoLoading] = useState(false);
-
-    const ksqlDB = ksqlDBData?.ksqlDB;
-
-    const fetchServerInfo = useCallback(async () => {
-        if (!ksqlDBId) return;
-        
-        setServerInfoLoading(true);
-        try {
-            const data = await executeGraphQL<GetKsqlDBServerInfoQuery>(GET_KSQLDB_SERVER_INFO, {
-                ksqlDBId: ksqlDBId,
+    const executeQueryMutation = useGraphQLMutation(EXECUTE_KSQL_QUERY, {
+        onSuccess: (data) => {
+            const result = data.executeKsqlQuery;
+            setQueryResult({
+                queryId: result.queryId,
+                columns: result.columns || [],
+                rows: result.rows || [],
+                executionTimeMs: result.executionTimeMs,
+                errorMessage: result.errorMessage,
             });
-            if (data && data.ksqlDBServerInfo) {
-                try {
-                    // Try to format as JSON if possible
-                    const parsed = JSON.parse(data.ksqlDBServerInfo);
-                    setServerInfo(JSON.stringify(parsed, null, 2));
-                } catch {
-                    // If not JSON, use as-is
-                    setServerInfo(data.ksqlDBServerInfo);
-                }
-            }
-        } catch (err: unknown) {
-            const error = err instanceof Error ? err : {message: "Failed to fetch server info"};
-            toast.error(error.message || "Failed to fetch server info");
-            setServerInfo("Error loading server info.");
-        } finally {
-            setServerInfoLoading(false);
-        }
-    }, [ksqlDBId]);
+            setIsExecuting(false);
+            toast.success('Query executed successfully');
+        },
+        onError: (error) => {
+            setQueryResult({
+                columns: [],
+                rows: [],
+                errorMessage: error.message || 'Query execution failed',
+            });
+            setIsExecuting(false);
+            toast.error(`Query failed: ${error.message}`);
+        },
+    });
 
-    useEffect(() => {
-        if (ksqlDB) {
-            fetchServerInfo();
+    const executeStatementMutation = useGraphQLMutation(EXECUTE_KSQL_STATEMENT, {
+        onSuccess: (data) => {
+            const result = data.executeKsqlStatement;
+            setQueryResult({
+                queryId: result.queryId,
+                columns: result.columns || [],
+                rows: result.rows || [],
+                executionTimeMs: result.executionTimeMs,
+                errorMessage: result.errorMessage,
+            });
+            setIsExecuting(false);
+            toast.success('Statement executed successfully');
+        },
+        onError: (error) => {
+            setQueryResult({
+                columns: [],
+                rows: [],
+                errorMessage: error.message || 'Statement execution failed',
+            });
+            setIsExecuting(false);
+            toast.error(`Statement failed: ${error.message}`);
+        },
+    });
+
+    const handleExecuteQuery = useCallback(async (query: string) => {
+        if (!ksqlDBId) {
+            toast.error('ksqlDB ID is required');
+            return;
         }
-    }, [ksqlDB, fetchServerInfo]);
+
+        setIsExecuting(true);
+        setQueryResult(null);
+
+        // Determine if it's a SELECT query (query) or a statement (CREATE, DROP, etc.)
+        const trimmedQuery = query.trim().toUpperCase();
+        const isSelectQuery = trimmedQuery.startsWith('SELECT') || 
+                             trimmedQuery.startsWith('PRINT') ||
+                             trimmedQuery.startsWith('SHOW') ||
+                             trimmedQuery.startsWith('DESCRIBE') ||
+                             trimmedQuery.startsWith('EXPLAIN');
+
+        try {
+            if (isSelectQuery) {
+                await executeQueryMutation.mutate({
+                    ksqlDBId,
+                    input: {
+                        query,
+                        properties: {},
+                    },
+                });
+            } else {
+                await executeStatementMutation.mutate({
+                    ksqlDBId,
+                    input: {
+                        query,
+                        properties: {},
+                    },
+                });
+            }
+        } catch {
+            // Error is handled by mutation callbacks
+            setIsExecuting(false);
+        }
+    }, [ksqlDBId, executeQueryMutation, executeStatementMutation]);
+
+    const handleCancel = useCallback(() => {
+        setIsExecuting(false);
+        toast.info('Query execution cancelled');
+    }, []);
 
     if (ksqlDBLoading) {
         return (
@@ -93,9 +162,10 @@ export default function KsqlDBDetailPage() {
     }
 
     if (ksqlDBError) {
-        return <div className="text-destructive">Error loading ksqlDB
-            details: {ksqlDBError.message}</div>;
+        return <div className="text-destructive">Error loading ksqlDB details: {ksqlDBError.message}</div>;
     }
+
+    const ksqlDB = ksqlDBData?.ksqlDB;
 
     if (!ksqlDB) {
         return <div>ksqlDB instance not found.</div>;
@@ -103,6 +173,7 @@ export default function KsqlDBDetailPage() {
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div>
                 <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                     {ksqlDB.name}
@@ -110,10 +181,12 @@ export default function KsqlDBDetailPage() {
                         {ksqlDB.isReachable ? "Online" : "Offline"}
                     </Badge>
                 </h2>
-                <p className="text-muted-foreground">Details for ksqlDB instance <span
-                    className="font-mono">{ksqlDB.name}</span></p>
+                <p className="text-muted-foreground">
+                    Details for ksqlDB instance <span className="font-mono">{ksqlDB.name}</span>
+                </p>
             </div>
 
+            {/* Info Cards */}
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader>
@@ -125,12 +198,12 @@ export default function KsqlDBDetailPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Status</CardTitle>
+                        <CardTitle>Connection Status</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className={ksqlDB.isActive ? 'text-green-400 font-medium' : 'text-gray-500'}>
-                            {ksqlDB.isActive ? 'Active' : 'Inactive'}
-                        </p>
+                        <Badge variant={ksqlDB.isReachable ? "default" : "destructive"}>
+                            {ksqlDB.isReachable ? "Online" : "Offline"}
+                        </Badge>
                     </CardContent>
                 </Card>
                 <Card>
@@ -146,24 +219,52 @@ export default function KsqlDBDetailPage() {
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Server Information</CardTitle>
-                    <CardDescription>Server information from this ksqlDB instance.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {serverInfoLoading ? (
-                        <Skeleton className="h-64 w-full"/>
-                    ) : (
-                        <div className="border rounded-lg overflow-auto max-h-[600px] bg-muted/30">
-                            <pre className="p-4 font-mono text-sm">
-                                {serverInfo || '{}'}
-                            </pre>
+            {/* Main Content Tabs */}
+            <Tabs defaultValue="query" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="query" className="flex items-center gap-2">
+                        <Code className="h-4 w-4" />
+                        Query Editor
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Query History
+                    </TabsTrigger>
+                    <TabsTrigger value="streams-tables" className="flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        Streams & Tables
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="query" className="mt-6 space-y-0">
+                    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 h-[calc(100vh-350px)] min-h-[700px]">
+                        <div className="flex flex-col h-full min-h-0">
+                            <KsqlQueryEditor
+                                ksqlDBId={ksqlDBId!}
+                                onExecute={handleExecuteQuery}
+                                isExecuting={isExecuting}
+                                onCancel={handleCancel}
+                                className="h-full"
+                            />
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                        <div className="flex flex-col h-full min-h-0">
+                            <KsqlQueryResultViewer
+                                result={queryResult}
+                                isLoading={isExecuting}
+                                className="h-full"
+                            />
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="history" className="mt-6">
+                    {ksqlDBId && <KsqlQueryHistory ksqlDBId={ksqlDBId} />}
+                </TabsContent>
+
+                <TabsContent value="streams-tables" className="mt-6">
+                    {ksqlDBId && <KsqlStreamsTablesManagement ksqlDBId={ksqlDBId} />}
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
-

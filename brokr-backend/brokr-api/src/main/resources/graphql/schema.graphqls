@@ -232,6 +232,117 @@ type KsqlDB {
     isReachable: Boolean!
     lastConnectionError: String
     lastConnectionCheck: Long!
+    streams: [KsqlStreamTable!]!
+    tables: [KsqlStreamTable!]!
+}
+
+type KsqlQueryHistory {
+    id: ID!
+    ksqlDB: KsqlDB!
+    user: UserDto!
+    queryText: String!
+    queryType: String!
+    status: String!
+    executionTimeMs: Long
+    rowsReturned: Int
+    errorMessage: String
+    startedAt: Long!
+    completedAt: Long
+    properties: Map
+}
+
+type KsqlStreamTable {
+    id: ID!
+    ksqlDB: KsqlDB!
+    name: String!
+    type: String!
+    topicName: String
+    keyFormat: String
+    valueFormat: String
+    schema: String
+    queryText: String
+    createdAt: Long!
+    updatedAt: Long!
+    properties: Map
+}
+
+type KsqlQueryResult {
+    queryId: String
+    columns: [String!]!
+    rows: [[String!]!]!
+    executionTimeMs: Long
+    errorMessage: String
+}
+
+type KsqlQueryMetrics {
+    queryHistoryId: ID!
+    cpuUsagePercent: Float
+    memoryUsageMb: Long
+    rowsProcessedPerSecond: Long
+    bytesRead: Long
+    bytesWritten: Long
+    timestamp: Long!
+}
+
+type KsqlQueryHistoryPage {
+    content: [KsqlQueryHistory!]!
+    totalElements: Long!
+    totalPages: Int!
+    currentPage: Int!
+    pageSize: Int!
+}
+
+enum KsqlQueryType {
+    SELECT
+    CREATE_STREAM
+    CREATE_TABLE
+    CREATE_STREAM_AS_SELECT
+    CREATE_TABLE_AS_SELECT
+    DROP_STREAM
+    DROP_TABLE
+    TERMINATE
+    INSERT
+    INSERT_VALUES
+    SHOW
+    DESCRIBE
+    EXPLAIN
+    OTHER
+}
+
+enum KsqlQueryStatus {
+    SUCCESS
+    FAILURE
+    RUNNING
+    CANCELLED
+}
+
+enum KsqlStreamTableType {
+    STREAM
+    TABLE
+}
+
+enum SortDirection {
+    ASC
+    DESC
+}
+
+input KsqlQueryInput {
+    query: String!
+    properties: Map
+}
+
+input KsqlQueryFilter {
+    queryType: KsqlQueryType
+    status: KsqlQueryStatus
+    startDate: Long
+    endDate: Long
+}
+
+input KsqlQueryPagination {
+    page: Int!
+    size: Int!
+    sortBy: String
+    sortDirection: SortDirection
 }
 
 type ThreadMetadata {
@@ -556,6 +667,18 @@ type Query {
     ksqlDBs(clusterId: ID!): [KsqlDB!]!
     ksqlDB(id: ID!): KsqlDB
     ksqlDBServerInfo(ksqlDBId: ID!): String
+    
+    # ksqlDB Streams/Tables
+    ksqlStreams(ksqlDBId: ID!): [KsqlStreamTable!]!
+    ksqlTables(ksqlDBId: ID!): [KsqlStreamTable!]!
+    ksqlStreamTable(ksqlDBId: ID!, name: String!): KsqlStreamTable
+    
+    # ksqlDB Query History
+    ksqlQueryHistory(ksqlDBId: ID!, filter: KsqlQueryFilter, pagination: KsqlQueryPagination): KsqlQueryHistoryPage!
+    ksqlQueryHistoryById(id: ID!): KsqlQueryHistory
+    
+    # ksqlDB Metrics
+    ksqlQueryMetrics(queryHistoryId: ID!): [KsqlQueryMetrics!]!
 
     # Message queries
     messages(clusterId: ID!, input: MessageInput!): [Message!]!
@@ -624,4 +747,18 @@ type Mutation {
     updateKsqlDB(id: ID!, input: KsqlDBInput!): KsqlDB!
     deleteKsqlDB(id: ID!): Boolean!
     testKsqlDBConnection(id: ID!): Boolean!
+    
+    # ksqlDB Query Execution
+    executeKsqlQuery(ksqlDBId: ID!, input: KsqlQueryInput!): KsqlQueryResult!
+    executeKsqlStatement(ksqlDBId: ID!, input: KsqlQueryInput!): KsqlQueryResult!
+    terminateKsqlQuery(ksqlDBId: ID!, queryId: String!): Boolean!
+    
+    # ksqlDB Stream/Table Management
+    createKsqlStream(ksqlDBId: ID!, input: KsqlQueryInput!): KsqlStreamTable!
+    createKsqlTable(ksqlDBId: ID!, input: KsqlQueryInput!): KsqlStreamTable!
+    dropKsqlStream(ksqlDBId: ID!, streamName: String!): Boolean!
+    dropKsqlTable(ksqlDBId: ID!, tableName: String!): Boolean!
+    
+    # ksqlDB Query History
+    deleteKsqlQueryHistory(ksqlDBId: ID!, olderThanDays: Int!): Int!
 }

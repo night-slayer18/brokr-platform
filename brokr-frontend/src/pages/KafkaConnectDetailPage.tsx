@@ -66,12 +66,12 @@ export default function KafkaConnectDetailPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Status</CardTitle>
+            <CardTitle>Connection Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={kafkaConnect.isActive ? 'text-green-400 font-medium' : 'text-gray-500'}>
-              {kafkaConnect.isActive ? 'Active' : 'Inactive'}
-            </p>
+            <Badge variant={kafkaConnect.isReachable ? "default" : "destructive"}>
+              {kafkaConnect.isReachable ? "Online" : "Offline"}
+            </Badge>
           </CardContent>
         </Card>
         <Card>

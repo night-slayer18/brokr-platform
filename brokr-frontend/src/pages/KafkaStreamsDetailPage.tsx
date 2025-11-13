@@ -73,12 +73,20 @@ export default function KafkaStreamsDetailPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Status</CardTitle>
+            <CardTitle>Application Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={kafkaStreamsApp.isActive ? 'text-green-400 font-medium' : 'text-gray-500'}>
-              {kafkaStreamsApp.isActive ? 'Active' : 'Inactive'}
-            </p>
+            <Badge
+              variant={
+                kafkaStreamsApp.state === STREAMS_STATES.RUNNING
+                  ? "default"
+                  : kafkaStreamsApp.state === STREAMS_STATES.ERROR
+                    ? "destructive"
+                    : "secondary"
+              }
+            >
+              {kafkaStreamsApp.state || 'UNKNOWN'}
+            </Badge>
           </CardContent>
         </Card>
         <Card>

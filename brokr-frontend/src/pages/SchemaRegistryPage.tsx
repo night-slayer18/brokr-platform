@@ -120,7 +120,7 @@ export default function SchemaRegistryPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                    <h2 className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                         Schema Registries
                     </h2>
                     <p className="text-muted-foreground mt-2">
@@ -130,7 +130,7 @@ export default function SchemaRegistryPage() {
                 {canManageClusters() && (
                     <Button
                         onClick={() => setIsCreateFormOpen(true)}
-                        className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
+                        className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                     >
                         <Plus className="mr-2 h-4 w-4"/>
                         Add Schema Registry
@@ -152,7 +152,7 @@ export default function SchemaRegistryPage() {
                         {canManageClusters() && (
                             <Button
                                 onClick={() => setIsCreateFormOpen(true)}
-                                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
+                                className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/50"
                             >
                                 <Plus className="mr-2 h-4 w-4"/>
                                 Add Your First Schema Registry

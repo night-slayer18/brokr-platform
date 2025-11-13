@@ -302,18 +302,51 @@ public class KafkaAdminService {
     public List<ConsumerGroup> listConsumerGroups(KafkaCluster cluster) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
-            // Use the new listGroups() method
-            ListGroupsResult result = adminClient.listGroups();
-            Collection<GroupListing> groupListings = result.all().get(); // Returns Collection<GroupListing>
+            
+            // Step 1: List all groups
+            ListGroupsResult listGroupsResult = adminClient.listGroups();
+            Collection<GroupListing> groupListings = listGroupsResult.all().get();
 
-            List<String> groupIds = groupListings.stream()
-                    .map(GroupListing::groupId) // Use GroupListing here
+            if (groupListings.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            List<String> allGroupIds = groupListings.stream()
+                    .map(GroupListing::groupId)
                     .collect(Collectors.toList());
 
-            DescribeConsumerGroupsResult describeResult = adminClient.describeConsumerGroups(groupIds);
-            Map<String, ConsumerGroupDescription> groupDescriptions = describeResult.all().get();
+            // Step 2: Filter to only consumer groups by attempting to describe each one
+            // Non-consumer groups (connect, schema-registry, etc.) will throw IllegalArgumentException
+            Map<String, ConsumerGroupDescription> consumerGroupDescriptions = new HashMap<>();
+            
+            for (String groupId : allGroupIds) {
+                try {
+                    // Try to describe as a consumer group
+                    DescribeConsumerGroupsResult describeResult = 
+                            adminClient.describeConsumerGroups(Collections.singletonList(groupId));
+                    Map<String, ConsumerGroupDescription> descriptions = describeResult.all().get();
+                    consumerGroupDescriptions.putAll(descriptions);
+                } catch (ExecutionException e) {
+                    // Check if the underlying exception is IllegalArgumentException (non-consumer group)
+                    Throwable cause = e.getCause();
+                    if (cause instanceof IllegalArgumentException) {
+                        log.debug("Skipping non-consumer group: {} ({})", groupId, cause.getMessage());
+                    } else {
+                        // Re-throw if it's a different error
+                        log.warn("Failed to describe group {}: {}", groupId, e.getMessage());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while describing consumer groups", e);
+                }
+            }
 
-            return groupDescriptions.entrySet().stream()
+            if (consumerGroupDescriptions.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            // Step 3: Convert to domain model
+            return consumerGroupDescriptions.entrySet().stream()
                     .map(entry -> {
                         String groupId = entry.getKey();
                         ConsumerGroupDescription description = entry.getValue();

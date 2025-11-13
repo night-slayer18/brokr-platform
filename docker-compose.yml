@@ -1,6 +1,23 @@
+# Brokr Platform - Complete Development Environment
+# This file includes all services needed for testing the full platform
+# 
+# Quick Start:
+# 1. docker-compose up -d
+# 2. Access at http://localhost:8080
+#
+# Services included:
+# - PostgreSQL Database
+# - 3-node Kafka cluster (KRaft mode)
+# - Schema Registry
+# - Kafka Connect
+# - ksqlDB
+# - Brokr Platform Application (built from Dockerfile)
+
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
+    container_name: brokr-postgres
     environment:
       POSTGRES_DB: brokr
       POSTGRES_USER: postgres
@@ -9,191 +26,237 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # NOTE: Kafka services are OPTIONAL - only for testing/demo purposes
+  # Kafka Broker 1 (KRaft mode)
+  # NOTE: These Kafka services are OPTIONAL - only for testing/demo purposes
   # The Brokr platform connects to EXTERNAL Kafka clusters via bootstrap servers
-  # configured by admins in the UI. These Kafka clusters are just for local testing.
-  kafka-hotfix:
+  # configured by admins in the UI. This Kafka cluster is just for local testing.
+  kafka-broker-1:
     image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-1
     ports:
       - "9092:9092"
-      - "19092:19092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-hotfix:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka-hotfix:29092,CONTROLLER://kafka-hotfix:29093,PLAINTEXT_HOST://0.0.0.0:9092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-hotfix:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-1:29092,CONTROLLER://kafka-broker-1:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-1:29092,PLAINTEXT_HOST://kafka-broker-1:9092'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'j4dxG69GS1K8-SdMJVMhOg'
-    command: >
-      bash -c "
-        mkdir -p /tmp/kraft-combined-logs &&
-        /etc/confluent/docker/run
-      "
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'
+    volumes:
+      - kafka_data_1:/var/lib/kafka/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092" ]
-      interval: 10s
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  kafka-minor:
+  # Kafka Broker 2
+  kafka-broker-2:
     image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-2
     ports:
       - "9093:9093"
-      - "19093:19093"
     environment:
       KAFKA_NODE_ID: 2
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '2@kafka-minor:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka-minor:29092,CONTROLLER://kafka-minor:29093,PLAINTEXT_HOST://0.0.0.0:9093'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-minor:29092,PLAINTEXT_HOST://localhost:9093'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-2:29092,CONTROLLER://kafka-broker-2:29093,PLAINTEXT_HOST://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-2:29092,PLAINTEXT_HOST://kafka-broker-2:9093'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'v77usK6rTc-amojQsMoTXw'
-    command: >
-      bash -c "
-        mkdir -p /tmp/kraft-combined-logs &&
-        /etc/confluent/docker/run
-      "
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'
+    volumes:
+      - kafka_data_2:/var/lib/kafka/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9093" ]
-      interval: 10s
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9093 || exit 1" ]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  kafka-major:
+  # Kafka Broker 3
+  kafka-broker-3:
     image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-3
     ports:
       - "9094:9094"
-      - "19094:19094"
     environment:
       KAFKA_NODE_ID: 3
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '3@kafka-major:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka-major:29092,CONTROLLER://kafka-major:29093,PLAINTEXT_HOST://0.0.0.0:9094'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-major:29092,PLAINTEXT_HOST://localhost:9094'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-3:29092,CONTROLLER://kafka-broker-3:29093,PLAINTEXT_HOST://0.0.0.0:9094'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-3:29092,PLAINTEXT_HOST://kafka-broker-3:9094'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'O8ey3ASpRtmGRBmwCWixMA'
-    command: >
-      bash -c "
-        mkdir -p /tmp/kraft-combined-logs &&
-        /etc/confluent/docker/run
-      "
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'
+    volumes:
+      - kafka_data_3:/var/lib/kafka/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9094" ]
-      interval: 10s
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9094 || exit 1" ]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  kafka-prod:
-    image: confluentinc/cp-kafka:8.1.0
-    ports:
-      - "9095:9095"
-      - "19095:19095"
-    environment:
-      KAFKA_NODE_ID: 4
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '4@kafka-prod:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka-prod:29092,CONTROLLER://kafka-prod:29093,PLAINTEXT_HOST://0.0.0.0:9095'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-prod:29092,PLAINTEXT_HOST://localhost:9095'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'kl67hFJBQyqFljyYZ2kppA'
-    command: >
-      bash -c "
-        mkdir -p /tmp/kraft-combined-logs &&
-        /etc/confluent/docker/run
-      "
-    healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9095" ]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
+  # Schema Registry
   schema-registry:
     image: confluentinc/cp-schema-registry:8.1.0
+    container_name: brokr-schema-registry
     depends_on:
-      kafka-hotfix:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
         condition: service_healthy
     ports:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-hotfix:29092'
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 3
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Kafka Connect
   kafka-connect:
     image: confluentinc/cp-kafka-connect:8.1.0
+    container_name: brokr-kafka-connect
     depends_on:
-      kafka-hotfix:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
         condition: service_healthy
       schema-registry:
         condition: service_healthy
     ports:
       - "8083:8083"
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: 'kafka-hotfix:29092'
+      CONNECT_BOOTSTRAP_SERVERS: 'kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
       CONNECT_REST_PORT: 8083
       CONNECT_GROUP_ID: compose-connect-group
       CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
       CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      # Enable REST API
+      CONNECT_REST_LISTENERS: http://0.0.0.0:8083
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8083/connectors || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ksqlDB Server
+  ksqldb-server:
+    image: confluentinc/cp-ksqldb-server:latest
+    container_name: brokr-ksqldb-server
+    hostname: ksqldb-server
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_CONFIG_DIR: "/etc/ksql"
+      KSQL_BOOTSTRAP_SERVERS: "kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092"
+      KSQL_HOST_NAME: ksqldb-server
+      KSQL_LISTENERS: "http://0.0.0.0:8088"
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+      KSQL_KSQL_CONNECT_URL: "http://kafka-connect:8083"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 3
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8088/info || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Brokr Platform Application (built from Dockerfile)
   brokr-backend:
     build:
       context: .
-      dockerfile: brokr-backend/Dockerfile
+      dockerfile: Dockerfile
+    container_name: brokr-backend
     ports:
       - "8080:8080"
     depends_on:
@@ -202,16 +265,46 @@ services:
       # NOTE: Kafka services are NOT required - Brokr platform connects to external Kafka clusters
       # via bootstrap servers configured by admins in the UI. Kafka services above are only for local testing.
     environment:
+      # Database Configuration
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokr
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: password
-      # NOTE: SPRING_KAFKA_BOOTSTRAP_SERVERS is NOT needed - platform connects to external clusters
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: "true"
+
+      # JWT Configuration
+      JWT_SECRET: XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==
+      JWT_EXPIRATION: 86400
+
+      # CORS Configuration
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:8080
+
+      # Application Configuration
+      SPRING_PROFILES_ACTIVE: development
+
+      # Logging
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_IO_BROKR: INFO
+    networks:
+      - brokr-network
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health" ]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 5
       start_period: 60s
 
+networks:
+  brokr-network:
+    driver: bridge
+
 volumes:
   postgres_data:
+    driver: local
+  kafka_data_1:
+    driver: local
+  kafka_data_2:
+    driver: local
+  kafka_data_3:
+    driver: local

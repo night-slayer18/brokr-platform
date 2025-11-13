@@ -277,6 +277,123 @@ export const GET_KSQLDB_SERVER_INFO = gql`
     }
 `
 
+export const GET_KSQL_STREAMS = gql`
+    query GetKsqlStreams($ksqlDBId: ID!) {
+        ksqlStreams(ksqlDBId: $ksqlDBId) {
+            id
+            name
+            type
+            topicName
+            keyFormat
+            valueFormat
+            schema
+            queryText
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const GET_KSQL_TABLES = gql`
+    query GetKsqlTables($ksqlDBId: ID!) {
+        ksqlTables(ksqlDBId: $ksqlDBId) {
+            id
+            name
+            type
+            topicName
+            keyFormat
+            valueFormat
+            schema
+            queryText
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const GET_KSQL_STREAM_TABLE = gql`
+    query GetKsqlStreamTable($ksqlDBId: ID!, $name: String!) {
+        ksqlStreamTable(ksqlDBId: $ksqlDBId, name: $name) {
+            id
+            name
+            type
+            topicName
+            keyFormat
+            valueFormat
+            schema
+            queryText
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const GET_KSQL_QUERY_HISTORY = gql`
+    query GetKsqlQueryHistory(
+        $ksqlDBId: ID!
+        $filter: KsqlQueryFilter
+        $pagination: KsqlQueryPagination
+    ) {
+        ksqlQueryHistory(ksqlDBId: $ksqlDBId, filter: $filter, pagination: $pagination) {
+            content {
+                id
+                queryText
+                queryType
+                status
+                executionTimeMs
+                rowsReturned
+                errorMessage
+                startedAt
+                completedAt
+                user {
+                    id
+                    username
+                    email
+                }
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
+        }
+    }
+`
+
+export const GET_KSQL_QUERY_HISTORY_BY_ID = gql`
+    query GetKsqlQueryHistoryById($id: ID!) {
+        ksqlQueryHistoryById(id: $id) {
+            id
+            queryText
+            queryType
+            status
+            executionTimeMs
+            rowsReturned
+            errorMessage
+            startedAt
+            completedAt
+            user {
+                id
+                username
+                email
+            }
+        }
+    }
+`
+
+export const GET_KSQL_QUERY_METRICS = gql`
+    query GetKsqlQueryMetrics($queryHistoryId: ID!) {
+        ksqlQueryMetrics(queryHistoryId: $queryHistoryId) {
+            id
+            cpuUsagePercent
+            memoryUsageMb
+            rowsProcessedPerSecond
+            bytesRead
+            bytesWritten
+            timestamp
+        }
+    }
+`
+
 export const GET_SCHEMA_REGISTRY_SUBJECTS = gql`
     query GetSchemaRegistrySubjects($schemaRegistryId: ID!) {
         schemaRegistrySubjects(schemaRegistryId: $schemaRegistryId)
