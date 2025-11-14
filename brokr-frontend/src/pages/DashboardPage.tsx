@@ -1,13 +1,16 @@
 // src/pages/DashboardPage.tsx
-import {GET_CLUSTERS, GET_ME} from '@/graphql/queries'
-import type {GetClustersQuery, GetMeQuery} from '@/graphql/types'
+import {GET_CLUSTERS, GET_ME, GET_AUDIT_LOGS} from '@/graphql/queries'
+import type {GetClustersQuery, GetMeQuery, GetAuditLogsQuery} from '@/graphql/types'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Activity, FileText, Server, Users} from 'lucide-react'
-import React from "react";
+import React, {useMemo} from "react";
 import {useNavigate} from "react-router-dom";
 import type {KafkaCluster} from '@/types';
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
+import {useAuth} from '@/hooks/useAuth';
+import {format} from 'date-fns';
+import {ScrollArea} from '@/components/ui/scroll-area';
 
 interface StatCardProps {
     title: string
@@ -42,16 +45,69 @@ function StatCard({title, value, description, icon: Icon, trend}: StatCardProps)
 
 export default function DashboardPage() {
     const navigate = useNavigate();
+    const {canManageUsers, isSuperAdmin} = useAuth();
     const {data: userData, isLoading: userLoading} = useGraphQLQuery<GetMeQuery>(GET_ME)
-    const {data: clustersData, isLoading: clustersLoading} = useGraphQLQuery<GetClustersQuery, {organizationId?: string}>(GET_CLUSTERS, 
-        userData?.me?.organizationId ? {organizationId: userData.me.organizationId} : undefined,
+    
+    // For SUPER_ADMIN, don't filter by organizationId (they can see all clusters)
+    // For other roles, use their organizationId
+    const organizationIdForQuery = isSuperAdmin() ? null : userData?.me?.organizationId;
+    const shouldFetchClusters = isSuperAdmin() || !!userData?.me?.organizationId;
+    
+    const {data: clustersData, isLoading: clustersLoading} = useGraphQLQuery<GetClustersQuery, {organizationId?: string | null}>(GET_CLUSTERS, 
+        shouldFetchClusters ? (organizationIdForQuery ? {organizationId: organizationIdForQuery} : {organizationId: null}) : undefined,
         {
-            enabled: !!userData?.me?.organizationId,
+            enabled: shouldFetchClusters && !!userData?.me,
+        }
+    )
+
+    // Fetch recent audit logs - only for admin users
+    // SUPER_ADMIN can see all audit logs (no organizationId filter)
+    // Other admins see their organization's audit logs
+    const canAccessAuditLogs = canManageUsers();
+    const shouldFetchAuditLogs = canAccessAuditLogs && !!userData?.me;
+    const auditLogOrganizationId = isSuperAdmin() ? null : userData?.me?.organizationId;
+    
+    const {data: auditLogsData, isLoading: auditLogsLoading} = useGraphQLQuery<GetAuditLogsQuery>(
+        GET_AUDIT_LOGS,
+        {
+            filter: {
+                organizationId: auditLogOrganizationId || undefined,
+            },
+            pagination: {
+                page: 0,
+                size: 10,
+                sortBy: 'timestamp',
+                sortDirection: 'DESC',
+            },
+        },
+        {
+            enabled: shouldFetchAuditLogs,
         }
     )
 
     const clusterCount = (clustersData?.clusters || []).length
     const activeClusterCount = (clustersData?.clusters || []).filter((c: KafkaCluster) => c.isReachable)?.length || 0
+
+    // Aggregate topic and consumer group counts from all clusters
+    const {totalTopics, totalConsumerGroups} = useMemo(() => {
+        if (!clustersData?.clusters) return { totalTopics: 0, totalConsumerGroups: 0 };
+        
+        let topics = 0;
+        let consumerGroups = 0;
+        
+        clustersData.clusters.forEach((cluster: KafkaCluster) => {
+            if (cluster.topics) {
+                topics += cluster.topics.length;
+            }
+            if (cluster.consumerGroups) {
+                consumerGroups += cluster.consumerGroups.length;
+            }
+        });
+        
+        return { totalTopics: topics, totalConsumerGroups: consumerGroups };
+    }, [clustersData?.clusters]);
+
+    const recentActivities = auditLogsData?.auditLogs?.content || [];
 
     if (userLoading || clustersLoading) {
         return (
@@ -68,6 +124,8 @@ export default function DashboardPage() {
             </div>
         )
     }
+
+    const isLoadingMetrics = clustersLoading || auditLogsLoading;
 
     return (
         <div className="space-y-6">
@@ -90,14 +148,14 @@ export default function DashboardPage() {
                 />
                 <StatCard
                     title="Topics"
-                    value="-"
-                    description="Select a cluster to view"
+                    value={isLoadingMetrics ? "-" : totalTopics}
+                    description={isLoadingMetrics ? "Loading..." : `Across ${clusterCount} cluster${clusterCount !== 1 ? 's' : ''}`}
                     icon={FileText}
                 />
                 <StatCard
                     title="Consumer Groups"
-                    value="-"
-                    description="Select a cluster to view"
+                    value={isLoadingMetrics ? "-" : totalConsumerGroups}
+                    description={isLoadingMetrics ? "Loading..." : `Across ${clusterCount} cluster${clusterCount !== 1 ? 's' : ''}`}
                     icon={Users}
                 />
                 <StatCard
@@ -115,7 +173,44 @@ export default function DashboardPage() {
                         <CardDescription>Latest operations and events</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-muted-foreground">No recent activity to display</p>
+                        {!canAccessAuditLogs ? (
+                            <p className="text-sm text-muted-foreground">
+                                Recent activity is only available to administrators.
+                            </p>
+                        ) : auditLogsLoading ? (
+                            <div className="space-y-2">
+                                {[1, 2, 3].map((i) => (
+                                    <Skeleton key={i} className="h-12 w-full"/>
+                                ))}
+                            </div>
+                        ) : recentActivities.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No recent activity to display</p>
+                        ) : (
+                            <ScrollArea className="h-[400px] pr-4">
+                                <div className="space-y-3">
+                                    {recentActivities.map((activity) => (
+                                        <div key={activity.id} className="flex items-start justify-between border-b pb-3 last:border-0 last:pb-0">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">
+                                                        {activity.userEmail || 'System'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {activity.actionType}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground mt-1 truncate">
+                                                    {activity.resourceType}: {activity.resourceName || 'N/A'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    {format(new Date(activity.timestamp), 'MMM d, yyyy HH:mm:ss')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        )}
                     </CardContent>
                 </Card>
 

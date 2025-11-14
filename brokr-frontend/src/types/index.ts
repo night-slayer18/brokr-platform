@@ -49,6 +49,8 @@ export interface KafkaCluster {
     lastConnectionCheck: number
     lastConnectionError?: string
     brokers?: BrokerNode[]
+    topics?: Array<{ name: string }>
+    consumerGroups?: Array<{ groupId: string }>
 }
 
 export interface BrokerNode {

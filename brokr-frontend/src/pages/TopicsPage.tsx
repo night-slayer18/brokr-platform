@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useMemo} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_TOPICS} from '@/graphql/queries';
 import {DELETE_TOPIC_MUTATION} from '@/graphql/mutations';
@@ -8,7 +8,8 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 import {Skeleton} from '@/components/ui/skeleton';
-import {Eye, MessageSquareText, Plus, Trash2} from 'lucide-react';
+import {Input} from '@/components/ui/input';
+import {Eye, MessageSquareText, Plus, Trash2, Search} from 'lucide-react';
 import {toast} from 'sonner';
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table';
 import {CreateTopicForm} from '@/components/topics/CreateTopicForm';
@@ -32,6 +33,7 @@ export default function TopicsPage() {
     const [isCreateTopicFormOpen, setIsCreateTopicFormOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const queryClient = useQueryClient();
     const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetTopicsQuery, {clusterId: string}>(GET_TOPICS, 
@@ -40,6 +42,19 @@ export default function TopicsPage() {
             enabled: !!clusterId,
         }
     );
+
+    const allTopics = useMemo(() => data?.topics || [], [data?.topics]);
+    
+    // Filter topics based on search query
+    const topics = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return allTopics;
+        }
+        const query = searchQuery.toLowerCase();
+        return allTopics.filter((topic: Topic) => 
+            topic.name.toLowerCase().includes(query)
+        );
+    }, [allTopics, searchQuery]);
 
     const {mutate: deleteTopic} = useGraphQLMutation<DeleteTopicMutation, {clusterId: string; name: string}>(DELETE_TOPIC_MUTATION);
 
@@ -60,7 +75,7 @@ export default function TopicsPage() {
                     setIsDeleteDialogOpen(false);
                     setTopicToDelete(null);
                 },
-                onError: (err: any) => {
+                onError: (err: Error) => {
                     toast.error(err.message || 'Failed to delete topic');
                 },
             }
@@ -88,8 +103,6 @@ export default function TopicsPage() {
     if (error) {
         return <div className="text-destructive">Error loading topics: {error.message}</div>;
     }
-
-    const topics = data?.topics || [];
 
     return (
         <div className="space-y-6">
@@ -138,8 +151,24 @@ export default function TopicsPage() {
             ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>All Topics</CardTitle>
-                        <CardDescription>A list of all topics in this cluster.</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>All Topics</CardTitle>
+                                <CardDescription>
+                                    {searchQuery ? `${topics.length} of ${allTopics.length} topics` : `A list of all ${allTopics.length} topics in this cluster.`}
+                                </CardDescription>
+                            </div>
+                            <div className="relative w-64">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search topics..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
@@ -153,7 +182,14 @@ export default function TopicsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {topics.map((topic: Topic) => (
+                                {topics.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            {searchQuery ? `No topics found matching "${searchQuery}"` : 'No topics found'}
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    topics.map((topic: Topic) => (
                                     <TableRow key={topic.name}>
                                         <TableCell className="font-medium">{topic.name}</TableCell>
                                         <TableCell>{topic.partitions}</TableCell>
@@ -184,7 +220,8 @@ export default function TopicsPage() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

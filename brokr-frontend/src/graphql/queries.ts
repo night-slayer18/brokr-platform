@@ -42,6 +42,12 @@ export const GET_CLUSTERS = gql`
                 port
                 rack
             }
+            topics {
+                name
+            }
+            consumerGroups {
+                groupId
+            }
         }
     }
 `

@@ -25,13 +25,17 @@ public class ClusterDataService {
     public List<KafkaCluster> getAuthorizedClusters(String organizationId, String environmentId) {
         User currentUser = authorizationService.getCurrentUser();
 
+        // SUPER_ADMIN can see all clusters regardless of organizationId
+        boolean isSuperAdmin = currentUser.getRole() == io.brokr.core.model.Role.SUPER_ADMIN;
+        
         // If organizationId is not provided, use the current user's organization
-        if (organizationId == null) {
+        // Exception: SUPER_ADMIN doesn't need organizationId
+        if (organizationId == null && !isSuperAdmin) {
             organizationId = currentUser.getOrganizationId();
         }
 
-        // Verify the user has access to this organization
-        if (!authorizationService.hasAccessToOrganization(organizationId)) {
+        // Verify the user has access to this organization (skip for SUPER_ADMIN with null orgId)
+        if (organizationId != null && !authorizationService.hasAccessToOrganization(organizationId)) {
             // This check is also in the resolver/controller, but it's good practice
             // to have it in the service layer as a hard-stop.
             throw new AccessDeniedException("Access denied to this organization");
@@ -40,15 +44,29 @@ public class ClusterDataService {
         List<KafkaClusterEntity> clusters;
 
         // 1. Fetch the raw cluster data from the repository
-        if (environmentId != null) {
-            clusters = clusterRepository.findByOrganizationIdAndEnvironmentId(organizationId, environmentId);
+        if (isSuperAdmin && organizationId == null) {
+            // SUPER_ADMIN with no organizationId filter - get all clusters
+            if (environmentId != null) {
+                // Filter by environment only
+                clusters = clusterRepository.findAll().stream()
+                        .filter(entity -> entity.getEnvironmentId().equals(environmentId))
+                        .toList();
+            } else {
+                // Get all clusters
+                clusters = clusterRepository.findAll();
+            }
         } else {
-            clusters = clusterRepository.findByOrganizationId(organizationId);
+            // Regular users or SUPER_ADMIN with specific organizationId
+            if (environmentId != null) {
+                clusters = clusterRepository.findByOrganizationIdAndEnvironmentId(organizationId, environmentId);
+            } else {
+                clusters = clusterRepository.findByOrganizationId(organizationId);
+            }
         }
 
         // 2. Filter the results based on user's role and permissions
         Stream<KafkaClusterEntity> stream = clusters.stream();
-        if (currentUser.getRole() != io.brokr.core.model.Role.SUPER_ADMIN) {
+        if (!isSuperAdmin) {
             stream = stream.filter(entity -> currentUser.getAccessibleEnvironmentIds().contains(entity.getEnvironmentId()));
         }
 
