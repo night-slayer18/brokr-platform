@@ -8,6 +8,8 @@ import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
+import {TopicMetricsChart} from '@/components/metrics/TopicMetricsChart';
+import {TimeRangeSelector} from '@/components/metrics/TimeRangeSelector';
 import {formatDate, formatRelativeTime} from '@/lib/formatters';
 import {formatNumber} from '@/lib/utils';
 import {useEffect, useState} from "react";
@@ -36,6 +38,11 @@ export default function TopicDetailPage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
     const [isMessageDetailOpen, setIsMessageDetailOpen] = useState(false);
+    const [timeRange, setTimeRange] = useState(() => {
+        const endTime = Date.now();
+        const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
+        return { startTime, endTime };
+    });
 
     const queryClient = useQueryClient();
     const [messagesData, setMessagesData] = useState<GetMessagesQuery | null>(null);
@@ -258,6 +265,7 @@ export default function TopicDetailPage() {
                 <TabsList>
                     <TabsTrigger value="partitions">Partitions</TabsTrigger>
                     <TabsTrigger value="messages">Messages</TabsTrigger>
+                    <TabsTrigger value="metrics">Metrics</TabsTrigger>
                     <TabsTrigger value="configuration">Configuration</TabsTrigger>
                 </TabsList>
 
@@ -557,6 +565,21 @@ export default function TopicDetailPage() {
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="metrics" className="space-y-4">
+                    {clusterId && topicName && (
+                        <>
+                            <TimeRangeSelector 
+                                onTimeRangeChange={setTimeRange}
+                            />
+                            <TopicMetricsChart
+                                clusterId={clusterId}
+                                topicName={topicName}
+                                timeRange={timeRange}
+                            />
+                        </>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="configuration" className="space-y-4">

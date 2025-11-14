@@ -25,11 +25,8 @@ public class ClusterDataService {
     public List<KafkaCluster> getAuthorizedClusters(String organizationId, String environmentId) {
         User currentUser = authorizationService.getCurrentUser();
 
-        // SUPER_ADMIN can see all clusters regardless of organizationId
         boolean isSuperAdmin = currentUser.getRole() == io.brokr.core.model.Role.SUPER_ADMIN;
         
-        // If organizationId is not provided, use the current user's organization
-        // Exception: SUPER_ADMIN doesn't need organizationId
         if (organizationId == null && !isSuperAdmin) {
             organizationId = currentUser.getOrganizationId();
         }

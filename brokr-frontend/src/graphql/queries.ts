@@ -756,3 +756,61 @@ export const GET_AUDIT_LOG_STATISTICS = gql`
         }
     }
 `
+
+export const GET_TOPIC_METRICS = gql`
+    query GetTopicMetrics($clusterId: ID!, $topicName: String!, $timeRange: MetricsTimeRangeInput!, $limit: Int) {
+        topicMetrics(clusterId: $clusterId, topicName: $topicName, timeRange: $timeRange, limit: $limit) {
+            id
+            clusterId
+            topicName
+            messagesPerSecondIn
+            messagesPerSecondOut
+            bytesPerSecondIn
+            bytesPerSecondOut
+            totalSizeBytes
+            partitionCount
+            partitionSizes
+            partitionOffsets
+            timestamp
+        }
+    }
+`
+
+export const GET_CONSUMER_GROUP_METRICS = gql`
+    query GetConsumerGroupMetrics($clusterId: ID!, $consumerGroupId: String!, $timeRange: MetricsTimeRangeInput!, $limit: Int) {
+        consumerGroupMetrics(clusterId: $clusterId, consumerGroupId: $consumerGroupId, timeRange: $timeRange, limit: $limit) {
+            id
+            clusterId
+            consumerGroupId
+            totalLag
+            maxLag
+            minLag
+            avgLag
+            totalOffset
+            committedOffset
+            memberCount
+            activeMemberCount
+            topicLags
+            timestamp
+        }
+    }
+`
+
+export const GET_CLUSTER_METRICS = gql`
+    query GetClusterMetrics($clusterId: ID!, $timeRange: MetricsTimeRangeInput!, $limit: Int) {
+        clusterMetrics(clusterId: $clusterId, timeRange: $timeRange, limit: $limit) {
+            id
+            clusterId
+            brokerCount
+            activeBrokerCount
+            totalTopics
+            totalPartitions
+            totalMessagesPerSecond
+            totalBytesPerSecond
+            isHealthy
+            connectionErrorCount
+            brokerDetails
+            timestamp
+        }
+    }
+`

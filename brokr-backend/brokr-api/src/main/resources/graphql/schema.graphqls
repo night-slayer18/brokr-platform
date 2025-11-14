@@ -284,6 +284,59 @@ type KsqlQueryMetrics {
     timestamp: Long!
 }
 
+# Time-series metrics types
+type TopicMetrics {
+    id: ID!
+    clusterId: ID!
+    topicName: String!
+    messagesPerSecondIn: Long
+    messagesPerSecondOut: Long
+    bytesPerSecondIn: Long
+    bytesPerSecondOut: Long
+    totalSizeBytes: Long
+    partitionCount: Int!
+    partitionSizes: Map
+    partitionOffsets: Map
+    timestamp: Long!
+}
+
+type ConsumerGroupMetrics {
+    id: ID!
+    clusterId: ID!
+    consumerGroupId: String!
+    totalLag: Long
+    maxLag: Long
+    minLag: Long
+    avgLag: Long
+    totalOffset: Long
+    committedOffset: Long
+    memberCount: Int!
+    activeMemberCount: Int!
+    topicLags: Map
+    timestamp: Long!
+}
+
+type ClusterMetrics {
+    id: ID!
+    clusterId: ID!
+    brokerCount: Int!
+    activeBrokerCount: Int!
+    totalTopics: Int!
+    totalPartitions: Int!
+    totalMessagesPerSecond: Long
+    totalBytesPerSecond: Long
+    isHealthy: Boolean!
+    connectionErrorCount: Int!
+    brokerDetails: Map
+    timestamp: Long!
+}
+
+input MetricsTimeRangeInput {
+    startTime: Long!
+    endTime: Long!
+    interval: String  # "1m", "5m", "1h", "1d" for aggregation (optional)
+}
+
 type KsqlQueryHistoryPage {
     content: [KsqlQueryHistory!]!
     totalElements: Long!
@@ -672,6 +725,11 @@ type Query {
     ksqlStreams(ksqlDBId: ID!): [KsqlStreamTable!]!
     ksqlTables(ksqlDBId: ID!): [KsqlStreamTable!]!
     ksqlStreamTable(ksqlDBId: ID!, name: String!): KsqlStreamTable
+    
+    # Metrics queries
+    topicMetrics(clusterId: ID!, topicName: String!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [TopicMetrics!]!
+    consumerGroupMetrics(clusterId: ID!, consumerGroupId: String!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [ConsumerGroupMetrics!]!
+    clusterMetrics(clusterId: ID!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [ClusterMetrics!]!
     
     # ksqlDB Query History
     ksqlQueryHistory(ksqlDBId: ID!, filter: KsqlQueryFilter, pagination: KsqlQueryPagination): KsqlQueryHistoryPage!

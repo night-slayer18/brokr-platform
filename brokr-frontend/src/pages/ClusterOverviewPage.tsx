@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, FileText, Server, Users } from 'lucide-react';
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
+import { ClusterMetricsChart } from '@/components/metrics/ClusterMetricsChart';
+import { TimeRangeSelector } from '@/components/metrics/TimeRangeSelector';
 
 const StatCard = memo(function StatCard({ title, value, description, icon: Icon, to }: { title: string, value: string | number, description: string, icon: React.ElementType, to: string }) {
     return (
@@ -28,6 +30,11 @@ const StatCard = memo(function StatCard({ title, value, description, icon: Icon,
 
 function ClusterOverviewPage() {
     const { clusterId } = useParams<{ clusterId: string }>();
+    const [timeRange, setTimeRange] = useState(() => {
+        const endTime = Date.now();
+        const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
+        return { startTime, endTime };
+    });
 
     const { data, isLoading: loading, error } = useGraphQLQuery<GetClusterOverviewQuery, {id: string}>(GET_CLUSTER_OVERVIEW, 
         clusterId ? {id: clusterId} : undefined,
@@ -76,6 +83,18 @@ function ClusterOverviewPage() {
                 <StatCard title="Topics" value={topicsCount} description="Total topics" icon={FileText} to={`/clusters/${clusterId}/topics`} />
                 <StatCard title="Consumer Groups" value={consumerGroupsCount} description="Total consumer groups" icon={Users} to={`/clusters/${clusterId}/consumer-groups`} />
             </div>
+
+            {clusterId && (
+                <div className="space-y-4">
+                    <TimeRangeSelector 
+                        onTimeRangeChange={setTimeRange}
+                    />
+                    <ClusterMetricsChart
+                        clusterId={clusterId}
+                        timeRange={timeRange}
+                    />
+                </div>
+            )}
         </div>
     );
 }

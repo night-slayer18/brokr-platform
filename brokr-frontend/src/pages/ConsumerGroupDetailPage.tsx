@@ -6,17 +6,25 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Skeleton} from '@/components/ui/skeleton';
 import {Badge} from '@/components/ui/badge';
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table';
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {formatNumber} from '@/lib/utils';
 import {useState} from 'react';
 import {ResetOffsetForm} from '@/components/consumer-groups/ResetOffsetForm';
 import {Button} from '@/components/ui/button';
 import {RefreshCw} from 'lucide-react';
 import {useAuth} from '@/hooks/useAuth';
+import {ConsumerGroupMetricsChart} from '@/components/metrics/ConsumerGroupMetricsChart';
+import {TimeRangeSelector} from '@/components/metrics/TimeRangeSelector';
 
 export default function ConsumerGroupDetailPage() {
     const {clusterId, groupId} = useParams<{ clusterId: string; groupId: string }>();
     const {canManageTopics} = useAuth();
     const [isResetOffsetFormOpen, setIsResetOffsetFormOpen] = useState(false);
+    const [timeRange, setTimeRange] = useState(() => {
+        const endTime = Date.now();
+        const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
+        return { startTime, endTime };
+    });
 
     const {
         data,
@@ -101,71 +109,95 @@ export default function ConsumerGroupDetailPage() {
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Topic Lag</CardTitle>
-                    <CardDescription>Total lag per topic for this consumer group.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Topic</TableHead>
-                                <TableHead className="text-right">Total Lag</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {consumerGroup.topicOffsets && Object.entries(consumerGroup.topicOffsets).map(([topic, lag]) => (
-                                <TableRow key={topic}>
-                                    <TableCell>
-                                        <Link to={`/clusters/${clusterId}/topics/${topic}`}
-                                              className="text-primary hover:underline">
-                                            {topic}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell className="text-right">{formatNumber(lag as number)}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <Tabs defaultValue="details" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="metrics">Metrics</TabsTrigger>
+                </TabsList>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Members</CardTitle>
-                    <CardDescription>Active members of this consumer group.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Member ID</TableHead>
-                                <TableHead>Client ID</TableHead>
-                                <TableHead>Host</TableHead>
-                                <TableHead>Assigned Partitions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {consumerGroup.members.map(member => (
-                                <TableRow key={member.memberId}>
-                                    <TableCell>{member.memberId}</TableCell>
-                                    <TableCell>{member.clientId}</TableCell>
-                                    <TableCell>{member.host}</TableCell>
-                                    <TableCell>
-                                        {member.assignment.map(assignment => (
-                                            <Badge key={`${assignment.topic}-${assignment.partition}`}
-                                                   variant="secondary" className="mr-1 mb-1">
-                                                {assignment.topic}[{assignment.partition}]
-                                            </Badge>
-                                        ))}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                <TabsContent value="details" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Topic Lag</CardTitle>
+                            <CardDescription>Total lag per topic for this consumer group.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Topic</TableHead>
+                                        <TableHead className="text-right">Total Lag</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {consumerGroup.topicOffsets && Object.entries(consumerGroup.topicOffsets).map(([topic, lag]) => (
+                                        <TableRow key={topic}>
+                                            <TableCell>
+                                                <Link to={`/clusters/${clusterId}/topics/${topic}`}
+                                                      className="text-primary hover:underline">
+                                                    {topic}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell className="text-right">{formatNumber(lag as number)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Members</CardTitle>
+                            <CardDescription>Active members of this consumer group.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Member ID</TableHead>
+                                        <TableHead>Client ID</TableHead>
+                                        <TableHead>Host</TableHead>
+                                        <TableHead>Assigned Partitions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {consumerGroup.members.map(member => (
+                                        <TableRow key={member.memberId}>
+                                            <TableCell>{member.memberId}</TableCell>
+                                            <TableCell>{member.clientId}</TableCell>
+                                            <TableCell>{member.host}</TableCell>
+                                            <TableCell>
+                                                {member.assignment.map(assignment => (
+                                                    <Badge key={`${assignment.topic}-${assignment.partition}`}
+                                                           variant="secondary" className="mr-1 mb-1">
+                                                        {assignment.topic}[{assignment.partition}]
+                                                    </Badge>
+                                                ))}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="metrics" className="space-y-4">
+                    {clusterId && groupId && (
+                        <>
+                            <TimeRangeSelector 
+                                onTimeRangeChange={setTimeRange}
+                            />
+                            <ConsumerGroupMetricsChart
+                                clusterId={clusterId}
+                                consumerGroupId={groupId}
+                                timeRange={timeRange}
+                            />
+                        </>
+                    )}
+                </TabsContent>
+            </Tabs>
 
             <ResetOffsetForm
                 clusterId={clusterId!}

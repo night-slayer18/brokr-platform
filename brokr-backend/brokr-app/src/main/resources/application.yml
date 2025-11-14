@@ -15,13 +15,16 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
-      # Connection pool configuration for better performance
-      minimum-idle: 5
-      maximum-pool-size: 20
+      # Connection pool configuration optimized for enterprise-level load
+      minimum-idle: 10
+      maximum-pool-size: 50  # Increased for concurrent metrics collection and queries
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
       leak-detection-threshold: 60000
+      # Performance optimizations
+      register-mbeans: true  # Enable JMX monitoring
+      pool-name: BrokrHikariPool
 
   jpa:
     hibernate:
@@ -31,6 +34,16 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        # Batch insert configuration optimized for enterprise-level metrics collection
+        jdbc:
+          batch_size: 100  # Increased for better throughput with large datasets
+          order_inserts: true
+          order_updates: true
+        # Performance optimizations
+        jdbc.batch_versioned_data: true
+        # Query optimizations
+        query.plan_cache_max_size: 2048
+        query.plan_parameter_metadata_max_size: 128
 
   flyway:
     enabled: true
@@ -42,13 +55,16 @@ spring:
       enabled: true
       path: /graphiql
 
-  # Cache configuration
+  # Cache configuration optimized for enterprise-level load
   cache:
     type: caffeine
     caffeine:
-      spec: maximumSize=1000,expireAfterWrite=5m
+      spec: maximumSize=5000,expireAfterWrite=5m,expireAfterAccess=2m
     cache-names:
       - kafkaMessages
+      - topicMetrics
+      - consumerGroupMetrics
+      - clusterMetrics
 
 jwt:
   secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}

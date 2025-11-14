@@ -1,0 +1,72 @@
+package io.brokr.api.config;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+
+/**
+ * Async configuration for enterprise-level performance.
+ * Optimized for metrics collection and heavy concurrent operations.
+ */
+@Configuration
+@EnableAsync
+@Slf4j
+public class AsyncConfig implements AsyncConfigurer {
+
+    /**
+     * Thread pool for metrics collection operations.
+     * Sized for enterprise clusters with many topics and consumer groups.
+     */
+    @Bean(name = "metricsCollectionExecutor")
+    public Executor metricsCollectionExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        
+        // Core pool size: enough threads for parallel cluster processing
+        executor.setCorePoolSize(10);
+        
+        // Max pool size: handle peak load with many clusters
+        executor.setMaxPoolSize(50);
+        
+        // Queue capacity: buffer for pending tasks
+        executor.setQueueCapacity(200);
+        
+        // Thread name prefix for monitoring
+        executor.setThreadNamePrefix("metrics-collect-");
+        
+        // Rejection policy: caller runs if queue is full (prevents task loss)
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        
+        // Keep alive time for idle threads
+        executor.setKeepAliveSeconds(60);
+        
+        // Allow core threads to timeout
+        executor.setAllowCoreThreadTimeOut(false);
+        
+        executor.initialize();
+        log.info("Metrics collection executor initialized: core={}, max={}, queue={}", 
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
+        
+        return executor;
+    }
+
+    @Override
+    public Executor getAsyncExecutor() {
+        // Default async executor for general async operations
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(20);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("async-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setKeepAliveSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+}
+
