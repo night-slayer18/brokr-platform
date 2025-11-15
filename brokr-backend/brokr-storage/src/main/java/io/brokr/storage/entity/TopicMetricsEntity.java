@@ -35,14 +35,8 @@ public class TopicMetricsEntity {
     @Column(name = "messages_per_second_in")
     private Long messagesPerSecondIn;
     
-    @Column(name = "messages_per_second_out")
-    private Long messagesPerSecondOut;
-    
     @Column(name = "bytes_per_second_in")
     private Long bytesPerSecondIn;
-    
-    @Column(name = "bytes_per_second_out")
-    private Long bytesPerSecondOut;
     
     @Column(name = "total_size_bytes")
     private Long totalSizeBytes;
@@ -68,9 +62,7 @@ public class TopicMetricsEntity {
                 .clusterId(clusterId)
                 .topicName(topicName)
                 .messagesPerSecondIn(messagesPerSecondIn)
-                .messagesPerSecondOut(messagesPerSecondOut)
                 .bytesPerSecondIn(bytesPerSecondIn)
-                .bytesPerSecondOut(bytesPerSecondOut)
                 .totalSizeBytes(totalSizeBytes)
                 .partitionCount(partitionCount)
                 .partitionSizes(partitionSizes)
@@ -85,9 +77,7 @@ public class TopicMetricsEntity {
                 .clusterId(metrics.getClusterId())
                 .topicName(metrics.getTopicName())
                 .messagesPerSecondIn(metrics.getMessagesPerSecondIn())
-                .messagesPerSecondOut(metrics.getMessagesPerSecondOut())
                 .bytesPerSecondIn(metrics.getBytesPerSecondIn())
-                .bytesPerSecondOut(metrics.getBytesPerSecondOut())
                 .totalSizeBytes(metrics.getTotalSizeBytes())
                 .partitionCount(metrics.getPartitionCount())
                 .partitionSizes(metrics.getPartitionSizes())

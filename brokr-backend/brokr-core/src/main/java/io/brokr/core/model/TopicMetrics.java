@@ -17,11 +17,9 @@ public class TopicMetrics {
     private String clusterId;
     private String topicName;
     
-    // Throughput
+    // Throughput (producer side only - consumer metrics tracked in ConsumerGroupMetrics)
     private Long messagesPerSecondIn;
-    private Long messagesPerSecondOut;
     private Long bytesPerSecondIn;
-    private Long bytesPerSecondOut;
     
     // Size
     private Long totalSizeBytes;

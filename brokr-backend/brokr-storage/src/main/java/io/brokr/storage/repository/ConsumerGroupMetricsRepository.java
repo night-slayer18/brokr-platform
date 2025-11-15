@@ -88,5 +88,20 @@ public interface ConsumerGroupMetricsRepository extends JpaRepository<ConsumerGr
      */
     @Query("SELECT COUNT(c) FROM ConsumerGroupMetricsEntity c WHERE c.clusterId = :clusterId")
     long countByClusterId(@Param("clusterId") String clusterId);
+    
+    /**
+     * Find all consumer group metrics that reference a specific topic in their topic_lags JSONB
+     * Used to clean up topic references when a topic is deleted
+     * Uses native query with jsonb_exists function (PostgreSQL JSONB key exists check)
+     */
+    @Query(value = "SELECT * FROM consumer_group_metrics c " +
+           "WHERE c.cluster_id = ?1 " +
+           "AND c.topic_lags IS NOT NULL " +
+           "AND jsonb_exists(c.topic_lags, ?2)",
+           nativeQuery = true)
+    List<ConsumerGroupMetricsEntity> findByClusterIdAndTopicInLags(
+            String clusterId,
+            String topicName
+    );
 }
 

@@ -27,9 +27,7 @@ public class MetricsCollectionService {
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
     private final ClusterMetricsService clusterMetricsService;
     private final Executor metricsExecutor;
-    
-    // Cache for previous metrics to calculate throughput (clusterId:topicName -> previous metrics)
-    private final Map<String, TopicMetrics> previousTopicMetricsCache = new ConcurrentHashMap<>();
+    private final TopicMetricsCache topicMetricsCache;
     
     public MetricsCollectionService(
             KafkaClusterRepository clusterRepository,
@@ -37,13 +35,15 @@ public class MetricsCollectionService {
             TopicMetricsService topicMetricsService,
             ConsumerGroupMetricsService consumerGroupMetricsService,
             ClusterMetricsService clusterMetricsService,
-            @Qualifier("metricsCollectionExecutor") Executor metricsExecutor) {
+            @Qualifier("metricsCollectionExecutor") Executor metricsExecutor,
+            TopicMetricsCache topicMetricsCache) {
         this.clusterRepository = clusterRepository;
         this.kafkaAdminService = kafkaAdminService;
         this.topicMetricsService = topicMetricsService;
         this.consumerGroupMetricsService = consumerGroupMetricsService;
         this.clusterMetricsService = clusterMetricsService;
         this.metricsExecutor = metricsExecutor;
+        this.topicMetricsCache = topicMetricsCache;
     }
     
     /**
@@ -244,14 +244,13 @@ public class MetricsCollectionService {
             
             // Calculate throughput by comparing with previous metrics
             // First try cache, then fall back to database
-            String cacheKey = cluster.getId() + ":" + topic.getName();
-            TopicMetrics previousMetrics = previousTopicMetricsCache.get(cacheKey);
+            TopicMetrics previousMetrics = topicMetricsCache.get(cluster.getId(), topic.getName());
             
             // If not in cache, try to get from database (for restarts or first run after restart)
             if (previousMetrics == null) {
                 previousMetrics = topicMetricsService.getLatestMetrics(cluster.getId(), topic.getName());
                 if (previousMetrics != null) {
-                    previousTopicMetricsCache.put(cacheKey, previousMetrics);
+                    topicMetricsCache.put(cluster.getId(), topic.getName(), previousMetrics);
                 }
             }
             
@@ -302,14 +301,12 @@ public class MetricsCollectionService {
                     .partitionSizes(partitionSizes)
                     .partitionOffsets(partitionOffsets)
                     .messagesPerSecondIn(messagesPerSecondIn)
-                    .messagesPerSecondOut(0L) // Consumer throughput requires consumer group data
                     .bytesPerSecondIn(bytesPerSecondIn)
-                    .bytesPerSecondOut(0L) // Consumer throughput requires consumer group data
                     .timestamp(timestamp)
                     .build();
             
             // Update cache with current metrics for next calculation
-            previousTopicMetricsCache.put(cacheKey, currentMetrics);
+            topicMetricsCache.put(cluster.getId(), topic.getName(), currentMetrics);
             
             return currentMetrics;
         } catch (Exception e) {
@@ -455,5 +452,6 @@ public class MetricsCollectionService {
             return null;
         }
     }
+    
 }
 

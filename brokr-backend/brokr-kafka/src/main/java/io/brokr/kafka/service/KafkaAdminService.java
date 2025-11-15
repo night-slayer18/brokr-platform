@@ -25,6 +25,9 @@ import java.util.stream.Collectors;
 public class KafkaAdminService {
 
     private final KafkaConnectionService kafkaConnectionService;
+    private final TopicMetricsService topicMetricsService;
+    private final TopicMetricsCache topicMetricsCache;
+    private final ConsumerGroupMetricsService consumerGroupMetricsService;
 
     @Retryable(
             value = {ExecutionException.class, InterruptedException.class},
@@ -253,17 +256,29 @@ public class KafkaAdminService {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             DeleteTopicsResult result = adminClient.deleteTopics(Collections.singleton(topicName));
             result.all().get();
+            
+            try {
+                // Delete topic metrics from database
+                topicMetricsService.deleteMetricsForTopic(cluster.getId(), topicName);
+                
+                // Remove topic from consumer group metrics' topicLags
+                // This ensures old consumer group metrics don't reference the deleted topic
+                consumerGroupMetricsService.removeTopicFromConsumerGroupMetrics(cluster.getId(), topicName);
+                
+                // Clear cached metrics (for throughput calculation)
+                topicMetricsCache.remove(cluster.getId(), topicName);
+                
+                log.info("Successfully deleted topic and cleaned up all metrics for: {} in cluster: {}", topicName, cluster.getName());
+            } catch (Exception e) {
+                log.error("Failed to delete metrics for topic: {} in cluster: {}", topicName, cluster.getName(), e);
+            }
         } catch (InterruptedException | ExecutionException e) {
-            // Check if the error is a permanent error (like topic doesn't exist)
-            // These should NOT be retried - handle them immediately
             Throwable cause = e.getCause();
             if (cause instanceof UnknownTopicOrPartitionException) {
                 log.warn("Topic {} does not exist in cluster: {} - considering it already deleted", topicName, cluster.getName());
-                // Topic doesn't exist, consider it already deleted (idempotent behavior)
                 return;
             }
             
-            // For transient errors (network issues, timeouts, etc.), let retry logic handle it
             log.error("Transient error deleting topic: {} for cluster: {} - will retry", topicName, cluster.getName(), e);
             kafkaConnectionService.removeAdminClient(cluster.getId());
             throw new RuntimeException("Failed to delete topic", e);

@@ -290,9 +290,7 @@ type TopicMetrics {
     clusterId: ID!
     topicName: String!
     messagesPerSecondIn: Long
-    messagesPerSecondOut: Long
     bytesPerSecondIn: Long
-    bytesPerSecondOut: Long
     totalSizeBytes: Long
     partitionCount: Int!
     partitionSizes: Map

@@ -53,6 +53,8 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Create and manage multiple organizations with isolated data
 - Environment-based organization structure (Production, Development, Staging, etc.)
 - Hierarchical access control per organization
+- Organization detail pages with user and environment management
+- Admin dashboard for platform-wide overview
 
 ### 🔐 Advanced Security & Access Control
 - **Four Role Levels**:
@@ -77,11 +79,13 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Cluster reachability testing
 
 ### 📝 Topic Management
-- View all topics across clusters
+- View all topics across clusters with search functionality
 - Topic details including partitions, replication factor, and configuration
 - Topic creation and configuration management
-- Message browsing and inspection
+- Message browsing and inspection with partition/offset selection
 - Partition-level offset information
+- Topic deletion with safety checks
+- Real-time topic metrics and analytics
 
 ### 👥 Consumer Group Monitoring
 - Real-time consumer group status monitoring
@@ -109,11 +113,53 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Application state tracking
 - Performance metrics
 
+### 🔍 ksqlDB Integration
+- Connect and manage multiple ksqlDB instances
+- Interactive SQL query editor with CodeMirror 6 syntax highlighting
+- Execute queries and view formatted results
+- Stream and table management (SHOW STREAMS, SHOW TABLES)
+- Query history tracking with filtering (by query type and status)
+- Save and load query templates
+- Real-time query execution with error handling
+
 ### 📈 Dashboard & Analytics
 - Organization-wide cluster overview
 - Real-time metrics and statistics
 - Visual representations of cluster health
 - Environment-based filtering and views
+- Recent activity feed from audit logs (admin-only)
+- Aggregated topic and consumer group counts across all clusters
+- Quick action shortcuts
+- Cluster status indicators (Online/Offline)
+
+### 📊 Time-Series Metrics & Analytics
+- **Topic Metrics**:
+  - Producer throughput (messages/sec in) over time
+  - Producer data transfer rates (bytes/sec in)
+  - Topic size growth tracking
+  - Partition-level metrics
+  - Note: Consumer metrics are tracked separately in ConsumerGroupMetrics
+- **Consumer Group Metrics**:
+  - Consumer lag trends (total, max, min, avg)
+  - Member count tracking
+  - Per-topic lag visualization
+- **Cluster Metrics**:
+  - Cluster-wide throughput aggregation
+  - Total data transfer across all topics
+  - Resource utilization (topics, partitions, brokers)
+  - Health status tracking
+- **Features**:
+  - Interactive charts with time range selection (1h, 6h, 24h, 7d, 30d, today)
+  - Tabbed interface for organized metric views (reduces page clutter)
+  - Automatic metrics collection every 30 seconds
+  - Historical data retention in PostgreSQL
+  - Enterprise-grade performance with:
+    - Batch processing (1000 topics/batch, 500 consumer groups/batch)
+    - Async execution with dedicated thread pools
+    - Connection pooling (HikariCP with 50 max connections)
+    - In-memory caching (Caffeine cache with 5-minute TTL)
+    - Throughput calculation via snapshot comparison
+    - Parallel metric collection across clusters
 
 ## Architecture
 
@@ -151,7 +197,7 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 
 1. **brokr-core**: Domain models and business logic
 2. **brokr-storage**: JPA entities and database repositories
-3. **brokr-kafka**: Kafka client integration and services
+3. **brokr-kafka**: Kafka client integration and services (includes metrics collection)
 4. **brokr-security**: Authentication, authorization, and security services
 5. **brokr-api**: GraphQL resolvers and REST controllers
 6. **brokr-app**: Spring Boot application configuration and entry point
@@ -172,10 +218,12 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 - **Spring Security**: Authentication and authorization
 - **Spring GraphQL**: GraphQL API implementation
 - **Spring Data JPA**: Database abstraction layer
-- **PostgreSQL 16**: Relational database
+- **PostgreSQL 16**: Relational database with time-series data support
 - **Flyway**: Database migration management
 - **JWT (JJWT)**: Token-based authentication
 - **Apache Kafka Client**: Kafka integration
+- **HikariCP**: High-performance JDBC connection pool
+- **Caffeine Cache**: In-memory caching for metrics
 - **Lombok**: Reduced boilerplate code
 - **Maven**: Build and dependency management
 
@@ -184,7 +232,7 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 - **TypeScript 5.9**: Type-safe JavaScript
 - **Vite**: Fast build tool and dev server
 - **Tailwind CSS 4**: Utility-first CSS framework
-- **Radix UI**: Accessible component primitives
+- **Radix UI (shadcn/ui)**: Accessible component primitives
 - **React Router 7**: Client-side routing
 - **React Query (TanStack Query)**: Server state management
 - **React Hook Form**: Form state management
@@ -194,6 +242,8 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 - **Sonner**: Toast notifications
 - **Lucide React**: Icon library
 - **Recharts**: Data visualization
+- **CodeMirror 6**: Code editor for ksqlDB queries
+- **date-fns**: Date formatting and manipulation
 
 ### Infrastructure
 - **Docker**: Containerization
@@ -282,7 +332,10 @@ This will start:
 - PostgreSQL database
 - Backend application
 - Frontend application (if configured)
-- Optional Kafka clusters for testing
+- Optional Kafka clusters for testing (3-node KRaft cluster)
+- Schema Registry
+- Kafka Connect
+- ksqlDB Server
 
 #### Option 2: Manual Start
 
@@ -325,7 +378,7 @@ brokr-platform/
 ├── brokr-backend/              # Backend application
 │   ├── brokr-core/            # Domain models and business logic
 │   ├── brokr-storage/         # Database entities and repositories
-│   ├── brokr-kafka/           # Kafka client integration
+│   ├── brokr-kafka/           # Kafka client integration and metrics
 │   ├── brokr-security/        # Security and authentication
 │   ├── brokr-api/             # GraphQL and REST APIs
 │   └── brokr-app/             # Spring Boot application
@@ -334,14 +387,22 @@ brokr-platform/
 ├── brokr-frontend/            # Frontend application
 │   ├── src/
 │   │   ├── components/       # React components
-│   │   ├── pages/            # Page components
-│   │   ├── hooks/            # Custom React hooks
-│   │   ├── graphql/          # GraphQL queries and mutations
-│   │   ├── lib/              # Utility functions
-│   │   └── store/            # State management
-│   └── public/               # Static assets
-├── docker-compose.yml         # Docker Compose configuration
-└── README.md                  # This file
+│   │   │   ├── admin/       # Admin management components
+│   │   │   ├── clusters/    # Cluster management components
+│   │   │   ├── metrics/     # Metrics chart components
+│   │   │   ├── ksqldb/      # ksqlDB query editor components
+│   │   │   └── ui/          # Reusable UI components (shadcn/ui)
+│   │   ├── pages/           # Page components
+│   │   │   ├── admin/      # Admin pages (organizations, audit logs)
+│   │   │   └── ...         # Feature pages (clusters, topics, etc.)
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── graphql/         # GraphQL queries and mutations
+│   │   ├── lib/             # Utility functions
+│   │   └── store/           # State management (Zustand)
+│   └── public/              # Static assets
+├── docker-compose.yml        # Docker Compose configuration
+├── PLATFORM_IMPROVEMENTS.md  # Future improvements roadmap
+└── README.md                 # This file
 ```
 
 ## API Documentation
@@ -350,8 +411,9 @@ brokr-platform/
 
 Brokr provides a comprehensive GraphQL API for flexible data querying. The GraphQL schema is available at `/graphql` endpoint.
 
-**Example Query**:
+**Example Queries**:
 
+**Get Clusters**:
 ```graphql
 query GetClusters($organizationId: String) {
   clusters(organizationId: $organizationId) {
@@ -386,16 +448,110 @@ query GetClusters($organizationId: String) {
 }
 ```
 
+**Get Topic Metrics**:
+```graphql
+query GetTopicMetrics($clusterId: ID!, $topicName: String!, $timeRange: MetricsTimeRangeInput!) {
+  topicMetrics(clusterId: $clusterId, topicName: $topicName, timeRange: $timeRange) {
+    id
+    timestamp
+    messagesPerSecondIn
+    bytesPerSecondIn
+    totalSizeBytes
+    partitionCount
+  }
+}
+```
+
+**Get Consumer Group Metrics**:
+```graphql
+query GetConsumerGroupMetrics($clusterId: ID!, $consumerGroupId: String!, $timeRange: MetricsTimeRangeInput!) {
+  consumerGroupMetrics(clusterId: $clusterId, consumerGroupId: $consumerGroupId, timeRange: $timeRange) {
+    id
+    timestamp
+    totalLag
+    maxLag
+    minLag
+    avgLag
+    memberCount
+    topicLags
+  }
+}
+```
+
+**Get Cluster Metrics**:
+```graphql
+query GetClusterMetrics($clusterId: ID!, $timeRange: MetricsTimeRangeInput!) {
+  clusterMetrics(clusterId: $clusterId, timeRange: $timeRange) {
+    id
+    timestamp
+    totalMessagesPerSecond
+    totalBytesPerSecond
+    totalTopics
+    totalPartitions
+    brokerCount
+    isHealthy
+  }
+}
+```
+
+**Execute ksqlDB Query**:
+```graphql
+mutation ExecuteKsqlQuery($ksqlDBId: ID!, $query: String!) {
+  executeKsqlQuery(ksqlDBId: $ksqlDBId, query: $query) {
+    success
+    result
+    error
+  }
+}
+```
+
 ### REST API
 
 REST endpoints are available for standard CRUD operations:
 
+**Authentication**:
 - `POST /api/v1/auth/login` - User authentication
+- `POST /api/v1/auth/logout` - User logout
+
+**Clusters**:
 - `GET /api/v1/clusters` - List clusters
 - `GET /api/v1/clusters/{id}` - Get cluster details
 - `POST /api/v1/clusters` - Create cluster
 - `PUT /api/v1/clusters/{id}` - Update cluster
 - `DELETE /api/v1/clusters/{id}` - Delete cluster
+
+**Topics**:
+- `GET /api/v1/clusters/{clusterId}/topics` - List topics
+- `GET /api/v1/clusters/{clusterId}/topics/{topicName}` - Get topic details
+- `POST /api/v1/clusters/{clusterId}/topics` - Create topic
+- `DELETE /api/v1/clusters/{clusterId}/topics/{topicName}` - Delete topic
+
+**Consumer Groups**:
+- `GET /api/v1/clusters/{clusterId}/consumer-groups` - List consumer groups
+- `GET /api/v1/clusters/{clusterId}/consumer-groups/{groupId}` - Get consumer group details
+- `POST /api/v1/clusters/{clusterId}/consumer-groups/{groupId}/reset-offsets` - Reset offsets
+
+**Schema Registry**:
+- `POST /api/v1/schema-registry/test-connection` - Test Schema Registry connection
+- `GET /api/v1/schema-registry/{id}/subjects` - List subjects
+- `GET /api/v1/schema-registry/{id}/subjects/{subject}/versions` - Get schema versions
+
+**Kafka Connect**:
+- `POST /api/v1/kafka-connect/test-connection` - Test Kafka Connect connection
+- `GET /api/v1/kafka-connect/{id}/connectors` - List connectors
+- `POST /api/v1/kafka-connect/{id}/connectors/{connector}/restart` - Restart connector
+
+**ksqlDB**:
+- `POST /api/v1/ksqldb/test-connection` - Test ksqlDB connection
+- `POST /api/v1/ksqldb/{id}/execute` - Execute ksqlDB query
+- `GET /api/v1/ksqldb/{id}/streams` - List streams (via SHOW STREAMS query)
+- `GET /api/v1/ksqldb/{id}/tables` - List tables (via SHOW TABLES query)
+- `GET /api/v1/ksqldb/{id}/query-history` - Get query history
+
+**Metrics**:
+- `GET /api/v1/metrics/topics/{clusterId}/{topicName}` - Get topic metrics
+- `GET /api/v1/metrics/consumer-groups/{clusterId}/{groupId}` - Get consumer group metrics
+- `GET /api/v1/metrics/clusters/{clusterId}` - Get cluster metrics
 
 ## Authentication & Authorization
 
@@ -438,6 +594,31 @@ POST /api/v1/auth/login
 ### Environment-Based Access Control
 
 VIEWER users are restricted to specific environments within their organization. They can only access clusters and resources in environments that have been explicitly assigned to them via `accessibleEnvironmentIds`.
+
+### Admin Features
+
+Brokr provides comprehensive administrative capabilities:
+
+**Organization Management**:
+- Create, update, and delete organizations
+- View organization details with user and environment lists
+- Manage organization settings and metadata
+
+**User Management**:
+- Create and manage users across organizations
+- Assign roles and permissions
+- Set environment access restrictions for VIEWER users
+- User profile management
+
+**Audit Logging**:
+- Comprehensive audit logs for all administrative actions
+- User management operations (create, update, delete)
+- Organization management
+- Cluster configuration changes
+- Resource access tracking
+- Audit logs are accessible to ADMIN and SUPER_ADMIN users
+- Recent activity feed available on dashboard
+- Filterable audit log pages with pagination
 
 ## Deployment
 

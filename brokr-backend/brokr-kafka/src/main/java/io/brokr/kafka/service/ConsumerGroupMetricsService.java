@@ -113,5 +113,55 @@ public class ConsumerGroupMetricsService {
         repository.deleteByTimestampBefore(cutoff);
         log.info("Deleted consumer group metrics older than {}", cutoff);
     }
+    
+    /**
+     * Remove a topic from all consumer group metrics' topicLags when topic is deleted
+     * This ensures old metrics don't reference deleted topics
+     * For consumer groups consuming from multiple topics, only the deleted topic is removed
+     */
+    @Transactional
+    public void removeTopicFromConsumerGroupMetrics(String clusterId, String topicName) {
+        // Find all consumer group metrics that reference this topic
+        List<ConsumerGroupMetricsEntity> metricsWithTopic = repository.findByClusterIdAndTopicInLags(clusterId, topicName);
+        
+        if (metricsWithTopic.isEmpty()) {
+            log.debug("No consumer group metrics found referencing topic: {} in cluster: {}", topicName, clusterId);
+            return;
+        }
+        
+        int updatedCount = 0;
+        for (ConsumerGroupMetricsEntity entity : metricsWithTopic) {
+            if (entity.getTopicLags() != null && entity.getTopicLags().containsKey(topicName)) {
+                // Remove the topic from topicLags map
+                entity.getTopicLags().remove(topicName);
+                
+                // Recalculate aggregated lag metrics if topicLags is not empty
+                if (!entity.getTopicLags().isEmpty()) {
+                    long totalLag = entity.getTopicLags().values().stream().mapToLong(Long::longValue).sum();
+                    long maxLag = entity.getTopicLags().values().stream().mapToLong(Long::longValue).max().orElse(0L);
+                    long minLag = entity.getTopicLags().values().stream().mapToLong(Long::longValue).min().orElse(0L);
+                    double avgLag = totalLag / (double) entity.getTopicLags().size();
+                    
+                    entity.setTotalLag(totalLag);
+                    entity.setMaxLag(maxLag);
+                    entity.setMinLag(minLag);
+                    entity.setAvgLag((long) avgLag);
+                } else {
+                    // If no topics left, set all lags to 0
+                    entity.setTotalLag(0L);
+                    entity.setMaxLag(0L);
+                    entity.setMinLag(0L);
+                    entity.setAvgLag(0L);
+                }
+                
+                updatedCount++;
+            }
+        }
+        
+        if (updatedCount > 0) {
+            repository.saveAll(metricsWithTopic);
+            log.info("Removed topic {} from {} consumer group metrics in cluster: {}", topicName, updatedCount, clusterId);
+        }
+    }
 }
 

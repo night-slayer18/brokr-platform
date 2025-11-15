@@ -65,12 +65,8 @@ public interface TopicMetricsRepository extends JpaRepository<TopicMetricsEntity
            "AVG(t.messagesPerSecondIn) as avgMsgIn, " +
            "MAX(t.messagesPerSecondIn) as maxMsgIn, " +
            "MIN(t.messagesPerSecondIn) as minMsgIn, " +
-           "AVG(t.messagesPerSecondOut) as avgMsgOut, " +
-           "MAX(t.messagesPerSecondOut) as maxMsgOut, " +
            "AVG(t.bytesPerSecondIn) as avgBytesIn, " +
-           "MAX(t.bytesPerSecondIn) as maxBytesIn, " +
-           "AVG(t.bytesPerSecondOut) as avgBytesOut, " +
-           "MAX(t.bytesPerSecondOut) as maxBytesOut " +
+           "MAX(t.bytesPerSecondIn) as maxBytesIn " +
            "FROM TopicMetricsEntity t " +
            "WHERE t.clusterId = :clusterId AND t.topicName = :topicName " +
            "AND t.timestamp BETWEEN :startTime AND :endTime")
@@ -93,5 +89,13 @@ public interface TopicMetricsRepository extends JpaRepository<TopicMetricsEntity
      */
     @Query("SELECT COUNT(t) FROM TopicMetricsEntity t WHERE t.clusterId = :clusterId")
     long countByClusterId(@Param("clusterId") String clusterId);
+    
+    /**
+     * Delete all metrics for a specific topic - used when topic is deleted
+     * Batch delete for performance
+     */
+    @Modifying
+    @Query("DELETE FROM TopicMetricsEntity t WHERE t.clusterId = :clusterId AND t.topicName = :topicName")
+    void deleteByClusterIdAndTopicName(@Param("clusterId") String clusterId, @Param("topicName") String topicName);
 }
 

@@ -114,5 +114,15 @@ public class TopicMetricsService {
         repository.deleteByTimestampBefore(cutoff);
         log.info("Deleted topic metrics older than {}", cutoff);
     }
+    
+    /**
+     * Delete all metrics for a specific topic - called when topic is deleted
+     * This ensures old metrics don't persist when a topic is recreated with the same name
+     */
+    @Transactional
+    public void deleteMetricsForTopic(String clusterId, String topicName) {
+        repository.deleteByClusterIdAndTopicName(clusterId, topicName);
+        log.info("Deleted all metrics for topic: {} in cluster: {}", topicName, clusterId);
+    }
 }
 

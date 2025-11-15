@@ -2,21 +2,21 @@ package io.brokr.api.service;
 
 import io.brokr.api.input.TopicInput;
 import io.brokr.core.exception.ResourceNotFoundException;
-import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Topic;
 import io.brokr.kafka.service.KafkaAdminService;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TopicApiService {
 
     private final KafkaClusterRepository clusterRepository;

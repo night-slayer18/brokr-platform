@@ -764,9 +764,7 @@ export const GET_TOPIC_METRICS = gql`
             clusterId
             topicName
             messagesPerSecondIn
-            messagesPerSecondOut
             bytesPerSecondIn
-            bytesPerSecondOut
             totalSizeBytes
             partitionCount
             partitionSizes

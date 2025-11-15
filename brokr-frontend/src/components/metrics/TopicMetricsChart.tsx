@@ -65,13 +65,11 @@ export function TopicMetricsChart({ clusterId, topicName, timeRange, limit = 100
     );
   }
 
-  const chartData = metrics.map((metric: { timestamp: number; messagesPerSecondIn?: number | null; messagesPerSecondOut?: number | null; bytesPerSecondIn?: number | null; bytesPerSecondOut?: number | null; totalSizeBytes?: number | null }) => ({
+  const chartData = metrics.map((metric: { timestamp: number; messagesPerSecondIn?: number | null; bytesPerSecondIn?: number | null; totalSizeBytes?: number | null }) => ({
     time: format(new Date(metric.timestamp), 'HH:mm:ss'),
     timestamp: metric.timestamp,
     messagesIn: metric.messagesPerSecondIn || 0,
-    messagesOut: metric.messagesPerSecondOut || 0,
     bytesIn: metric.bytesPerSecondIn || 0,
-    bytesOut: metric.bytesPerSecondOut || 0,
     totalSize: metric.totalSizeBytes || 0,
   }));
 
@@ -122,14 +120,6 @@ export function TopicMetricsChart({ clusterId, topicName, timeRange, limit = 100
                       fillOpacity={0.6}
                       name="Messages In/sec" 
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="messagesOut" 
-                      stroke="#82ca9d" 
-                      fill="#82ca9d" 
-                      fillOpacity={0.6}
-                      name="Messages Out/sec" 
-                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -176,13 +166,6 @@ export function TopicMetricsChart({ clusterId, topicName, timeRange, limit = 100
                       dataKey="bytesIn" 
                       stroke="#8884d8" 
                       name="Bytes In/sec" 
-                      strokeWidth={2}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="bytesOut" 
-                      stroke="#82ca9d" 
-                      name="Bytes Out/sec" 
                       strokeWidth={2}
                     />
                   </LineChart>
