@@ -13,6 +13,8 @@ import KafkaStreamsPage from './pages/KafkaStreamsPage'
 import KsqlDBPage from './pages/KsqlDBPage'
 import TopicDetailPage from './pages/TopicDetailPage'
 import ConsumerGroupDetailPage from './pages/ConsumerGroupDetailPage'
+import ReplayJobsPage from './pages/ReplayJobsPage'
+import ReplayJobDetailPage from './pages/ReplayJobDetailPage'
 import SchemaRegistryDetailPage from './pages/SchemaRegistryDetailPage'
 import KafkaConnectDetailPage from './pages/KafkaConnectDetailPage'
 import KafkaStreamsDetailPage from './pages/KafkaStreamsDetailPage'
@@ -63,6 +65,8 @@ function App() {
                     <Route path="topics/:topicName" element={<TopicDetailPage />} />
                     <Route path="consumer-groups" element={<ConsumerGroupsPage />} />
                     <Route path="consumer-groups/:groupId" element={<ConsumerGroupDetailPage />} />
+                    <Route path="replay" element={<ReplayJobsPage />} />
+                    <Route path="replay/:jobId" element={<ReplayJobDetailPage />} />
                     <Route path="schema-registry" element={<SchemaRegistryPage />} />
                     <Route path="schema-registry/:srId" element={<SchemaRegistryDetailPage />} />
                     <Route path="kafka-connect" element={<KafkaConnectPage />} />

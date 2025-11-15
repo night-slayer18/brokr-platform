@@ -465,6 +465,7 @@ enum AuditResourceType {
     KAFKA_STREAMS
     KSQLDB
     MESSAGE
+    MESSAGE_REPLAY
     SCHEMA
     CONNECTOR
 }
@@ -665,12 +666,169 @@ input MessageInput {
     limit: Int!
 }
 
+# Message Replay Input Types
+input MessageReplayInput {
+    clusterId: ID!
+    sourceTopic: String!
+    targetTopic: String
+    consumerGroupId: String
+    startOffset: Long
+    startTimestamp: String
+    endOffset: Long
+    endTimestamp: String
+    partitions: [Int!]
+    filters: MessageFilterInput
+    transformation: MessageTransformationInput
+    scheduleTime: String
+    scheduleCron: String
+    scheduleTimezone: String
+    maxRetries: Int
+    retryDelaySeconds: Int
+}
+
+input MessageFilterInput {
+    keyFilter: KeyFilterInput
+    valueFilter: ValueFilterInput
+    headerFilters: [HeaderFilterInput!]
+    timestampRangeFilter: TimestampRangeFilterInput
+    logic: FilterLogic
+}
+
+input KeyFilterInput {
+    type: KeyFilterType!
+    value: String!
+}
+
+input ValueFilterInput {
+    type: ValueFilterType!
+    value: String
+    minSize: Long
+    maxSize: Long
+}
+
+input HeaderFilterInput {
+    headerKey: String!
+    headerValue: String
+    exactMatch: Boolean
+}
+
+input TimestampRangeFilterInput {
+    startTimestamp: String!
+    endTimestamp: String!
+}
+
+input MessageTransformationInput {
+    keyTransformation: KeyTransformationInput
+    valueTransformation: ValueTransformationInput
+    headerAdditions: Map
+    headerRemovals: [String!]
+}
+
+input KeyTransformationInput {
+    type: KeyTransformationType!
+    newValue: String
+}
+
+input ValueTransformationInput {
+    type: ValueTransformationType!
+    newValue: String
+    targetFormat: String
+}
+
+enum FilterLogic {
+    AND
+    OR
+}
+
+enum KeyFilterType {
+    EXACT
+    PREFIX
+    REGEX
+    CONTAINS
+}
+
+enum ValueFilterType {
+    JSON_PATH
+    REGEX
+    CONTAINS
+    SIZE
+}
+
+enum KeyTransformationType {
+    KEEP
+    REMOVE
+    MODIFY
+}
+
+enum ValueTransformationType {
+    KEEP
+    MODIFY
+    FORMAT_CONVERSION
+}
+
 type Message {
     partition: Int!
     offset: Long!
     timestamp: Long!
     key: String
     value: String
+    headers: Map
+}
+
+# Message Replay/Reprocessing Types
+enum ReplayJobStatus {
+    PENDING
+    RUNNING
+    COMPLETED
+    FAILED
+    CANCELLED
+}
+
+type ReplayJobProgress {
+    messagesProcessed: Long!
+    messagesTotal: Long
+    throughput: Float
+    estimatedTimeRemainingSeconds: Long
+    partitionProgress: Map
+}
+
+type MessageReplayJob {
+    id: ID!
+    clusterId: ID!
+    sourceTopic: String!
+    targetTopic: String
+    consumerGroupId: String
+    startOffset: Long
+    startTimestamp: String
+    endOffset: Long
+    endTimestamp: String
+    partitions: [Int!]
+    status: ReplayJobStatus!
+    progress: ReplayJobProgress
+    scheduleCron: String
+    scheduleTimezone: String
+    nextScheduledRun: String
+    isRecurring: Boolean!
+    lastScheduledRun: String
+    retryCount: Int!
+    maxRetries: Int!
+    retryDelaySeconds: Int!
+    createdBy: String!
+    createdAt: String!
+    startedAt: String
+    completedAt: String
+    errorMessage: String
+    metadata: Map
+}
+
+type MessageReplayJobHistory {
+    id: ID!
+    replayJobId: ID!
+    action: String!
+    messageCount: Long!
+    throughput: Float
+    timestamp: String!
+    details: Map
 }
 
 type Query {
@@ -745,6 +903,11 @@ type Query {
     auditLogsByUser(userId: String!, pagination: AuditLogPagination): AuditLogPage!
     auditLogsByResource(resourceType: AuditResourceType!, resourceId: String!, pagination: AuditLogPagination): AuditLogPage!
     auditLogStatistics(filter: AuditLogFilter): AuditLogStatistics!
+    
+    # Message Replay queries
+    replayJobs(clusterId: ID, status: ReplayJobStatus, page: Int = 0, size: Int = 20): [MessageReplayJob!]!
+    replayJob(id: ID!): MessageReplayJob
+    replayHistory(jobId: ID!, page: Int = 0, size: Int = 20): [MessageReplayJobHistory!]!
 }
 
 type Mutation {
@@ -780,6 +943,13 @@ type Mutation {
 
     # Consumer group mutations
     resetConsumerGroupOffset(clusterId: ID!, groupId: String!, topic: String!, partition: Int!, offset: Long!): Boolean!
+    
+    # Message Replay mutations
+    replayMessages(input: MessageReplayInput!): MessageReplayJob!
+    scheduleReplay(input: MessageReplayInput!): MessageReplayJob!
+    cancelReplay(id: ID!): Boolean!
+    retryReplay(id: ID!): Boolean!
+    deleteReplay(id: ID!): Boolean!
 
     # Schema Registry mutations
     createSchemaRegistry(input: SchemaRegistryInput!): SchemaRegistry!

@@ -389,7 +389,7 @@ export const GET_KSQL_QUERY_HISTORY_BY_ID = gql`
 export const GET_KSQL_QUERY_METRICS = gql`
     query GetKsqlQueryMetrics($queryHistoryId: ID!) {
         ksqlQueryMetrics(queryHistoryId: $queryHistoryId) {
-            id
+            queryHistoryId
             cpuUsagePercent
             memoryUsageMb
             rowsProcessedPerSecond
@@ -477,6 +477,94 @@ export const GET_MESSAGES = gql`
             timestamp
             key
             value
+        }
+    }
+`
+
+export const GET_REPLAY_JOBS = gql`
+    query GetReplayJobs($clusterId: ID, $status: ReplayJobStatus, $page: Int, $size: Int) {
+        replayJobs(clusterId: $clusterId, status: $status, page: $page, size: $size) {
+            id
+            clusterId
+            sourceTopic
+            targetTopic
+            consumerGroupId
+            startOffset
+            startTimestamp
+            endOffset
+            endTimestamp
+            partitions
+            status
+            progress {
+                messagesProcessed
+                messagesTotal
+                throughput
+                estimatedTimeRemainingSeconds
+            }
+            scheduleCron
+            scheduleTimezone
+            nextScheduledRun
+            isRecurring
+            lastScheduledRun
+            retryCount
+            maxRetries
+            retryDelaySeconds
+            createdBy
+            createdAt
+            startedAt
+            completedAt
+            errorMessage
+        }
+    }
+`
+
+export const GET_REPLAY_JOB = gql`
+    query GetReplayJob($id: ID!) {
+        replayJob(id: $id) {
+            id
+            clusterId
+            sourceTopic
+            targetTopic
+            consumerGroupId
+            startOffset
+            startTimestamp
+            endOffset
+            endTimestamp
+            partitions
+            status
+            progress {
+                messagesProcessed
+                messagesTotal
+                throughput
+                estimatedTimeRemainingSeconds
+            }
+            scheduleCron
+            scheduleTimezone
+            nextScheduledRun
+            isRecurring
+            lastScheduledRun
+            retryCount
+            maxRetries
+            retryDelaySeconds
+            createdBy
+            createdAt
+            startedAt
+            completedAt
+            errorMessage
+        }
+    }
+`
+
+export const GET_REPLAY_HISTORY = gql`
+    query GetReplayHistory($jobId: ID!, $page: Int, $size: Int) {
+        replayHistory(jobId: $jobId, page: $page, size: $size) {
+            id
+            replayJobId
+            action
+            messageCount
+            throughput
+            timestamp
+            details
         }
     }
 `

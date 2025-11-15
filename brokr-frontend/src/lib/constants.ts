@@ -66,6 +66,7 @@ export const AUDIT_RESOURCE_TYPES = [
     'KAFKA_STREAMS',
     'KSQLDB',
     'MESSAGE',
+    'MESSAGE_REPLAY',
     'SCHEMA',
     'CONNECTOR',
 ] as const

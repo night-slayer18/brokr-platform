@@ -397,3 +397,53 @@ export const DELETE_USER_MUTATION = gql`
         deleteUser(id: $id)
     }
 `
+
+export const REPLAY_MESSAGES_MUTATION = gql`
+    mutation ReplayMessages($input: MessageReplayInput!) {
+        replayMessages(input: $input) {
+            id
+            clusterId
+            sourceTopic
+            targetTopic
+            consumerGroupId
+            status
+            createdAt
+        }
+    }
+`
+
+export const SCHEDULE_REPLAY_MUTATION = gql`
+    mutation ScheduleReplay($input: MessageReplayInput!) {
+        scheduleReplay(input: $input) {
+            id
+            clusterId
+            sourceTopic
+            targetTopic
+            consumerGroupId
+            status
+            scheduleCron
+            scheduleTimezone
+            nextScheduledRun
+            isRecurring
+            createdAt
+        }
+    }
+`
+
+export const CANCEL_REPLAY_MUTATION = gql`
+    mutation CancelReplay($id: ID!) {
+        cancelReplay(id: $id)
+    }
+`
+
+export const RETRY_REPLAY_MUTATION = gql`
+    mutation RetryReplay($id: ID!) {
+        retryReplay(id: $id)
+    }
+`
+
+export const DELETE_REPLAY_MUTATION = gql`
+    mutation DeleteReplay($id: ID!) {
+        deleteReplay(id: $id)
+    }
+`

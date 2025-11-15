@@ -16,7 +16,7 @@ import {useEffect, useState} from "react";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Button} from "@/components/ui/button";
 import {Label} from "@/components/ui/label";
-import {Eye, Loader2, RefreshCw} from "lucide-react";
+import {Eye, Loader2, RefreshCw, RotateCw} from "lucide-react";
 import {toast} from "sonner";
 import type {Message} from "@/types";
 import {
@@ -28,6 +28,7 @@ import {
     PaginationPrevious
 } from "@/components/ui/pagination";
 import {MessageDetailPanel} from "@/components/topics/MessageDetailPanel";
+import {ReplayJobForm} from "@/components/replay/ReplayJobForm";
 
 
 export default function TopicDetailPage() {
@@ -38,6 +39,7 @@ export default function TopicDetailPage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
     const [isMessageDetailOpen, setIsMessageDetailOpen] = useState(false);
+    const [isReplayFormOpen, setIsReplayFormOpen] = useState(false);
     const [timeRange, setTimeRange] = useState(() => {
         const endTime = Date.now();
         const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
@@ -223,13 +225,21 @@ export default function TopicDetailPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                    {topic.name}
-                    {topic.isInternal && <Badge variant="secondary">Internal</Badge>}
-                </h2>
-                <p className="text-muted-foreground">Details for topic <span className="font-mono">{topic.name}</span>
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                        {topic.name}
+                        {topic.isInternal && <Badge variant="secondary">Internal</Badge>}
+                    </h2>
+                    <p className="text-muted-foreground">Details for topic <span className="font-mono">{topic.name}</span>
+                    </p>
+                </div>
+                {clusterId && (
+                    <Button onClick={() => setIsReplayFormOpen(true)}>
+                        <RotateCw className="mr-2 h-4 w-4"/>
+                        Create Replay Job
+                    </Button>
+                )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -647,6 +657,18 @@ export default function TopicDetailPage() {
                 isOpen={isMessageDetailOpen}
                 onOpenChange={setIsMessageDetailOpen}
             />
+            
+            {clusterId && topicName && (
+                <ReplayJobForm
+                    clusterId={clusterId}
+                    sourceTopic={topicName}
+                    isOpen={isReplayFormOpen}
+                    onOpenChange={setIsReplayFormOpen}
+                    onReplayCreated={() => {
+                        // Optionally refresh data or show success message
+                    }}
+                />
+            )}
         </div>
     );
 }

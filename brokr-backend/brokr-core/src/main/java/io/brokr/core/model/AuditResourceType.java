@@ -12,6 +12,7 @@ public enum AuditResourceType {
     KAFKA_STREAMS,
     KSQLDB,
     MESSAGE,
+    MESSAGE_REPLAY,
     SCHEMA,
     CONNECTOR
 }

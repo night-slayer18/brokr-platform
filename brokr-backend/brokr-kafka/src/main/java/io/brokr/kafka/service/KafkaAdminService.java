@@ -598,4 +598,91 @@ public class KafkaAdminService {
             throw new RuntimeException("Failed to reset consumer group offset", e);
         }
     }
+    
+    /**
+     * Resets consumer group offsets for multiple partitions of a topic.
+     * Supports both offset-based and timestamp-based reset.
+     * 
+     * @param cluster The Kafka cluster
+     * @param groupId The consumer group ID
+     * @param topic The topic name
+     * @param partitions List of partition IDs (null = all partitions for the topic)
+     * @param offset The offset to reset to (null if using timestamp)
+     * @param timestamp The timestamp to reset to (null if using offset)
+     * @return true if successful
+     */
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
+    public boolean resetConsumerGroupOffsets(
+            KafkaCluster cluster,
+            String groupId,
+            String topic,
+            List<Integer> partitions,
+            Long offset,
+            java.time.LocalDateTime timestamp) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+            
+            // Get topic metadata to determine partitions if not specified
+            DescribeTopicsResult topicsResult = adminClient.describeTopics(Collections.singletonList(topic));
+            TopicDescription topicDescription = topicsResult.allTopicNames().get().get(topic);
+            
+            List<Integer> partitionsToReset = partitions != null ? partitions : 
+                    topicDescription.partitions().stream()
+                            .map(org.apache.kafka.common.TopicPartitionInfo::partition)
+                            .collect(Collectors.toList());
+            
+            Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata> offsetsToReset = new HashMap<>();
+            
+            if (timestamp != null) {
+                // Convert timestamp to offsets for each partition
+                long timestampMs = timestamp.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                
+                Map<org.apache.kafka.common.TopicPartition, OffsetSpec> offsetSpecs = new HashMap<>();
+                for (Integer partition : partitionsToReset) {
+                    org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topic, partition);
+                    offsetSpecs.put(tp, OffsetSpec.forTimestamp(timestampMs));
+                }
+                
+                ListOffsetsResult offsetsResult = adminClient.listOffsets(offsetSpecs);
+                Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets = offsetsResult.all().get();
+                
+                for (Integer partition : partitionsToReset) {
+                    org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topic, partition);
+                    ListOffsetsResult.ListOffsetsResultInfo info = offsets.get(tp);
+                    if (info != null) {
+                        offsetsToReset.put(tp, new OffsetAndMetadata(info.offset()));
+                    } else {
+                        log.warn("Could not get offset for partition {}:{} at timestamp {}, skipping", topic, partition, timestamp);
+                    }
+                }
+            } else {
+                // Use provided offset for all partitions
+                for (Integer partition : partitionsToReset) {
+                    org.apache.kafka.common.TopicPartition tp = new org.apache.kafka.common.TopicPartition(topic, partition);
+                    offsetsToReset.put(tp, new OffsetAndMetadata(offset != null ? offset : 0L));
+                }
+            }
+            
+            if (offsetsToReset.isEmpty()) {
+                log.warn("No offsets to reset for consumer group {} and topic {}", groupId, topic);
+                return false;
+            }
+            
+            AlterConsumerGroupOffsetsResult result = adminClient.alterConsumerGroupOffsets(groupId, offsetsToReset);
+            result.all().get();
+            
+            log.info("Successfully reset offsets for consumer group {} on topic {} ({} partitions)", 
+                    groupId, topic, offsetsToReset.size());
+            return true;
+            
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to reset offsets for group [{}], topic [{}]: {}", groupId, topic, e.getMessage(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            throw new RuntimeException("Failed to reset consumer group offsets", e);
+        }
+    }
 }

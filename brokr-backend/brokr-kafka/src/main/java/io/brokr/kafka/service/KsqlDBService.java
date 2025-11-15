@@ -1,6 +1,5 @@
 package io.brokr.kafka.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.brokr.core.model.KsqlDB;

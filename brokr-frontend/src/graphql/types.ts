@@ -272,6 +272,36 @@ export interface GetMessagesVariables {
     input: MessageInput
 }
 
+// Message Replay Query Types
+export interface GetReplayJobsQuery {
+    replayJobs: import('@/types').MessageReplayJob[]
+}
+
+export interface GetReplayJobsVariables {
+    clusterId?: string | null
+    status?: import('@/types').ReplayJobStatus | null
+    page?: number | null
+    size?: number | null
+}
+
+export interface GetReplayJobQuery {
+    replayJob: import('@/types').MessageReplayJob
+}
+
+export interface GetReplayJobVariables {
+    id: string
+}
+
+export interface GetReplayHistoryQuery {
+    replayHistory: import('@/types').MessageReplayJobHistory[]
+}
+
+export interface GetReplayHistoryVariables {
+    jobId: string
+    page?: number | null
+    size?: number | null
+}
+
 // Mutation Variables Types
 export interface LoginMutationVariables {
     input: LoginInput
@@ -316,6 +346,47 @@ export interface ResetConsumerOffsetMutationVariables {
     topic: string
     partition: number
     offset: number
+}
+
+// Message Replay Mutation Types
+export interface ReplayMessagesMutation {
+    replayMessages: import('@/types').MessageReplayJob
+}
+
+export interface ReplayMessagesMutationVariables {
+    input: import('@/types').MessageReplayInput
+}
+
+export interface ScheduleReplayMutation {
+    scheduleReplay: import('@/types').MessageReplayJob
+}
+
+export interface ScheduleReplayMutationVariables {
+    input: import('@/types').MessageReplayInput
+}
+
+export interface CancelReplayMutation {
+    cancelReplay: boolean
+}
+
+export interface CancelReplayMutationVariables {
+    id: string
+}
+
+export interface RetryReplayMutation {
+    retryReplay: boolean
+}
+
+export interface RetryReplayMutationVariables {
+    id: string
+}
+
+export interface DeleteReplayMutation {
+    deleteReplay: boolean
+}
+
+export interface DeleteReplayMutationVariables {
+    id: string
 }
 
 export interface GetSchemaRegistryQuery {
@@ -546,6 +617,7 @@ export type AuditResourceType =
     | 'KAFKA_STREAMS' 
     | 'KSQLDB' 
     | 'MESSAGE' 
+    | 'MESSAGE_REPLAY' 
     | 'SCHEMA' 
     | 'CONNECTOR'
 

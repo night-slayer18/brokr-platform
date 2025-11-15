@@ -169,4 +169,133 @@ export interface Message {
     timestamp: number
     key?: string | null
     value?: string | null
+    headers?: Record<string, string> | null
+}
+
+// Message Replay Types
+export type ReplayJobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+
+export interface ReplayJobProgress {
+    messagesProcessed: number
+    messagesTotal?: number | null
+    throughput?: number | null
+    estimatedTimeRemainingSeconds?: number | null
+    partitionProgress?: Record<string, unknown> | null
+}
+
+export interface MessageReplayJob {
+    id: string
+    clusterId: string
+    sourceTopic: string
+    targetTopic?: string | null
+    consumerGroupId?: string | null
+    startOffset?: number | null
+    startTimestamp?: string | null
+    endOffset?: number | null
+    endTimestamp?: string | null
+    partitions?: number[] | null
+    status: ReplayJobStatus
+    progress?: ReplayJobProgress | null
+    scheduleCron?: string | null
+    scheduleTimezone?: string | null
+    nextScheduledRun?: string | null
+    isRecurring: boolean
+    lastScheduledRun?: string | null
+    retryCount: number
+    maxRetries: number
+    retryDelaySeconds: number
+    createdBy: string
+    createdAt: string
+    startedAt?: string | null
+    completedAt?: string | null
+    errorMessage?: string | null
+    metadata?: Record<string, unknown> | null
+}
+
+export interface MessageReplayJobHistory {
+    id: string
+    replayJobId: string
+    action: string
+    messageCount: number
+    throughput?: number | null
+    timestamp: string
+    details?: Record<string, unknown> | null
+}
+
+export type FilterLogic = 'AND' | 'OR'
+
+export type KeyFilterType = 'EXACT' | 'PREFIX' | 'REGEX' | 'CONTAINS'
+
+export type ValueFilterType = 'JSON_PATH' | 'REGEX' | 'CONTAINS' | 'SIZE'
+
+export type KeyTransformationType = 'KEEP' | 'REMOVE' | 'MODIFY'
+
+export type ValueTransformationType = 'KEEP' | 'MODIFY' | 'FORMAT_CONVERSION'
+
+export interface KeyFilterInput {
+    type: KeyFilterType
+    value: string
+}
+
+export interface ValueFilterInput {
+    type: ValueFilterType
+    value?: string | null
+    minSize?: number | null
+    maxSize?: number | null
+}
+
+export interface HeaderFilterInput {
+    headerKey: string
+    headerValue?: string | null
+    exactMatch?: boolean | null
+}
+
+export interface TimestampRangeFilterInput {
+    startTimestamp: string
+    endTimestamp: string
+}
+
+export interface MessageFilterInput {
+    keyFilter?: KeyFilterInput | null
+    valueFilter?: ValueFilterInput | null
+    headerFilters?: HeaderFilterInput[] | null
+    timestampRangeFilter?: TimestampRangeFilterInput | null
+    logic?: FilterLogic | null
+}
+
+export interface KeyTransformationInput {
+    type: KeyTransformationType
+    newValue?: string | null
+}
+
+export interface ValueTransformationInput {
+    type: ValueTransformationType
+    newValue?: string | null
+    targetFormat?: string | null
+}
+
+export interface MessageTransformationInput {
+    keyTransformation?: KeyTransformationInput | null
+    valueTransformation?: ValueTransformationInput | null
+    headerAdditions?: Record<string, string> | null
+    headerRemovals?: string[] | null
+}
+
+export interface MessageReplayInput {
+    clusterId: string
+    sourceTopic: string
+    targetTopic?: string | null
+    consumerGroupId?: string | null
+    startOffset?: number | null
+    startTimestamp?: string | null
+    endOffset?: number | null
+    endTimestamp?: string | null
+    partitions?: number[] | null
+    filters?: MessageFilterInput | null
+    transformation?: MessageTransformationInput | null
+    scheduleTime?: string | null
+    scheduleCron?: string | null
+    scheduleTimezone?: string | null
+    maxRetries?: number | null
+    retryDelaySeconds?: number | null
 }

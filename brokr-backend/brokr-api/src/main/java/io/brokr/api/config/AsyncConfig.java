@@ -58,14 +58,43 @@ public class AsyncConfig implements AsyncConfigurer {
     @Override
     public Executor getAsyncExecutor() {
         // Default async executor for general async operations
+        // Optimized for enterprise-scale with replay jobs and other async tasks
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(20);
-        executor.setQueueCapacity(100);
+        executor.setCorePoolSize(10);  // Increased for concurrent replay jobs
+        executor.setMaxPoolSize(50);   // Increased for peak load
+        executor.setQueueCapacity(500); // Increased queue for enterprise load
         executor.setThreadNamePrefix("async-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setKeepAliveSeconds(60);
+        executor.setAllowCoreThreadTimeOut(false);
         executor.initialize();
+        log.info("Default async executor initialized: core={}, max={}, queue={}", 
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
+        return executor;
+    }
+    
+    /**
+     * Dedicated thread pool for replay job execution.
+     * Separate pool to isolate replay operations from other async tasks.
+     */
+    @Bean(name = "replayJobExecutor")
+    public Executor replayJobExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        
+        // Sized for max concurrent replay jobs (configurable, default 5)
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(20);  // Allow burst capacity
+        executor.setQueueCapacity(100); // Queue pending jobs
+        
+        executor.setThreadNamePrefix("replay-job-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setKeepAliveSeconds(300); // Keep threads alive longer for long-running jobs
+        executor.setAllowCoreThreadTimeOut(false);
+        
+        executor.initialize();
+        log.info("Replay job executor initialized: core={}, max={}, queue={}", 
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
+        
         return executor;
     }
 }

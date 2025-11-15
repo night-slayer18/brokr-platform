@@ -70,6 +70,16 @@ jwt:
   secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}
   expiration: ${JWT_EXPIRATION:86400}
 
+# Message Replay Configuration
+# Optimized for enterprise-scale operations (LinkedIn-scale ready)
+message-replay:
+  max-messages-per-job: ${MESSAGE_REPLAY_MAX_MESSAGES:10000000}  # 10 million messages per job (safety limit)
+  max-concurrent-jobs: ${MESSAGE_REPLAY_MAX_CONCURRENT:5}  # Maximum concurrent replay jobs
+  progress-update-interval: ${MESSAGE_REPLAY_PROGRESS_INTERVAL:1000}  # Update progress every N messages (reduces DB load)
+  job-timeout-minutes: ${MESSAGE_REPLAY_TIMEOUT_MINUTES:1440}  # 24 hours timeout
+  streaming-batch-size: ${MESSAGE_REPLAY_STREAMING_BATCH:10000}  # Batch size for streaming (prevents OOM)
+  rate-limit-messages-per-second: ${MESSAGE_REPLAY_RATE_LIMIT:0}  # 0 = no rate limit (optional throttling)
+
 logging:
   level:
     io.brokr: DEBUG
