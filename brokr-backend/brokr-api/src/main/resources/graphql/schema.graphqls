@@ -496,6 +496,7 @@ enum AuditResourceType {
     MESSAGE_REPLAY
     SCHEMA
     CONNECTOR
+    API_KEY
 }
 
 enum AuditStatus {
@@ -869,6 +870,72 @@ type MessageReplayJobHistory {
     details: Map
 }
 
+# API Key Management Types
+type ApiKey {
+    id: ID!
+    userId: ID!
+    organizationId: ID!
+    name: String!
+    description: String
+    keyPrefix: String!
+    scopes: [String!]!
+    isActive: Boolean!
+    isRevoked: Boolean!
+    revokedAt: String
+    revokedReason: String
+    expiresAt: String
+    lastUsedAt: String
+    createdAt: String!
+    updatedAt: String!
+}
+
+type ApiKeyGenerationResult {
+    apiKey: ApiKey!
+    fullKey: String!  # Only shown once when created
+}
+
+type ApiKeyUsageStatistics {
+    apiKeyId: ID!
+    startTime: String!
+    endTime: String!
+    totalRequests: Long!
+    successCount: Long!
+    errorCount: Long!
+    errorRate: Float!
+    averageResponseTimeMs: Int
+    statusCodeCounts: Map
+}
+
+type RateLimitConfig {
+    id: ID!
+    apiKeyId: ID!
+    limitType: String!
+    limitValue: Int!
+    windowSeconds: Int!
+    createdAt: String!
+    updatedAt: String!
+}
+
+input ApiKeyInput {
+    name: String!
+    description: String
+    scopes: [String!]!
+    expiresAt: String
+}
+
+input ApiKeyUpdateInput {
+    name: String
+    description: String
+    scopes: [String!]
+    expiresAt: String
+}
+
+input RateLimitConfigInput {
+    limitType: String!
+    limitValue: Int!
+    windowSeconds: Int!
+}
+
 type Query {
     # User queries
     me: UserDto
@@ -942,6 +1009,12 @@ type Query {
     auditLogsByUser(userId: String!, pagination: AuditLogPagination): AuditLogPage!
     auditLogsByResource(resourceType: AuditResourceType!, resourceId: String!, pagination: AuditLogPagination): AuditLogPage!
     auditLogStatistics(filter: AuditLogFilter): AuditLogStatistics!
+    
+    # API Key queries
+    apiKeys: [ApiKey!]!
+    apiKey(id: ID!): ApiKey
+    apiKeyUsage(id: ID!, startTime: String!, endTime: String!): ApiKeyUsageStatistics!
+    apiKeyRateLimits(apiKeyId: ID!): [RateLimitConfig!]!
     
     # Message Replay queries
     replayJobs(clusterId: ID, status: ReplayJobStatus, page: Int = 0, size: Int = 20): [MessageReplayJob!]!
@@ -1036,4 +1109,12 @@ type Mutation {
     
     # ksqlDB Query History
     deleteKsqlQueryHistory(ksqlDBId: ID!, olderThanDays: Int!): Int!
+    
+    # API Key mutations
+    createApiKey(input: ApiKeyInput!): ApiKeyGenerationResult!
+    updateApiKey(id: ID!, input: ApiKeyUpdateInput!): ApiKey!
+    revokeApiKey(id: ID!, reason: String): Boolean!
+    rotateApiKey(id: ID!, gracePeriodDays: Int): ApiKeyGenerationResult!
+    deleteApiKey(id: ID!): Boolean!
+    configureApiKeyRateLimits(apiKeyId: ID!, configs: [RateLimitConfigInput!]!): [RateLimitConfig!]!
 }

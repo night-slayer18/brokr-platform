@@ -2,6 +2,7 @@ package io.brokr.security.service;
 
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
+import io.brokr.security.model.ApiKeyAuthenticationToken;
 import io.brokr.security.model.BrokrUserDetails;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.entity.KafkaConnectEntity;
@@ -33,8 +34,26 @@ public class AuthorizationService {
 
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        // Handle API key authentication
+        if (authentication instanceof ApiKeyAuthenticationToken) {
+            ApiKeyAuthenticationToken apiKeyAuth = (ApiKeyAuthenticationToken) authentication;
+            Object principal = apiKeyAuth.getPrincipal();
+            if (principal instanceof BrokrUserDetails) {
+                return ((BrokrUserDetails) principal).getUser();
+            }
+            // Fallback: extract from UserDetails
+            String email = authentication.getName();
+            return userRepository.findByEmail(email)
+                    .map(entity -> {
+                        Hibernate.initialize(entity.getAccessibleEnvironmentIds());
+                        return entity.toDomain();
+                    })
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+        }
+        
+        // Handle JWT authentication (existing flow)
         Object principal = authentication.getPrincipal();
-
         if (principal instanceof BrokrUserDetails) {
             return ((BrokrUserDetails) principal).getUser();
         }
@@ -49,6 +68,37 @@ public class AuthorizationService {
                     return entity.toDomain();
                 })
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+    
+    /**
+     * Get API key authentication token if present.
+     */
+    private ApiKeyAuthenticationToken getApiKeyAuthentication() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof ApiKeyAuthenticationToken) {
+            return (ApiKeyAuthenticationToken) authentication;
+        }
+        return null;
+    }
+    
+    /**
+     * Check API key scopes. Throws AccessDeniedException if scope missing.
+     * Only checks if authenticated via API key; JWT uses role-based auth.
+     */
+    private void checkApiKeyScope(String... requiredScopes) {
+        ApiKeyAuthenticationToken apiKeyAuth = getApiKeyAuthentication();
+        if (apiKeyAuth == null) {
+            // Not API key auth, skip scope check (JWT uses role-based auth)
+            return;
+        }
+        
+        if (!apiKeyAuth.hasAnyScope(requiredScopes)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "API key missing required scope. Required: " + 
+                    java.util.Arrays.toString(requiredScopes) + 
+                    ", Available: " + apiKeyAuth.getScopes()
+            );
+        }
     }
 
     public boolean hasAccessToOrganization(String organizationId) {
@@ -81,6 +131,9 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToCluster(String clusterId) {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("clusters:read", "clusters:write");
+        
         User user = getCurrentUser();
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
@@ -147,8 +200,22 @@ public class AuthorizationService {
 
 
     public boolean canManageTopics() {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("topics:write");
+        
         User user = getCurrentUser();
         return user.getRole() == Role.ADMIN || user.getRole() == Role.SUPER_ADMIN;
+    }
+    
+    /**
+     * Check if user can read topics (for API keys with topics:read scope).
+     */
+    public boolean canReadTopics() {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("topics:read");
+        
+        // For JWT, any authenticated user can read topics
+        return true;
     }
 
     public boolean canManageUsers() {

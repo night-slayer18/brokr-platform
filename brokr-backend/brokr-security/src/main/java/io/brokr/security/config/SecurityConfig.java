@@ -1,5 +1,6 @@
 package io.brokr.security.config;
 
+import io.brokr.security.service.ApiKeyAuthenticationFilter;
 import io.brokr.security.service.JwtAuthenticationFilter;
 import io.brokr.security.service.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
     private final PasswordEncoder passwordEncoder;
@@ -71,7 +73,10 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // API key filter runs FIRST (before JWT filter)
+                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // JWT filter runs second (after API key filter, before UsernamePasswordAuthenticationFilter)
+                .addFilterAfter(jwtAuthFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }

@@ -14,6 +14,7 @@ public enum AuditResourceType {
     MESSAGE,
     MESSAGE_REPLAY,
     SCHEMA,
-    CONNECTOR
+    CONNECTOR,
+    API_KEY
 }
 

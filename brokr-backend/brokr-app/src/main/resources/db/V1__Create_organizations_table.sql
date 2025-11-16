@@ -6,6 +6,7 @@ CREATE TABLE organizations (
                                is_active BOOLEAN NOT NULL DEFAULT true,
                                mfa_required BOOLEAN DEFAULT FALSE,
                                mfa_grace_period_days INT DEFAULT 7,
+                               mfa_required_since TIMESTAMP,
                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

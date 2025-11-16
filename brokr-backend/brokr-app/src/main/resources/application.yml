@@ -65,6 +65,8 @@ spring:
       - topicMetrics
       - consumerGroupMetrics
       - clusterMetrics
+      - rateLimitConfigs
+
 
 jwt:
   secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}
@@ -105,6 +107,36 @@ message-replay:
   job-timeout-minutes: ${MESSAGE_REPLAY_TIMEOUT_MINUTES:1440}  # 24 hours timeout
   streaming-batch-size: ${MESSAGE_REPLAY_STREAMING_BATCH:10000}  # Batch size for streaming (prevents OOM)
   rate-limit-messages-per-second: ${MESSAGE_REPLAY_RATE_LIMIT:0}  # 0 = no rate limit (optional throttling)
+
+# API Key Configuration
+api-key:
+  prefix: ${API_KEY_PREFIX:brokr_}
+  secret-length: ${API_KEY_SECRET_LENGTH:32}
+  default-expiration-days: ${API_KEY_DEFAULT_EXPIRATION_DAYS:365}
+  rotation-grace-period-days: ${API_KEY_ROTATION_GRACE_PERIOD_DAYS:7}
+  
+  rate-limit:
+    default:
+      per-second: ${API_KEY_RATE_LIMIT_PER_SECOND:10}
+      per-minute: ${API_KEY_RATE_LIMIT_PER_MINUTE:100}
+      per-hour: ${API_KEY_RATE_LIMIT_PER_HOUR:1000}
+      per-day: ${API_KEY_RATE_LIMIT_PER_DAY:10000}
+  
+  usage-tracking:
+    enabled: ${API_KEY_USAGE_TRACKING_ENABLED:true}
+    batch-size: ${API_KEY_USAGE_BATCH_SIZE:100}
+    batch-interval-seconds: ${API_KEY_USAGE_BATCH_INTERVAL:5}
+    retention-days: ${API_KEY_USAGE_RETENTION_DAYS:90}
+  
+  security:
+    brute-force-protection:
+      enabled: ${API_KEY_BRUTE_FORCE_PROTECTION_ENABLED:true}
+      max-attempts: ${API_KEY_BRUTE_FORCE_MAX_ATTEMPTS:5}
+      lockout-duration-minutes: ${API_KEY_BRUTE_FORCE_LOCKOUT_MINUTES:15}
+    suspicious-activity:
+      enabled: ${API_KEY_SUSPICIOUS_ACTIVITY_ENABLED:true}
+      spike-threshold: ${API_KEY_SUSPICIOUS_SPIKE_THRESHOLD:10}  # 10x normal usage
+      new-ip-alert: ${API_KEY_SUSPICIOUS_NEW_IP_ALERT:true}
 
 logging:
   level:

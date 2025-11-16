@@ -914,3 +914,77 @@ export const GET_CLUSTER_METRICS = gql`
         }
     }
 `
+
+export const GET_API_KEYS = gql`
+    query GetApiKeys {
+        apiKeys {
+            id
+            userId
+            organizationId
+            name
+            description
+            keyPrefix
+            scopes
+            isActive
+            isRevoked
+            revokedAt
+            revokedReason
+            expiresAt
+            lastUsedAt
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const GET_API_KEY = gql`
+    query GetApiKey($id: ID!) {
+        apiKey(id: $id) {
+            id
+            userId
+            organizationId
+            name
+            description
+            keyPrefix
+            scopes
+            isActive
+            isRevoked
+            revokedAt
+            revokedReason
+            expiresAt
+            lastUsedAt
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const GET_API_KEY_USAGE = gql`
+    query GetApiKeyUsage($id: ID!, $startTime: String!, $endTime: String!) {
+        apiKeyUsage(id: $id, startTime: $startTime, endTime: $endTime) {
+            apiKeyId
+            startTime
+            endTime
+            totalRequests
+            successCount
+            errorCount
+            errorRate
+            averageResponseTimeMs
+            statusCodeCounts
+        }
+    }
+`
+
+export const GET_API_KEY_RATE_LIMITS = gql`
+    query GetApiKeyRateLimits($apiKeyId: ID!) {
+        apiKeyRateLimits(apiKeyId: $apiKeyId) {
+            id
+            apiKeyId
+            limitType
+            limitValue
+            windowSeconds
+            createdAt
+            updatedAt
+        }
+    }
+`

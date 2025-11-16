@@ -32,6 +32,8 @@ import OrganizationDetailPage from './pages/admin/OrganizationDetailPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
+import ApiKeysPage from './pages/ApiKeysPage';
+import ApiKeyDetailPage from './pages/ApiKeyDetailPage';
 
 function App() {
     return (
@@ -50,6 +52,8 @@ function App() {
                     <Route path="dashboard" element={<DashboardPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="api-keys" element={<ApiKeysPage />} />
+                    <Route path="api-keys/:id" element={<ApiKeyDetailPage />} />
                     <Route path="clusters" element={<ClustersPage />} />
                     <Route path="clusters/new" element={<AdminRoute><CreateClusterPage /></AdminRoute>} />
                 </Route>

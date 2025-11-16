@@ -301,3 +301,92 @@ export interface MessageReplayInput {
     maxRetries?: number | null
     retryDelaySeconds?: number | null
 }
+
+// API Key Types
+export interface ApiKey {
+    id: string
+    userId: string
+    organizationId: string
+    name: string
+    description?: string | null
+    keyPrefix: string
+    scopes: string[]
+    isActive: boolean
+    isRevoked: boolean
+    revokedAt?: string | null
+    revokedReason?: string | null
+    expiresAt?: string | null
+    lastUsedAt?: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ApiKeyGenerationResult {
+    apiKey: ApiKey
+    fullKey: string
+}
+
+export interface ApiKeyUsageStatistics {
+    apiKeyId: string
+    startTime: string
+    endTime: string
+    totalRequests: number
+    successCount: number
+    errorCount: number
+    errorRate: number
+    averageResponseTimeMs?: number | null
+    statusCodeCounts?: Record<string, number> | null
+}
+
+export interface RateLimitConfig {
+    id: string
+    apiKeyId: string
+    limitType: string
+    limitValue: number
+    windowSeconds: number
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ApiKeyInput {
+    name: string
+    description?: string | null
+    scopes: string[]
+    expiresAt?: string | null
+}
+
+export interface ApiKeyUpdateInput {
+    name?: string | null
+    description?: string | null
+    scopes?: string[] | null
+    expiresAt?: string | null
+}
+
+export interface RateLimitConfigInput {
+    limitType: string
+    limitValue: number
+    windowSeconds: number
+}
+
+// Available API Key Scopes
+export const API_KEY_SCOPES = [
+    { value: 'clusters:read', label: 'Clusters: Read', description: 'Read cluster information' },
+    { value: 'clusters:write', label: 'Clusters: Write', description: 'Create and modify clusters' },
+    { value: 'topics:read', label: 'Topics: Read', description: 'Read topic information and messages' },
+    { value: 'topics:write', label: 'Topics: Write', description: 'Create and modify topics' },
+    { value: 'messages:read', label: 'Messages: Read', description: 'Read messages from topics' },
+    { value: 'messages:write', label: 'Messages: Write', description: 'Produce messages to topics' },
+    { value: 'consumer-groups:read', label: 'Consumer Groups: Read', description: 'Read consumer group information' },
+    { value: 'consumer-groups:write', label: 'Consumer Groups: Write', description: 'Modify consumer groups' },
+    { value: 'metrics:read', label: 'Metrics: Read', description: 'Read metrics and statistics' },
+    { value: 'replay:read', label: 'Replay: Read', description: 'View replay jobs' },
+    { value: 'replay:write', label: 'Replay: Write', description: 'Create and manage replay jobs' },
+    { value: 'schema-registry:read', label: 'Schema Registry: Read', description: 'Read schema registry information' },
+    { value: 'schema-registry:write', label: 'Schema Registry: Write', description: 'Modify schema registry' },
+    { value: 'kafka-connect:read', label: 'Kafka Connect: Read', description: 'Read Kafka Connect information' },
+    { value: 'kafka-connect:write', label: 'Kafka Connect: Write', description: 'Modify Kafka Connect' },
+    { value: 'kafka-streams:read', label: 'Kafka Streams: Read', description: 'Read Kafka Streams information' },
+    { value: 'kafka-streams:write', label: 'Kafka Streams: Write', description: 'Modify Kafka Streams' },
+    { value: 'ksqldb:read', label: 'ksqlDB: Read', description: 'Read ksqlDB information' },
+    { value: 'ksqldb:write', label: 'ksqlDB: Write', description: 'Modify ksqlDB' },
+] as const

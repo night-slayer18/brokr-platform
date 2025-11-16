@@ -1,6 +1,6 @@
 import {Link, useLocation} from 'react-router-dom'
 import {cn} from '@/lib/utils'
-import {LayoutDashboard, Server, Shield, FileText} from 'lucide-react'
+import {LayoutDashboard, Server, Shield, FileText, Key} from 'lucide-react'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {useAuth} from '@/hooks/useAuth'
 
@@ -14,6 +14,11 @@ const navigation = [
         name: 'Clusters',
         href: '/clusters',
         icon: Server,
+    },
+    {
+        name: 'API Keys',
+        href: '/api-keys',
+        icon: Key,
     },
 ]
 

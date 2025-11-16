@@ -516,3 +516,93 @@ export const DELETE_REPLAY_MUTATION = gql`
         deleteReplay(id: $id)
     }
 `
+
+export const CREATE_API_KEY_MUTATION = gql`
+    mutation CreateApiKey($input: ApiKeyInput!) {
+        createApiKey(input: $input) {
+            apiKey {
+                id
+                userId
+                organizationId
+                name
+                description
+                keyPrefix
+                scopes
+                isActive
+                isRevoked
+                expiresAt
+                createdAt
+                updatedAt
+            }
+            fullKey
+        }
+    }
+`
+
+export const UPDATE_API_KEY_MUTATION = gql`
+    mutation UpdateApiKey($id: ID!, $input: ApiKeyUpdateInput!) {
+        updateApiKey(id: $id, input: $input) {
+            id
+            userId
+            organizationId
+            name
+            description
+            keyPrefix
+            scopes
+            isActive
+            isRevoked
+            expiresAt
+            lastUsedAt
+            createdAt
+            updatedAt
+        }
+    }
+`
+
+export const REVOKE_API_KEY_MUTATION = gql`
+    mutation RevokeApiKey($id: ID!, $reason: String) {
+        revokeApiKey(id: $id, reason: $reason)
+    }
+`
+
+export const ROTATE_API_KEY_MUTATION = gql`
+    mutation RotateApiKey($id: ID!, $gracePeriodDays: Int) {
+        rotateApiKey(id: $id, gracePeriodDays: $gracePeriodDays) {
+            apiKey {
+                id
+                userId
+                organizationId
+                name
+                description
+                keyPrefix
+                scopes
+                isActive
+                isRevoked
+                expiresAt
+                createdAt
+                updatedAt
+            }
+            fullKey
+        }
+    }
+`
+
+export const DELETE_API_KEY_MUTATION = gql`
+    mutation DeleteApiKey($id: ID!) {
+        deleteApiKey(id: $id)
+    }
+`
+
+export const CONFIGURE_API_KEY_RATE_LIMITS_MUTATION = gql`
+    mutation ConfigureApiKeyRateLimits($apiKeyId: ID!, $configs: [RateLimitConfigInput!]!) {
+        configureApiKeyRateLimits(apiKeyId: $apiKeyId, configs: $configs) {
+            id
+            apiKeyId
+            limitType
+            limitValue
+            windowSeconds
+            createdAt
+            updatedAt
+        }
+    }
+`

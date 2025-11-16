@@ -1,5 +1,6 @@
 package io.brokr.security.service;
 
+import io.brokr.security.model.ApiKeyAuthenticationToken;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.SignatureException;
@@ -9,6 +10,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,6 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -64,30 +67,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             userEmail = jwtService.extractUsername(jwt);
 
             if (userEmail != null) {
-                // Check if we need to set authentication (either no auth or not authenticated)
+                // Check if API key authentication is already set - don't override it
                 Authentication existingAuth = SecurityContextHolder.getContext().getAuthentication();
-                if (existingAuth == null || !existingAuth.isAuthenticated()) {
-                    UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                if (existingAuth instanceof ApiKeyAuthenticationToken) {
+                    // API key authentication already set, skip JWT processing
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                
+                // Process JWT token - always set authentication if valid (overrides anonymous/null)
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                    if (jwtService.validateToken(jwt, userDetails)) {
-                        // Reject challenge tokens - only accept fully verified tokens
-                        if (jwtService.isChallengeToken(jwt)) {
-                            // Don't set authentication - user needs to complete MFA
-                            filterChain.doFilter(request, response);
-                            return;
-                        }
-
-                        // Create authenticated token (3-parameter constructor with authorities automatically marks it as authenticated)
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-                        authToken.setDetails(
-                                new WebAuthenticationDetailsSource().buildDetails(request)
-                        );
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtService.validateToken(jwt, userDetails)) {
+                    // Reject challenge tokens - only accept fully verified tokens
+                    if (jwtService.isChallengeToken(jwt)) {
+                        // Don't set authentication - user needs to complete MFA
+                        filterChain.doFilter(request, response);
+                        return;
                     }
+
+                    // Create authenticated token (3-parameter constructor with authorities automatically marks it as authenticated)
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (SignatureException e) {

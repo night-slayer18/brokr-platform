@@ -1,11 +1,18 @@
 // GraphQL Query and Mutation Types
 import type {
+    ApiKey,
+    ApiKeyGenerationResult,
+    ApiKeyInput,
+    ApiKeyUpdateInput,
+    ApiKeyUsageStatistics,
     ConsumerGroup,
     Environment,
     KafkaCluster,
     KafkaConnect,
     KafkaStreamsApplication,
     Message,
+    RateLimitConfig,
+    RateLimitConfigInput,
     SchemaRegistry,
     Topic,
     User
@@ -423,6 +430,90 @@ export interface DeleteReplayMutation {
 
 export interface DeleteReplayMutationVariables {
     id: string
+}
+
+// API Key Query Types
+export interface GetApiKeysQuery {
+    apiKeys: ApiKey[]
+}
+
+export interface GetApiKeyQuery {
+    apiKey: ApiKey
+}
+
+export interface GetApiKeyQueryVariables {
+    id: string
+}
+
+export interface GetApiKeyUsageQuery {
+    apiKeyUsage: ApiKeyUsageStatistics
+}
+
+export interface GetApiKeyUsageQueryVariables {
+    id: string
+    startTime: string
+    endTime: string
+}
+
+export interface GetApiKeyRateLimitsQuery {
+    apiKeyRateLimits: RateLimitConfig[]
+}
+
+export interface GetApiKeyRateLimitsQueryVariables {
+    apiKeyId: string
+}
+
+// API Key Mutation Types
+export interface CreateApiKeyMutation {
+    createApiKey: ApiKeyGenerationResult
+}
+
+export interface CreateApiKeyMutationVariables {
+    input: ApiKeyInput
+}
+
+export interface UpdateApiKeyMutation {
+    updateApiKey: ApiKey
+}
+
+export interface UpdateApiKeyMutationVariables {
+    id: string
+    input: ApiKeyUpdateInput
+}
+
+export interface RevokeApiKeyMutation {
+    revokeApiKey: boolean
+}
+
+export interface RevokeApiKeyMutationVariables {
+    id: string
+    reason?: string | null
+}
+
+export interface RotateApiKeyMutation {
+    rotateApiKey: ApiKeyGenerationResult
+}
+
+export interface RotateApiKeyMutationVariables {
+    id: string
+    gracePeriodDays?: number | null
+}
+
+export interface DeleteApiKeyMutation {
+    deleteApiKey: boolean
+}
+
+export interface DeleteApiKeyMutationVariables {
+    id: string
+}
+
+export interface ConfigureApiKeyRateLimitsMutation {
+    configureApiKeyRateLimits: RateLimitConfig[]
+}
+
+export interface ConfigureApiKeyRateLimitsMutationVariables {
+    apiKeyId: string
+    configs: RateLimitConfigInput[]
 }
 
 export interface GetSchemaRegistryQuery {
