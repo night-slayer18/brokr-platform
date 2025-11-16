@@ -9,11 +9,14 @@ import io.brokr.storage.entity.KafkaStreamsApplicationEntity;
 import io.brokr.storage.entity.KsqlDBEntity;
 import io.brokr.storage.entity.SchemaRegistryEntity;
 import io.brokr.storage.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 @RequiredArgsConstructor
@@ -25,13 +28,13 @@ public class AuthorizationService {
     private final KafkaConnectRepository kafkaConnectRepository;
     private final KafkaStreamsApplicationRepository kafkaStreamsApplicationRepository;
     private final KsqlDBRepository ksqlDBRepository;
+    private final JwtService jwtService;
 
 
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Object principal = authentication.getPrincipal();
 
-        // FIX: Get User model directly from the principal, no DB call
         if (principal instanceof BrokrUserDetails) {
             return ((BrokrUserDetails) principal).getUser();
         }
@@ -217,5 +220,54 @@ public class AuthorizationService {
 
         // Viewers cannot access prod
         return false;
+    }
+
+    /**
+     * Check if current user is in MFA grace period (has grace period token).
+     * Users in grace period can only perform MFA setup operations.
+     */
+    public boolean isInGracePeriod() {
+        try {
+            HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+            if (request == null) {
+                return false;
+            }
+
+            // Check cookie
+            String jwt = null;
+            if (request.getCookies() != null) {
+                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                    if ("brokr_token".equals(cookie.getName())) {
+                        jwt = cookie.getValue();
+                        break;
+                    }
+                }
+            }
+
+            // Check Authorization header
+            if (jwt == null) {
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    jwt = authHeader.substring(7);
+                }
+            }
+
+            if (jwt != null) {
+                return jwtService.isGracePeriodToken(jwt);
+            }
+        } catch (Exception e) {
+            // If we can't determine, assume not in grace period
+        }
+        return false;
+    }
+
+    /**
+     * Check if user needs to complete MFA setup (in grace period or MFA not enabled when required).
+     * Throws exception if user tries to access non-MFA operations while in grace period.
+     */
+    public void checkMfaSetupRequired() {
+        if (isInGracePeriod()) {
+            throw new RuntimeException("MFA setup is required. Please complete MFA setup to access this feature.");
+        }
     }
 }

@@ -50,6 +50,26 @@ type UserDto {
     organizationId: String
     accessibleEnvironmentIds: [String!]
     isActive: Boolean!
+    mfaEnabled: Boolean!
+    mfaType: String
+}
+
+# MFA Types
+type MfaSetupResult {
+    secretKey: String!
+    qrCodeDataUrl: String!
+    qrCodeUri: String!
+    deviceId: String!
+}
+
+type MfaSetupCompleteResult {
+    backupCodes: [String!]!
+}
+
+type MfaStatus {
+    enabled: Boolean!
+    type: String
+    unusedBackupCodesCount: Int!
 }
 
 # The User type is now used for nested resolutions (e.g., Organization.users)
@@ -75,6 +95,8 @@ type Organization {
     clusters: [KafkaCluster!]
     users: [User!]
     isActive: Boolean!
+    mfaRequired: Boolean!
+    mfaGracePeriodDays: Int
 }
 
 type Environment {
@@ -451,6 +473,12 @@ enum AuditActionType {
     BULK_OPERATION
     EXPORT
     IMPORT
+    MFA_SETUP_INITIATED
+    MFA_SETUP_COMPLETED
+    MFA_DISABLED
+    MFA_VERIFICATION_SUCCESS
+    MFA_VERIFICATION_FAILED
+    MFA_BACKUP_CODES_REGENERATED
 }
 
 enum AuditResourceType {
@@ -551,7 +579,12 @@ type AuditLogStatistics {
 
 type AuthResponse {
     token: String!
-    user: UserDto!
+    user: UserDto
+    mfaRequired: Boolean!
+    mfaType: String
+    mfaGracePeriod: Boolean
+    mfaGracePeriodDaysRemaining: Long
+    mfaSetupRequired: Boolean
 }
 
 input UserInput {
@@ -572,6 +605,11 @@ input OrganizationInput {
     name: String!
     description: String
     isActive: Boolean!
+}
+
+input OrganizationMfaPolicyInput {
+    mfaRequired: Boolean!
+    mfaGracePeriodDays: Int
 }
 
 input EnvironmentInput {
@@ -836,6 +874,7 @@ type Query {
     me: UserDto
     users(organizationId: String): [UserDto!]!
     user(id: ID!): UserDto
+    mfaStatus: MfaStatus!
 
     # Organization queries
     organizations: [Organization!]!
@@ -914,6 +953,16 @@ type Mutation {
     # Authentication mutations
     login(input: LoginInput!): AuthResponse!
     register(input: UserInput!): AuthResponse!
+    verifyMfaCode(challengeToken: String!, code: String!, isBackupCode: Boolean = false): AuthResponse!
+    
+    # MFA management mutations
+    setupMfa: MfaSetupResult!
+    verifyMfaSetup(deviceId: String!, code: String!): MfaSetupCompleteResult!
+    disableMfa(password: String!): Boolean!
+    regenerateBackupCodes(password: String!): [String!]!
+    
+    # Organization MFA policy mutations
+    updateOrganizationMfaPolicy(organizationId: ID!, input: OrganizationMfaPolicyInput!): Organization!
 
     # User mutations
     createUser(input: UserInput!): UserDto!

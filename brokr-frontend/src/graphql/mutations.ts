@@ -3,7 +3,7 @@ import gql from 'graphql-tag'
 export const LOGIN_MUTATION = gql`
     mutation Login($input: LoginInput!) {
         login(input: $input) {
-            # Token is now in HttpOnly cookie, not returned in response (secure against XSS)
+            token
             user {
                 id
                 username
@@ -14,7 +14,76 @@ export const LOGIN_MUTATION = gql`
                 organizationId
                 accessibleEnvironmentIds
                 isActive
+                mfaEnabled
+                mfaType
             }
+            mfaRequired
+            mfaType
+        }
+    }
+`
+
+export const VERIFY_MFA_CODE_MUTATION = gql`
+    mutation VerifyMfaCode($challengeToken: String!, $code: String!, $isBackupCode: Boolean) {
+        verifyMfaCode(challengeToken: $challengeToken, code: $code, isBackupCode: $isBackupCode) {
+            token
+            user {
+                id
+                username
+                email
+                firstName
+                lastName
+                role
+                organizationId
+                accessibleEnvironmentIds
+                isActive
+                mfaEnabled
+                mfaType
+            }
+            mfaRequired
+            mfaType
+        }
+    }
+`
+
+export const SETUP_MFA_MUTATION = gql`
+    mutation SetupMfa {
+        setupMfa {
+            secretKey
+            qrCodeDataUrl
+            qrCodeUri
+            deviceId
+        }
+    }
+`
+
+export const VERIFY_MFA_SETUP_MUTATION = gql`
+    mutation VerifyMfaSetup($deviceId: String!, $code: String!) {
+        verifyMfaSetup(deviceId: $deviceId, code: $code) {
+            backupCodes
+        }
+    }
+`
+
+export const DISABLE_MFA_MUTATION = gql`
+    mutation DisableMfa($password: String!) {
+        disableMfa(password: $password)
+    }
+`
+
+export const REGENERATE_BACKUP_CODES_MUTATION = gql`
+    mutation RegenerateBackupCodes($password: String!) {
+        regenerateBackupCodes(password: $password)
+    }
+`
+
+export const UPDATE_ORGANIZATION_MFA_POLICY_MUTATION = gql`
+    mutation UpdateOrganizationMfaPolicy($organizationId: ID!, $input: OrganizationMfaPolicyInput!) {
+        updateOrganizationMfaPolicy(organizationId: $organizationId, input: $input) {
+            id
+            name
+            mfaRequired
+            mfaGracePeriodDays
         }
     }
 `

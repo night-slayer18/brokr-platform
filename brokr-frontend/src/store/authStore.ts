@@ -12,6 +12,8 @@ export interface User {
     organizationId?: string
     accessibleEnvironmentIds: string[]
     isActive: boolean
+    mfaEnabled?: boolean
+    mfaType?: string | null
 }
 
 interface AuthState {

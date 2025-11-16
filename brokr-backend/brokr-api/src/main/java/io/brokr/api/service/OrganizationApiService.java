@@ -1,6 +1,7 @@
 package io.brokr.api.service;
 
 import io.brokr.api.input.OrganizationInput;
+import io.brokr.api.input.OrganizationMfaPolicyInput;
 import io.brokr.core.dto.EnvironmentDto;
 import io.brokr.core.dto.OrganizationDto;
 import io.brokr.core.exception.AccessDeniedException;
@@ -167,5 +168,38 @@ public class OrganizationApiService {
         }
         // Throw exception if not found, consistent with other methods
         throw new ResourceNotFoundException("Organization not found with id: " + id);
+    }
+
+    @Transactional
+    public Organization updateOrganizationMfaPolicy(String id, OrganizationMfaPolicyInput input) {
+        var currentUser = authorizationService.getCurrentUser();
+        
+        // ADMIN can only update their own organization
+        if (currentUser.getRole() == Role.ADMIN) {
+            if (!currentUser.getOrganizationId().equals(id)) {
+                throw new AccessDeniedException("ADMIN can only update their own organization");
+            }
+        }
+        
+        OrganizationEntity entity = organizationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
+
+        if (input.getMfaRequired() != null) {
+            boolean wasRequired = entity.isMfaRequired();
+            entity.setMfaRequired(input.getMfaRequired());
+            
+            // Set timestamp when MFA is first required (for grace period calculation)
+            if (input.getMfaRequired() && !wasRequired) {
+                entity.setMfaRequiredSince(java.time.LocalDateTime.now());
+            } else if (!input.getMfaRequired()) {
+                // Clear timestamp when MFA requirement is removed
+                entity.setMfaRequiredSince(null);
+            }
+        }
+        if (input.getMfaGracePeriodDays() != null) {
+            entity.setMfaGracePeriodDays(input.getMfaGracePeriodDays());
+        }
+
+        return organizationRepository.save(entity).toDomain();
     }
 }

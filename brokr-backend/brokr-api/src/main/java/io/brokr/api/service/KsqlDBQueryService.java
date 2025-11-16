@@ -37,11 +37,15 @@ public class KsqlDBQueryService {
 
     /**
      * Execute a ksqlDB query (SELECT statements)
+     * SECURITY: Validates query before execution
      */
     @Transactional
     public KsqlDBService.KsqlQueryResult executeQuery(String ksqlDBId, String query, Map<String, Object> properties) {
         User currentUser = authorizationService.getCurrentUser();
         KsqlDB ksqlDB = getKsqlDB(ksqlDBId);
+
+        // Validate query before execution
+        validateKsqlQuery(query);
 
         long startTime = System.currentTimeMillis();
         String status = "SUCCESS";
@@ -75,11 +79,15 @@ public class KsqlDBQueryService {
 
     /**
      * Execute a ksqlDB statement (DDL statements like CREATE, DROP, etc.)
+     * SECURITY: Validates statement before execution
      */
     @Transactional
     public KsqlDBService.KsqlStatementResult executeStatement(String ksqlDBId, String statement, Map<String, Object> properties) {
         User currentUser = authorizationService.getCurrentUser();
         KsqlDB ksqlDB = getKsqlDB(ksqlDBId);
+
+        // Validate statement before execution
+        validateKsqlStatement(statement);
 
         long startTime = System.currentTimeMillis();
         String queryType = determineQueryType(statement);
@@ -250,6 +258,76 @@ public class KsqlDBQueryService {
             return "EXPLAIN";
         }
         return "OTHER";
+    }
+
+    /**
+     * Validates KSQL query to prevent malicious queries.
+     * Basic validation: checks for dangerous patterns and query length.
+     */
+    private void validateKsqlQuery(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new IllegalArgumentException("Query cannot be null or empty");
+        }
+
+        String trimmed = query.trim();
+        
+        // Check query length (prevent extremely long queries)
+        if (trimmed.length() > 100000) { // 100KB limit
+            throw new IllegalArgumentException("Query too long (max 100KB)");
+        }
+
+        // Basic check: query should start with SELECT, PRINT, SHOW, DESCRIBE, or EXPLAIN
+        String upper = trimmed.toUpperCase();
+        if (!upper.startsWith("SELECT") && 
+            !upper.startsWith("PRINT") && 
+            !upper.startsWith("SHOW") && 
+            !upper.startsWith("DESCRIBE") && 
+            !upper.startsWith("EXPLAIN")) {
+            throw new IllegalArgumentException("Query must start with SELECT, PRINT, SHOW, DESCRIBE, or EXPLAIN");
+        }
+
+        // Prevent multiple statements (semicolon injection)
+        if (trimmed.split(";").length > 1) {
+            throw new IllegalArgumentException("Query cannot contain multiple statements");
+        }
+    }
+
+    /**
+     * Validates KSQL statement to prevent malicious statements.
+     * Basic validation: checks for dangerous patterns and statement length.
+     */
+    private void validateKsqlStatement(String statement) {
+        if (statement == null || statement.trim().isEmpty()) {
+            throw new IllegalArgumentException("Statement cannot be null or empty");
+        }
+
+        String trimmed = statement.trim();
+        
+        // Check statement length (prevent extremely long statements)
+        if (trimmed.length() > 100000) { // 100KB limit
+            throw new IllegalArgumentException("Statement too long (max 100KB)");
+        }
+
+        // Basic check: statement should start with allowed keywords
+        String upper = trimmed.toUpperCase();
+        String[] allowedKeywords = {"CREATE", "DROP", "ALTER", "TERMINATE", "INSERT", "SHOW", "DESCRIBE", "EXPLAIN"};
+        boolean startsWithAllowed = false;
+        for (String keyword : allowedKeywords) {
+            if (upper.startsWith(keyword)) {
+                startsWithAllowed = true;
+                break;
+            }
+        }
+        
+        if (!startsWithAllowed) {
+            throw new IllegalArgumentException("Statement must start with one of: CREATE, DROP, ALTER, TERMINATE, INSERT, SHOW, DESCRIBE, EXPLAIN");
+        }
+
+        // Prevent multiple statements (semicolon injection)
+        String[] statements = trimmed.split(";");
+        if (statements.length > 2) { // Allow one semicolon at the end
+            throw new IllegalArgumentException("Statement cannot contain multiple statements");
+        }
     }
 }
 

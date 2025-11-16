@@ -1,3 +1,4 @@
+import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {useForm} from 'react-hook-form'
 import {zodResolver} from '@hookform/resolvers/zod'
@@ -13,6 +14,7 @@ import {Loader2} from 'lucide-react'
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
 import {extractErrorMessage} from '@/lib/error-utils'
 import type {LoginMutation} from '@/graphql/types'
+import {MfaVerificationForm} from './MfaVerificationForm'
 
 const loginSchema = z.object({
     username: z.string().email('Please enter a valid email address'),
@@ -24,6 +26,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 export function LoginForm() {
     const navigate = useNavigate()
     const login = useAuthStore((state) => state.login)
+    const [mfaChallenge, setMfaChallenge] = useState<{token: string; mfaType: string} | null>(null)
     const {mutate: loginMutation, isPending: loading} = useGraphQLMutation<LoginMutation, {input: {username: string; password: string}}>(LOGIN_MUTATION)
 
     const {
@@ -44,17 +47,46 @@ export function LoginForm() {
             },
             {
                 onSuccess: (result) => {
-                    // Token is now in HttpOnly cookie, not in response
-                    const {user} = result.login
-                    login(user)
-                    toast.success('Logged in successfully')
-                    navigate('/dashboard')
+                    const {user, mfaRequired, token, mfaType} = result.login
+                    
+                    if (mfaRequired && token && mfaType) {
+                        // MFA challenge required - show MFA verification form
+                        setMfaChallenge({token, mfaType})
+                    } else if (user) {
+                        // No MFA - proceed with normal login
+                        login(user)
+                        toast.success('Logged in successfully')
+                        navigate('/dashboard')
+                    } else {
+                        toast.error('Login failed - invalid response')
+                    }
                 },
                 onError: (error: Error) => {
                     const errorMessage = extractErrorMessage(error)
                     toast.error(errorMessage || 'Login failed. Please check your credentials and try again.')
                 },
             }
+        )
+    }
+
+    const handleMfaSuccess = () => {
+        setMfaChallenge(null)
+        navigate('/dashboard')
+    }
+
+    const handleMfaCancel = () => {
+        setMfaChallenge(null)
+    }
+
+    // Show MFA verification form if challenge is active
+    if (mfaChallenge) {
+        return (
+            <MfaVerificationForm
+                challengeToken={mfaChallenge.token}
+                mfaType={mfaChallenge.mfaType}
+                onSuccess={handleMfaSuccess}
+                onCancel={handleMfaCancel}
+            />
         )
     }
 

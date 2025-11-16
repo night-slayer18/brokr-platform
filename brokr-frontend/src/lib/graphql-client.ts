@@ -135,7 +135,7 @@ function createGraphQLClient(): GraphQLClient {
 export const graphqlClient = new Proxy({} as GraphQLClient, {
     get(_target, prop) {
         const client = createGraphQLClient();
-        const value = (client as any)[prop];
+        const value = (client as unknown as Record<string, unknown>)[prop as string];
         if (typeof value === 'function') {
             return value.bind(client);
         }
@@ -144,48 +144,51 @@ export const graphqlClient = new Proxy({} as GraphQLClient, {
 });
 
 // Helper function to execute GraphQL requests with error handling
-async function executeRequest<TData = any, TVariables = any>(
+async function executeRequest<TData = unknown, TVariables = unknown>(
     document: DocumentNode | string,
     variables?: TVariables
 ): Promise<TData> {
     try {
         const queryString = typeof document === 'string' ? document : print(document);
         // graphql-request expects variables to be an object or undefined
-        const vars = (variables ?? {}) as Record<string, any>;
-        return await graphqlClient.request<TData, Record<string, any>>(queryString, vars);
-    } catch (error: any) {
+        const vars = (variables ?? {}) as Record<string, unknown>;
+        return await graphqlClient.request<TData, Record<string, unknown>>(queryString, vars);
+    } catch (error: unknown) {
         // Handle GraphQL errors
-        if (error.response?.errors) {
-            const graphqlErrors = error.response.errors;
-            graphqlErrors.forEach((err: any) => {
-                console.error(
-                    `[GraphQL error]: Message: ${err.message}, Location: ${err.locations}, Path: ${err.path}`
-                );
+        if (error && typeof error === 'object' && 'response' in error) {
+            const response = (error as { response?: { errors?: Array<{ message?: string; locations?: unknown; path?: unknown }> } }).response;
+            if (response?.errors) {
+                const graphqlErrors = response.errors;
+                graphqlErrors.forEach((err) => {
+                    console.error(
+                        `[GraphQL error]: Message: ${err.message}, Location: ${err.locations}, Path: ${err.path}`
+                    );
 
-                // Handle unauthorized errors
-                if (err.message.includes('Unauthorized') || err.message.includes('401') || err.message.includes('authentication')) {
-                    // Clear auth state and redirect to login
-                    if (typeof window !== 'undefined') {
-                        window.location.href = '/login';
+                    // Handle unauthorized errors
+                    if (err.message?.includes('Unauthorized') || err.message?.includes('401') || err.message?.includes('authentication')) {
+                        // Clear auth state and redirect to login
+                        if (typeof window !== 'undefined') {
+                            window.location.href = '/login';
+                        }
+                        throw new Error('Unauthorized. Please log in again.');
                     }
-                    throw new Error('Unauthorized. Please log in again.');
-                }
-            });
-        } else if (error.message) {
-            console.error(`[Network error]: ${error.message}`);
+                });
+            }
+        } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
+            console.error(`[Network error]: ${(error as { message: string }).message}`);
         }
 
         // Create a new error with extracted message for better error handling
         const errorMessage = extractErrorMessage(error);
         const enhancedError = new Error(errorMessage);
         // Preserve original error for debugging
-        (enhancedError as any).originalError = error;
+        (enhancedError as Error & { originalError?: unknown }).originalError = error;
         throw enhancedError;
     }
 }
 
 // Helper function to execute GraphQL requests
-export async function executeGraphQL<TData = any, TVariables = any>(
+export async function executeGraphQL<TData = unknown, TVariables = unknown>(
     query: DocumentNode | string,
     variables?: TVariables
 ): Promise<TData> {

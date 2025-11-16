@@ -16,6 +16,14 @@ export interface GetMeQuery {
     me: User
 }
 
+export interface GetMfaStatusQuery {
+    mfaStatus: {
+        enabled: boolean
+        type: string | null
+        unusedBackupCodesCount: number
+    }
+}
+
 export interface GetClustersQuery {
     clusters: KafkaCluster[]
 }
@@ -92,6 +100,8 @@ export interface GetOrganizationQuery {
         name: string;
         description?: string | null;
         isActive: boolean;
+        mfaRequired?: boolean;
+        mfaGracePeriodDays?: number | null;
         users?: Array<{
             id: string;
             username: string;
@@ -134,8 +144,34 @@ export interface GetMessagesQuery {
 // Mutation Response Types
 export interface LoginMutation {
     login: {
-        // Token is now in HttpOnly cookie, not returned in response (secure against XSS)
+        token: string
+        user: User | null
+        mfaRequired: boolean
+        mfaType: string | null
+    }
+}
+
+export interface VerifyMfaCodeMutation {
+    verifyMfaCode: {
+        token: string
         user: User
+        mfaRequired: boolean
+        mfaType: string | null
+    }
+}
+
+export interface SetupMfaMutation {
+    setupMfa: {
+        secretKey: string
+        qrCodeDataUrl: string
+        qrCodeUri: string
+        deviceId: string
+    }
+}
+
+export interface VerifyMfaSetupMutation {
+    verifyMfaSetup: {
+        backupCodes: string[]
     }
 }
 
@@ -551,6 +587,15 @@ export interface UpdateOrganizationMutation {
 
 export interface DeleteOrganizationMutation {
     deleteOrganization: boolean;
+}
+
+export interface UpdateOrganizationMfaPolicyMutation {
+    updateOrganizationMfaPolicy: {
+        id: string;
+        name: string;
+        mfaRequired: boolean;
+        mfaGracePeriodDays?: number | null;
+    };
 }
 
 // User mutation types

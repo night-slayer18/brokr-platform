@@ -27,6 +27,10 @@ export function UserMenu() {
         navigate('/profile')
     }
 
+    const handleSettings = () => {
+        navigate('/settings')
+    }
+
     const getUserInitials = () => {
         if (user?.firstName && user?.lastName) {
             return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
@@ -74,10 +78,9 @@ export function UserMenu() {
                     <User className="mr-2 h-4 w-4"/>
                     <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                <DropdownMenuItem onClick={handleSettings} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4"/>
                     <span>Settings</span>
-                    <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator/>
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-foreground hover:text-foreground focus:text-foreground">

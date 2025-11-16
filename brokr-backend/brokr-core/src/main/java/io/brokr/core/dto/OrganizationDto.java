@@ -18,6 +18,10 @@ public class OrganizationDto {
     private String description;
     private List<EnvironmentDto> environments;
     private boolean isActive;
+    
+    // MFA Policy fields
+    private boolean mfaRequired;
+    private Integer mfaGracePeriodDays;
 
     public static OrganizationDto fromDomain(Organization organization) {
         return OrganizationDto.builder()
@@ -25,6 +29,8 @@ public class OrganizationDto {
                 .name(organization.getName())
                 .description(organization.getDescription())
                 .isActive(organization.isActive())
+                .mfaRequired(organization.isMfaRequired())
+                .mfaGracePeriodDays(organization.getMfaGracePeriodDays())
                 .build();
     }
 }

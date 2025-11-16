@@ -22,6 +22,7 @@ public class UserResolver {
     private final UserApiService userApiService;
 
     @QueryMapping
+    @PreAuthorize("isAuthenticated()")
     public UserDto me() {
         return UserDto.fromDomain(userApiService.getCurrentUser());
     }

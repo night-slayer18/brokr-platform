@@ -32,12 +32,27 @@ public class OrganizationEntity {
     @Builder.Default
     private List<EnvironmentEntity> environments = new ArrayList<>();
 
+    // MFA Policy fields
+    @Column(name = "mfa_required", nullable = false)
+    @Builder.Default
+    private boolean mfaRequired = false;
+
+    @Column(name = "mfa_grace_period_days")
+    @Builder.Default
+    private Integer mfaGracePeriodDays = 7;
+
+    @Column(name = "mfa_required_since")
+    private java.time.LocalDateTime mfaRequiredSince;
+
     public Organization toDomain() {
         return Organization.builder()
                 .id(id)
                 .name(name)
                 .description(description)
                 .isActive(isActive)
+                .mfaRequired(mfaRequired)
+                .mfaGracePeriodDays(mfaGracePeriodDays)
+                .mfaRequiredSince(mfaRequiredSince)
                 .build();
     }
 
@@ -55,6 +70,9 @@ public class OrganizationEntity {
                 .name(organization.getName())
                 .description(organization.getDescription())
                 .isActive(organization.isActive())
+                .mfaRequired(organization.isMfaRequired())
+                .mfaGracePeriodDays(organization.getMfaGracePeriodDays())
+                .mfaRequiredSince(organization.getMfaRequiredSince())
                 .environments(envEntities)
                 .build();
     }

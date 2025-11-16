@@ -26,7 +26,23 @@ export function useGraphQLMutation<TData = any, TVariables = any>(
       
       // Invalidate queries that might be affected by this mutation
       // Check if mutation contains keywords to determine what to invalidate
-      if (mutationString.includes('cluster') || mutationString.includes('Cluster')) {
+      if (mutationString.includes('mfa') || mutationString.includes('Mfa') || mutationString.includes('MFA') || 
+          mutationString.includes('backup') || mutationString.includes('Backup') || 
+          mutationString.includes('regenerateBackupCodes') || mutationString.includes('disableMfa') ||
+          mutationString.includes('setupMfa') || mutationString.includes('verifyMfaSetup')) {
+        // Invalidate MFA-related queries (mfaStatus, me query which includes mfaEnabled)
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const queryKey = query.queryKey[0];
+            const queryString = query.queryKey[1]?.toString() || '';
+            return queryKey === 'graphql' && 
+                   (queryString.includes('mfaStatus') || 
+                    queryString.includes('mfaEnabled') ||
+                    queryString.includes('GetMe') ||
+                    queryString.includes('me {'));
+          }
+        });
+      } else if (mutationString.includes('cluster') || mutationString.includes('Cluster')) {
         queryClient.invalidateQueries({ 
           predicate: (query) => {
             const queryKey = query.queryKey[0];

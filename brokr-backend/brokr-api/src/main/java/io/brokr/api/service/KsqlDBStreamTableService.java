@@ -169,12 +169,20 @@ public class KsqlDBStreamTableService {
 
     /**
      * Drop a stream
+     * SECURITY: Validates and sanitizes stream name to prevent injection attacks
      */
     @Transactional
     public boolean dropStream(String ksqlDBId, String streamName) {
         KsqlDB ksqlDB = getKsqlDB(ksqlDBId);
 
-        String dropStatement = "DROP STREAM IF EXISTS " + streamName + ";";
+        // Validate and sanitize stream name to prevent SQL injection
+        String sanitizedStreamName = validateAndSanitizeIdentifier(streamName);
+        
+        // Verify stream exists in database before dropping (additional security check)
+        streamTableRepository.findByKsqlDbIdAndName(ksqlDBId, sanitizedStreamName)
+                .orElseThrow(() -> new ResourceNotFoundException("Stream not found: " + sanitizedStreamName));
+
+        String dropStatement = "DROP STREAM IF EXISTS " + sanitizedStreamName + ";";
         KsqlDBService.KsqlStatementResult result = ksqlDBService.executeStatement(ksqlDB, dropStatement, null);
         
         if (result.getErrorMessage() != null) {
@@ -182,18 +190,26 @@ public class KsqlDBStreamTableService {
         }
 
         // Delete from database
-        streamTableRepository.deleteByKsqlDbIdAndName(ksqlDBId, streamName);
+        streamTableRepository.deleteByKsqlDbIdAndName(ksqlDBId, sanitizedStreamName);
         return true;
     }
 
     /**
      * Drop a table
+     * SECURITY: Validates and sanitizes table name to prevent injection attacks
      */
     @Transactional
     public boolean dropTable(String ksqlDBId, String tableName) {
         KsqlDB ksqlDB = getKsqlDB(ksqlDBId);
 
-        String dropStatement = "DROP TABLE IF EXISTS " + tableName + ";";
+        // Validate and sanitize table name to prevent SQL injection
+        String sanitizedTableName = validateAndSanitizeIdentifier(tableName);
+        
+        // Verify table exists in database before dropping (additional security check)
+        streamTableRepository.findByKsqlDbIdAndName(ksqlDBId, sanitizedTableName)
+                .orElseThrow(() -> new ResourceNotFoundException("Table not found: " + sanitizedTableName));
+
+        String dropStatement = "DROP TABLE IF EXISTS " + sanitizedTableName + ";";
         KsqlDBService.KsqlStatementResult result = ksqlDBService.executeStatement(ksqlDB, dropStatement, null);
         
         if (result.getErrorMessage() != null) {
@@ -201,7 +217,7 @@ public class KsqlDBStreamTableService {
         }
 
         // Delete from database
-        streamTableRepository.deleteByKsqlDbIdAndName(ksqlDBId, tableName);
+        streamTableRepository.deleteByKsqlDbIdAndName(ksqlDBId, sanitizedTableName);
         return true;
     }
 
@@ -302,6 +318,46 @@ public class KsqlDBStreamTableService {
         }
         
         return name.toString().trim();
+    }
+
+    /**
+     * Validates and sanitizes KSQL identifier (stream/table name) to prevent injection attacks.
+     * KSQL identifiers must:
+     * - Start with a letter or underscore
+     * - Contain only letters, digits, and underscores
+     * - Not contain SQL keywords or special characters
+     * 
+     * @param identifier The identifier to validate
+     * @return Sanitized identifier
+     * @throws IllegalArgumentException if identifier is invalid
+     */
+    private String validateAndSanitizeIdentifier(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) {
+            throw new IllegalArgumentException("Identifier cannot be null or empty");
+        }
+
+        String trimmed = identifier.trim();
+        
+        // Check length (KSQL has reasonable limits)
+        if (trimmed.length() > 255) {
+            throw new IllegalArgumentException("Identifier too long (max 255 characters)");
+        }
+
+        // KSQL identifiers must start with letter or underscore, and contain only alphanumeric and underscore
+        if (!trimmed.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+            throw new IllegalArgumentException("Invalid identifier format. Must start with letter or underscore and contain only alphanumeric characters and underscores");
+        }
+
+        // Additional check: prevent common SQL injection patterns
+        String upper = trimmed.toUpperCase();
+        String[] dangerousKeywords = {"DROP", "DELETE", "TRUNCATE", "ALTER", "CREATE", "INSERT", "UPDATE", "SELECT", "EXEC", "EXECUTE", "UNION", "SCRIPT"};
+        for (String keyword : dangerousKeywords) {
+            if (upper.contains(keyword)) {
+                throw new IllegalArgumentException("Identifier contains potentially dangerous keyword: " + keyword);
+            }
+        }
+
+        return trimmed;
     }
 }
 

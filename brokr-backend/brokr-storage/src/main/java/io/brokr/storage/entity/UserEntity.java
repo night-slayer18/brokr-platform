@@ -1,5 +1,6 @@
 package io.brokr.storage.entity;
 
+import io.brokr.core.model.MfaType;
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
 import jakarta.persistence.*;
@@ -52,6 +53,20 @@ public class UserEntity {
     @Column(nullable = false)
     private boolean isActive;
 
+    // MFA fields
+    @Column(name = "mfa_enabled", nullable = false)
+    @Builder.Default
+    private boolean mfaEnabled = false;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "mfa_type", length = 20)
+    private MfaType mfaType;
+
+    @Column(name = "mfa_enforced", nullable = false)
+    @Builder.Default
+    private boolean mfaEnforced = false;
+
     public User toDomain() {
         return User.builder()
                 .id(id)
@@ -64,6 +79,9 @@ public class UserEntity {
                 .organizationId(organizationId)
                 .accessibleEnvironmentIds(accessibleEnvironmentIds)
                 .isActive(isActive)
+                .mfaEnabled(mfaEnabled)
+                .mfaType(mfaType)
+                .mfaEnforced(mfaEnforced)
                 .build();
     }
 
@@ -79,6 +97,9 @@ public class UserEntity {
                 .organizationId(user.getOrganizationId())
                 .accessibleEnvironmentIds(user.getAccessibleEnvironmentIds())
                 .isActive(user.isActive())
+                .mfaEnabled(user.isMfaEnabled())
+                .mfaType(user.getMfaType())
+                .mfaEnforced(user.isMfaEnforced())
                 .build();
     }
 }

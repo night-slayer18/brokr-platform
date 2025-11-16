@@ -2,6 +2,7 @@ package io.brokr.api.graphql;
 
 import io.brokr.api.annotation.AuditLoggable;
 import io.brokr.api.input.OrganizationInput;
+import io.brokr.api.input.OrganizationMfaPolicyInput;
 import io.brokr.api.service.ClusterApiService;
 import io.brokr.api.service.EnvironmentApiService;
 import io.brokr.api.service.OrganizationApiService;
@@ -121,5 +122,12 @@ public class OrganizationResolver {
     @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.ORGANIZATION, resourceIdParam = "id")
     public boolean deleteOrganization(@Argument String id) {
         return organizationApiService.deleteOrganization(id);
+    }
+
+    @MutationMapping
+    @PreAuthorize("@authorizationService.canManageOwnOrganization(#organizationId)")
+    @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.ORGANIZATION, resourceIdParam = "organizationId")
+    public Organization updateOrganizationMfaPolicy(@Argument String organizationId, @Argument OrganizationMfaPolicyInput input) {
+        return organizationApiService.updateOrganizationMfaPolicy(organizationId, input);
     }
 }

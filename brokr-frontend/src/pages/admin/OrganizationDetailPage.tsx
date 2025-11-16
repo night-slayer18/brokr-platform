@@ -4,9 +4,14 @@ import type {GetOrganizationQuery} from '@/graphql/types'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Button} from '@/components/ui/button'
 import {Skeleton} from '@/components/ui/skeleton'
-import {ArrowLeft, Building2, Users, Server, Edit, Trash2, Plus} from 'lucide-react'
+import {Switch} from '@/components/ui/switch'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {ArrowLeft, Building2, Users, Server, Edit, Trash2, Plus, Shield} from 'lucide-react'
 import {useState, useEffect} from 'react'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
+import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
+import {UPDATE_ORGANIZATION_MFA_POLICY_MUTATION} from '@/graphql/mutations'
 import {ROLES} from '@/lib/constants'
 import {UserHierarchyTree} from '@/components/admin/UserHierarchyTree'
 import {UserDetailDrawer} from '@/components/admin/UserDetailDrawer'
@@ -14,13 +19,14 @@ import {EditOrganizationDialog} from '@/components/admin/EditOrganizationDialog'
 import {DeleteOrganizationDialog} from '@/components/admin/DeleteOrganizationDialog'
 import {CreateUserDialog} from '@/components/admin/CreateUserDialog'
 import {useAuth} from '@/hooks/useAuth'
+import {toast} from 'sonner'
 import type {GetOrganizationQuery as OrgQuery} from '@/graphql/types'
 
 export default function OrganizationDetailPage() {
     const {orgId} = useParams<{orgId: string}>()
     const navigate = useNavigate()
     const {canManageUsers, canManageOwnOrganization, canManageOrganizations} = useAuth()
-    const {data, isLoading, error} = useGraphQLQuery<GetOrganizationQuery, {id: string}>(GET_ORGANIZATION, 
+    const {data, isLoading, error, refetch} = useGraphQLQuery<GetOrganizationQuery, {id: string}>(GET_ORGANIZATION, 
         orgId ? {id: orgId} : undefined,
         {
             enabled: !!orgId,
@@ -31,6 +37,19 @@ export default function OrganizationDetailPage() {
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false)
+    const [mfaRequired, setMfaRequired] = useState(false)
+    const [mfaGracePeriodDays, setMfaGracePeriodDays] = useState(7)
+    
+    const {mutate: updateMfaPolicy, isPending: updatingMfaPolicy} = useGraphQLMutation(UPDATE_ORGANIZATION_MFA_POLICY_MUTATION)
+    
+    const organization = data?.organization
+    
+    useEffect(() => {
+        if (organization) {
+            setMfaRequired(organization.mfaRequired || false)
+            setMfaGracePeriodDays(organization.mfaGracePeriodDays || 7)
+        }
+    }, [organization])
 
     if (error) {
         return null
@@ -39,8 +58,6 @@ export default function OrganizationDetailPage() {
     if (!orgId) {
         return null
     }
-
-    const organization = data?.organization
 
     // Update selectedUser when organization data changes to ensure we have fresh data
     useEffect(() => {
@@ -164,6 +181,78 @@ export default function OrganizationDetailPage() {
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {canManageOwnOrganization(organization?.id || '') && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Shield className="h-5 w-5 text-primary"/>
+                            MFA Policy
+                        </CardTitle>
+                        <CardDescription>Require Multi-Factor Authentication for all users in this organization</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                                <Label htmlFor="mfa-required" className="text-base font-medium">
+                                    Require MFA for all users
+                                </Label>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    When enabled, all users in this organization must enable MFA to access the platform.
+                                </p>
+                            </div>
+                            <Switch
+                                id="mfa-required"
+                                checked={mfaRequired}
+                                onCheckedChange={setMfaRequired}
+                                disabled={updatingMfaPolicy}
+                            />
+                        </div>
+                        {mfaRequired && (
+                            <div className="space-y-2">
+                                <Label htmlFor="grace-period">Grace Period (days)</Label>
+                                <Input
+                                    id="grace-period"
+                                    type="number"
+                                    min="0"
+                                    max="30"
+                                    value={mfaGracePeriodDays}
+                                    onChange={(e) => setMfaGracePeriodDays(parseInt(e.target.value) || 7)}
+                                    disabled={updatingMfaPolicy}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Number of days users have to enable MFA before being locked out. Default is 7 days.
+                                </p>
+                            </div>
+                        )}
+                        <Button
+                            onClick={() => {
+                                updateMfaPolicy(
+                                    {
+                                        organizationId: organization?.id || '',
+                                        input: {
+                                            mfaRequired,
+                                            mfaGracePeriodDays: mfaRequired ? mfaGracePeriodDays : null,
+                                        },
+                                    },
+                                    {
+                                        onSuccess: () => {
+                                            toast.success('MFA policy updated successfully')
+                                            refetch()
+                                        },
+                                        onError: (error: Error) => {
+                                            toast.error(error.message || 'Failed to update MFA policy')
+                                        },
+                                    }
+                                )
+                            }}
+                            disabled={updatingMfaPolicy || !organization}
+                        >
+                            {updatingMfaPolicy ? 'Saving...' : 'Save MFA Policy'}
+                        </Button>
+                    </CardContent>
+                </Card>
             )}
 
             <Card>

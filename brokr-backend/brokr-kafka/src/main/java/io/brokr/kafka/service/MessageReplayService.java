@@ -240,25 +240,33 @@ public class MessageReplayService {
     /**
      * Processes pending jobs when slots become available.
      * Called after a job completes to allow queued jobs to start.
+     * FIXED: Race condition - check and start jobs atomically within synchronized block
      */
     private void processPendingJobs() {
-        if (runningJobs.size() >= maxConcurrentJobs) {
-            return;  // No slots available
-        }
-        
-        // Find oldest pending job
-        List<MessageReplayJobEntity> pendingJobs = replayJobRepository.findActiveJobs()
-                .stream()
-                .filter(job -> job.getStatus() == ReplayJobStatus.PENDING)
-                .sorted(Comparator.comparing(MessageReplayJobEntity::getCreatedAt))
-                .limit(maxConcurrentJobs - runningJobs.size())
-                .toList();
-        
-        for (MessageReplayJobEntity job : pendingJobs) {
-            if (runningJobs.size() >= maxConcurrentJobs) {
-                break;
+        // Use synchronized block to prevent race condition
+        synchronized (concurrentLimitLock) {
+            int availableSlots = maxConcurrentJobs - runningJobs.size();
+            if (availableSlots <= 0) {
+                return;  // No slots available
             }
-            startReplayJobExecution(job.getId());
+            
+            // Find oldest pending jobs (limit to available slots)
+            List<MessageReplayJobEntity> pendingJobs = replayJobRepository.findActiveJobs()
+                    .stream()
+                    .filter(job -> job.getStatus() == ReplayJobStatus.PENDING)
+                    .sorted(Comparator.comparing(MessageReplayJobEntity::getCreatedAt))
+                    .limit(availableSlots)
+                    .toList();
+            
+            // Start jobs atomically - check is already done in startReplayJobExecution's sync block
+            // but we limit the number we attempt to start here
+            for (MessageReplayJobEntity job : pendingJobs) {
+                // Double-check inside loop (defensive programming)
+                if (runningJobs.size() >= maxConcurrentJobs) {
+                    break;
+                }
+                startReplayJobExecution(job.getId());
+            }
         }
     }
     

@@ -16,6 +16,9 @@ CREATE TABLE users (
                        role user_role NOT NULL,
                        organization_id VARCHAR(255),
                        is_active BOOLEAN NOT NULL DEFAULT true,
+                       mfa_enabled BOOLEAN DEFAULT FALSE,
+                       mfa_type VARCHAR(20),
+                       mfa_enforced BOOLEAN DEFAULT FALSE,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        FOREIGN KEY (organization_id) REFERENCES organizations(id)
@@ -26,6 +29,10 @@ CREATE INDEX idx_users_organization_id ON users(organization_id);
 -- Indexes on username and email for faster lookups (UNIQUE constraints already create indexes, but explicit for clarity)
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
+
+-- Indexes for MFA fields
+CREATE INDEX idx_users_mfa_enabled ON users(mfa_enabled);
+CREATE INDEX idx_users_mfa_enforced ON users(mfa_enforced);
 
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users

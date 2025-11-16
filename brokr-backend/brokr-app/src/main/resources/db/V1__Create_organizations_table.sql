@@ -4,9 +4,13 @@ CREATE TABLE organizations (
                                name VARCHAR(255) NOT NULL UNIQUE,
                                description TEXT,
                                is_active BOOLEAN NOT NULL DEFAULT true,
+                               mfa_required BOOLEAN DEFAULT FALSE,
+                               mfa_grace_period_days INT DEFAULT 7,
                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_organizations_mfa_required ON organizations(mfa_required);
 
 CREATE TRIGGER update_organizations_updated_at
     BEFORE UPDATE ON organizations

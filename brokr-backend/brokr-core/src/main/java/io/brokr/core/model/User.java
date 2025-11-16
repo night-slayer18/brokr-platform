@@ -22,4 +22,9 @@ public class User {
     private String organizationId;
     private List<String> accessibleEnvironmentIds;
     private boolean isActive;
+    
+    // MFA fields
+    private boolean mfaEnabled;
+    private MfaType mfaType;
+    private boolean mfaEnforced; // Organization-level enforcement
 }

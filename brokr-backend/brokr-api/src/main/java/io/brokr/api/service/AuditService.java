@@ -75,7 +75,6 @@ public class AuditService {
                 }
             } catch (Exception e) {
                 // User context not available (e.g., unauthenticated request)
-                log.debug("Could not enrich audit log with user context: {}", e.getMessage());
             }
 
             // Mask sensitive data
@@ -205,6 +204,55 @@ public class AuditService {
         logAction(auditLog);
     }
 
+    public void logMfaSetupInitiated(String userId, String userEmail) {
+        AuditLog auditLog = buildBaseAuditLog(AuditActionType.MFA_SETUP_INITIATED, AuditResourceType.USER, userId, userEmail);
+        auditLog.setStatus(AuditStatus.SUCCESS);
+        auditLog.setSeverity(AuditSeverity.INFO);
+        logAction(auditLog);
+    }
+
+    public void logMfaSetupCompleted(String userId, String userEmail) {
+        AuditLog auditLog = buildBaseAuditLog(AuditActionType.MFA_SETUP_COMPLETED, AuditResourceType.USER, userId, userEmail);
+        auditLog.setStatus(AuditStatus.SUCCESS);
+        auditLog.setSeverity(AuditSeverity.INFO);
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("mfaType", "TOTP");
+        auditLog.setMetadata(metadata);
+        logAction(auditLog);
+    }
+
+    public void logMfaDisabled(String userId, String userEmail) {
+        AuditLog auditLog = buildBaseAuditLog(AuditActionType.MFA_DISABLED, AuditResourceType.USER, userId, userEmail);
+        auditLog.setStatus(AuditStatus.SUCCESS);
+        auditLog.setSeverity(AuditSeverity.WARNING);
+        logAction(auditLog);
+    }
+
+    public void logMfaVerification(String userId, String userEmail, boolean success, String method, String error) {
+        AuditLog auditLog = buildBaseAuditLog(
+                success ? AuditActionType.MFA_VERIFICATION_SUCCESS : AuditActionType.MFA_VERIFICATION_FAILED,
+                AuditResourceType.USER, userId, userEmail);
+        auditLog.setStatus(success ? AuditStatus.SUCCESS : AuditStatus.FAILURE);
+        auditLog.setSeverity(success ? AuditSeverity.INFO : AuditSeverity.WARNING);
+        if (error != null) {
+            auditLog.setErrorMessage(error);
+        }
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("method", method); // "TOTP" or "BACKUP_CODE"
+        if (error != null) {
+            metadata.put("error", error);
+        }
+        auditLog.setMetadata(metadata);
+        logAction(auditLog);
+    }
+
+    public void logMfaBackupCodesRegenerated(String userId, String userEmail) {
+        AuditLog auditLog = buildBaseAuditLog(AuditActionType.MFA_BACKUP_CODES_REGENERATED, AuditResourceType.USER, userId, userEmail);
+        auditLog.setStatus(AuditStatus.SUCCESS);
+        auditLog.setSeverity(AuditSeverity.INFO);
+        logAction(auditLog);
+    }
+
     private AuditLog buildBaseAuditLog(AuditActionType actionType, AuditResourceType resourceType, 
                                        String resourceId, String resourceName) {
         AuditLog.AuditLogBuilder builder = AuditLog.builder()
@@ -226,7 +274,6 @@ public class AuditService {
                    .organizationId(currentUser.getOrganizationId());
         } catch (Exception e) {
             // User context not available
-            log.debug("Could not get user context for audit log: {}", e.getMessage());
         }
 
         return builder.build();

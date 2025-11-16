@@ -70,6 +70,32 @@ jwt:
   secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}
   expiration: ${JWT_EXPIRATION:86400}
 
+# MFA Configuration
+mfa:
+  encryption:
+    # Base64-encoded AES-256 key (32 bytes = 256 bits) for encrypting TOTP secret keys
+    # Generate with: openssl rand -base64 32
+    # 
+    # ⚠️ SECURITY WARNING: 
+    # - This is a DEVELOPMENT-ONLY default key
+    # - In PRODUCTION: MUST override via environment variable MFA_ENCRYPTION_KEY
+    # - NEVER use this default key in production environments
+    # - Generate a new key for production: openssl rand -base64 32
+    #
+    # To override in production:
+    #   export MFA_ENCRYPTION_KEY=$(openssl rand -base64 32)
+    key: ${MFA_ENCRYPTION_KEY:toIUKBWfqdYUG+2COEOSzH88vXYmqTfJPpkwthZOwxA=}
+  totp:
+    issuer: ${MFA_TOTP_ISSUER:Brokr Platform}
+  backup-codes:
+    count: ${MFA_BACKUP_CODES_COUNT:10}
+    length: ${MFA_BACKUP_CODES_LENGTH:8}
+  rate-limit:
+    # Rate limiting for MFA verification attempts to prevent brute force attacks
+    max-attempts: ${MFA_RATE_LIMIT_MAX_ATTEMPTS:5}  # Max failed attempts before lockout
+    window-minutes: ${MFA_RATE_LIMIT_WINDOW_MINUTES:15}  # Time window for counting attempts
+    lockout-minutes: ${MFA_RATE_LIMIT_LOCKOUT_MINUTES:30}  # Lockout duration after max attempts
+
 # Message Replay Configuration
 # Optimized for enterprise-scale operations (LinkedIn-scale ready)
 message-replay:

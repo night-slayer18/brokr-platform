@@ -18,6 +18,11 @@ public class Organization {
     private String description;
     private List<Environment> environments;
     private boolean isActive;
+    
+    // MFA Policy fields
+    private boolean mfaRequired;
+    private Integer mfaGracePeriodDays; // Grace period in days for users to enable MFA
+    private java.time.LocalDateTime mfaRequiredSince; // When MFA was required (for grace period calculation)
 
     // Convenience method for DTO conversion
     public OrganizationDto toDto() {

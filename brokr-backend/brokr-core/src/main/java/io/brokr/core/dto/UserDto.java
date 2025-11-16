@@ -22,6 +22,8 @@ public class UserDto {
     private String organizationId;
     private List<String> accessibleEnvironmentIds;
     private boolean isActive;
+    private boolean mfaEnabled;
+    private String mfaType;
 
     public static UserDto fromDomain(User user) {
         return UserDto.builder()
@@ -34,6 +36,8 @@ public class UserDto {
                 .organizationId(user.getOrganizationId())
                 .accessibleEnvironmentIds(user.getAccessibleEnvironmentIds())
                 .isActive(user.isActive())
+                .mfaEnabled(user.isMfaEnabled())
+                .mfaType(user.getMfaType() != null ? user.getMfaType().name() : null)
                 .build();
     }
 }

@@ -9,19 +9,18 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.lang.NonNull;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -64,33 +63,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtService.extractUsername(jwt);
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            if (userEmail != null) {
+                // Check if we need to set authentication (either no auth or not authenticated)
+                Authentication existingAuth = SecurityContextHolder.getContext().getAuthentication();
+                if (existingAuth == null || !existingAuth.isAuthenticated()) {
+                    UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                if (jwtService.validateToken(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    if (jwtService.validateToken(jwt, userDetails)) {
+                        // Reject challenge tokens - only accept fully verified tokens
+                        if (jwtService.isChallengeToken(jwt)) {
+                            // Don't set authentication - user needs to complete MFA
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+
+                        // Create authenticated token (3-parameter constructor with authorities automatically marks it as authenticated)
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request)
+                        );
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
                 }
             }
         } catch (SignatureException e) {
-            log.debug("JWT signature verification failed - token may be signed with different secret: {}", e.getMessage());
             // Invalid token signature - treat as unauthenticated and continue filter chain
             // User will be redirected to login by Spring Security
         } catch (ExpiredJwtException e) {
-            log.debug("JWT token expired: {}", e.getMessage());
             // Token expired - treat as unauthenticated and continue filter chain
         } catch (JwtException e) {
-            log.debug("JWT validation failed: {}", e.getMessage());
             // Any other JWT exception - treat as unauthenticated and continue filter chain
         } catch (Exception e) {
-            log.warn("Unexpected error during JWT authentication: {}", e.getMessage());
             // Unexpected error - treat as unauthenticated and continue filter chain
         }
 

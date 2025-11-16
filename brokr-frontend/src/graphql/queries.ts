@@ -12,6 +12,18 @@ export const GET_ME = gql`
             organizationId
             accessibleEnvironmentIds
             isActive
+            mfaEnabled
+            mfaType
+        }
+    }
+`
+
+export const GET_MFA_STATUS = gql`
+    query GetMfaStatus {
+        mfaStatus {
+            enabled
+            type
+            unusedBackupCodesCount
         }
     }
 `
@@ -616,6 +628,8 @@ export const GET_ORGANIZATION = gql`
             name
             description
             isActive
+            mfaRequired
+            mfaGracePeriodDays
             users {
                 id
                 username

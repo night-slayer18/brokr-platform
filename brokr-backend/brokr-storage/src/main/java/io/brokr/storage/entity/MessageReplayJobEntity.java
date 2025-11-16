@@ -1,9 +1,6 @@
 package io.brokr.storage.entity;
 
-import io.brokr.core.model.MessageFilter;
 import io.brokr.core.model.MessageReplayJob;
-import io.brokr.core.model.MessageTransformation;
-import io.brokr.core.model.ReplayJobProgress;
 import io.brokr.core.model.ReplayJobStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -17,7 +14,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "message_replay_jobs", indexes = {
