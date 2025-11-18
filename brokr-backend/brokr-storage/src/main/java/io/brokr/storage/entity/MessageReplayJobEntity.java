@@ -1,12 +1,17 @@
 package io.brokr.storage.entity;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.brokr.core.model.MessageFilter;
 import io.brokr.core.model.MessageReplayJob;
+import io.brokr.core.model.MessageTransformation;
+import io.brokr.core.model.ReplayJobProgress;
 import io.brokr.core.model.ReplayJobStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -26,7 +31,11 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Slf4j
 public class MessageReplayJobEntity {
+    
+    // Static ObjectMapper for JSON deserialization
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     @Id
     private String id;
     
@@ -127,10 +136,38 @@ public class MessageReplayJobEntity {
     private Integer retryDelaySeconds = 60;
     
     // Helper methods to convert between domain and entity
-    // Note: Full conversion of filters/transformation requires JSON serialization
-    // For now, we'll use Map<String, Object> and handle conversion in service layer
     
     public MessageReplayJob toDomain() {
+        // Deserialize filters from JSON
+        MessageFilter filters = null;
+        if (filtersJson != null && !filtersJson.isEmpty()) {
+            try {
+                filters = objectMapper.convertValue(filtersJson, MessageFilter.class);
+            } catch (Exception e) {
+                log.warn("Failed to deserialize filters for job {}: {}", id, e.getMessage());
+            }
+        }
+        
+        // Deserialize transformation from JSON
+        MessageTransformation transformation = null;
+        if (transformationJson != null && !transformationJson.isEmpty()) {
+            try {
+                transformation = objectMapper.convertValue(transformationJson, MessageTransformation.class);
+            } catch (Exception e) {
+                log.warn("Failed to deserialize transformation for job {}: {}", id, e.getMessage());
+            }
+        }
+        
+        // Deserialize progress from JSON
+        ReplayJobProgress progress = null;
+        if (progressJson != null && !progressJson.isEmpty()) {
+            try {
+                progress = objectMapper.convertValue(progressJson, ReplayJobProgress.class);
+            } catch (Exception e) {
+                log.warn("Failed to deserialize progress for job {}: {}", id, e.getMessage());
+            }
+        }
+        
         return MessageReplayJob.builder()
                 .id(id)
                 .clusterId(clusterId)
@@ -142,9 +179,10 @@ public class MessageReplayJobEntity {
                 .endOffset(endOffset)
                 .endTimestamp(endTimestamp)
                 .partitions(partitions)
-                // Filters and transformation will be deserialized in service layer
+                .filters(filters)
+                .transformation(transformation)
                 .status(status)
-                // Progress will be deserialized in service layer
+                .progress(progress)
                 .createdBy(createdBy)
                 .createdAt(createdAt)
                 .startedAt(startedAt)

@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * Domain model for API key usage tracking.
@@ -29,6 +29,6 @@ public class ApiKeyUsage {
     private Integer requestSizeBytes;
     private Integer responseSizeBytes;
     private String errorMessage;
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 }
 

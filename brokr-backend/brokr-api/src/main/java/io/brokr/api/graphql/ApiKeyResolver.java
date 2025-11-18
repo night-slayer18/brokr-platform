@@ -82,6 +82,20 @@ public class ApiKeyResolver {
         Instant start = Instant.parse(startTime);
         Instant end = Instant.parse(endTime);
         
+        // Security: Enforce maximum date range to prevent full-table scans
+        // Limit to 30 days to prevent abuse and database overload
+        java.time.Duration duration = java.time.Duration.between(start, end);
+        if (duration.toDays() > 30) {
+            throw new IllegalArgumentException(
+                "Date range cannot exceed 30 days. Requested range: " + duration.toDays() + " days"
+            );
+        }
+        
+        // Ensure end is after start
+        if (end.isBefore(start)) {
+            throw new IllegalArgumentException("End time must be after start time");
+        }
+
         return usageService.getUsageStatistics(id, start, end);
     }
     

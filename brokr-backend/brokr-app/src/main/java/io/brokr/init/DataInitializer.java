@@ -27,6 +27,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
+    
+    // Security: Fail fast if this runs in production
+    @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:}")
+    private String activeProfiles;
 
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
@@ -35,6 +39,16 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        // Security: Fail fast if misconfigured to run in production
+        if (activeProfiles != null && (activeProfiles.contains("prod") || 
+            (!activeProfiles.contains("dev") && !activeProfiles.contains("test")))) {
+            throw new IllegalStateException(
+                "DataInitializer should NEVER run in production! " +
+                "Active profiles: " + activeProfiles + ". " +
+                "This component seeds hardcoded credentials and should only run in dev/test environments."
+            );
+        }
+        
         initializeSuperAdmin();
         initializeSampleOrganization();
     }

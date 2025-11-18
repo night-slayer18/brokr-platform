@@ -904,6 +904,7 @@ type ApiKeyUsageStatistics {
     errorRate: Float!
     averageResponseTimeMs: Int
     statusCodeCounts: Map
+    timeSeriesData: Map
 }
 
 type RateLimitConfig {

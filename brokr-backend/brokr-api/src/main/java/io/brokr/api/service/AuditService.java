@@ -30,6 +30,7 @@ public class AuditService {
     private static final List<String> SENSITIVE_FIELDS = Arrays.asList(
             "password", "saslPassword", "sslTruststorePassword",
             "sslKeystorePassword", "sslKeyPassword", "token", "secret",
+            "key", "fullKey", "apiKey", // API key fields - should never be logged
             "properties" // properties can contain sensitive configs
     );
     
@@ -38,7 +39,8 @@ public class AuditService {
             "brokers", "topics", "consumerGroups", "schemaRegistries", 
             "kafkaConnects", "kafkaStreamsApplications", "ksqlDBs",
             "partitionsInfo", "cluster", "environment", "organization",
-            "lastConnectionCheck", "lastConnectionError", "isReachable"
+            "lastConnectionCheck", "lastConnectionError", "isReachable",
+            "fullKey" // CRITICAL: Never log full API keys in audit logs
     );
 
     @Async
@@ -294,10 +296,29 @@ public class AuditService {
     /**
      * Extract only relevant, non-sensitive fields from an object for audit logging.
      * Excludes internal/transient fields and masks sensitive data.
+     * 
+     * CRITICAL SECURITY: Never logs full API keys or other sensitive credentials.
      */
     private Map<String, Object> extractRelevantFields(Object obj) {
         if (obj == null) {
             return new HashMap<>();
+        }
+        
+        // Special handling for ApiKeyGenerationResult - only extract apiKey, never fullKey
+        String className = obj.getClass().getSimpleName();
+        if (className.contains("ApiKeyGenerationResult") || className.contains("ApiKeyGeneration")) {
+            try {
+                // Try to extract only the apiKey field, ignore fullKey completely
+                java.lang.reflect.Method getApiKeyMethod = obj.getClass().getMethod("getApiKey");
+                Object apiKeyObj = getApiKeyMethod.invoke(obj);
+                if (apiKeyObj != null) {
+                    // Recursively extract fields from the apiKey object only
+                    return extractRelevantFields(apiKeyObj);
+                }
+            } catch (Exception e) {
+                log.debug("Could not extract apiKey from ApiKeyGenerationResult: {}", e.getMessage());
+                // Fall through to normal processing
+            }
         }
         
         Map<String, Object> fullMap = convertToMap(obj);
@@ -308,7 +329,7 @@ public class AuditService {
             String key = entry.getKey();
             Object value = entry.getValue();
             
-            // Skip excluded fields
+            // Skip excluded fields (including fullKey)
             if (EXCLUDED_FIELDS.contains(key)) {
                 continue;
             }
@@ -338,7 +359,7 @@ public class AuditService {
             relevantFields.put(key, value);
         }
         
-        // Mask sensitive fields
+        // Mask sensitive fields (double-check for any that slipped through)
         maskSensitiveFields(relevantFields);
         
         return relevantFields;
@@ -401,9 +422,15 @@ public class AuditService {
             Object value = entry.getValue();
             if (value instanceof String) {
                 String strValue = (String) value;
-                // Mask if it looks like a password/token (long alphanumeric strings)
-                if (strValue.length() > 20 && strValue.matches("^[A-Za-z0-9+/=]+$")) {
-                    values.put(entry.getKey(), "***MASKED***");
+                // Mask if it looks like a password/token/API key (long alphanumeric strings)
+                // API keys typically look like: "brokr_<uuid>_<long-secret>" (40+ chars)
+                if (strValue.length() > 20 && strValue.matches("^[A-Za-z0-9+/=_-]+$")) {
+                    // Additional check: if it starts with "brokr_" it's definitely an API key
+                    if (strValue.startsWith("brokr_") && strValue.length() > 40) {
+                        values.put(entry.getKey(), "***API_KEY_MASKED***");
+                    } else if (strValue.length() > 20 && strValue.matches("^[A-Za-z0-9+/=]+$")) {
+                        values.put(entry.getKey(), "***MASKED***");
+                    }
                 }
             }
         }

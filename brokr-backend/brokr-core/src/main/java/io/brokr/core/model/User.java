@@ -11,6 +11,8 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@lombok.ToString(exclude = {"password"})
+@lombok.EqualsAndHashCode(exclude = {"password"})
 public class User {
     private String id;
     private String username;

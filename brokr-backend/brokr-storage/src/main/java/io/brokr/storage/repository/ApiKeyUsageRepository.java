@@ -22,6 +22,7 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
     /**
      * Find usage records for an API key within time range.
      * Uses index: idx_api_key_usage_key_time
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT u FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
@@ -29,14 +30,15 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "ORDER BY u.createdAt DESC")
     Page<ApiKeyUsageEntity> findByApiKeyIdAndCreatedAtBetween(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime,
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime,
             Pageable pageable
     );
     
     /**
      * Find usage records for a user within time range.
      * Uses index: idx_api_key_usage_user_id
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT u FROM ApiKeyUsageEntity u " +
            "WHERE u.userId = :userId " +
@@ -44,14 +46,15 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "ORDER BY u.createdAt DESC")
     Page<ApiKeyUsageEntity> findByUserIdAndCreatedAtBetween(
             @Param("userId") String userId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime,
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime,
             Pageable pageable
     );
     
     /**
      * Find usage records for an organization within time range.
      * Uses index: idx_api_key_usage_org_id
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT u FROM ApiKeyUsageEntity u " +
            "WHERE u.organizationId = :organizationId " +
@@ -59,26 +62,28 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "ORDER BY u.createdAt DESC")
     Page<ApiKeyUsageEntity> findByOrganizationIdAndCreatedAtBetween(
             @Param("organizationId") String organizationId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime,
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime,
             Pageable pageable
     );
     
     /**
      * Count requests for an API key within time range.
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT COUNT(u) FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
            "AND u.createdAt BETWEEN :startTime AND :endTime")
     long countByApiKeyIdAndCreatedAtBetween(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime
     );
     
     /**
      * Count requests by status code for an API key.
      * Uses index: idx_api_key_usage_status
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT u.statusCode, COUNT(u) FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
@@ -86,13 +91,14 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "GROUP BY u.statusCode")
     List<Object[]> countByApiKeyIdAndStatusCode(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime
     );
     
     /**
      * Count requests by endpoint for an API key.
      * Uses index: idx_api_key_usage_endpoint
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT u.endpoint, COUNT(u) FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
@@ -101,13 +107,14 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "ORDER BY COUNT(u) DESC")
     List<Object[]> countByApiKeyIdAndEndpoint(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime,
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime,
             Pageable pageable
     );
     
     /**
      * Get average response time for an API key.
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT AVG(u.responseTimeMs) FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
@@ -115,12 +122,13 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "AND u.responseTimeMs IS NOT NULL")
     Double getAverageResponseTime(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime
     );
     
     /**
      * Get error rate for an API key.
+     * Uses LocalDateTime matching how other metrics handle timestamps.
      */
     @Query("SELECT COUNT(u) FROM ApiKeyUsageEntity u " +
            "WHERE u.apiKeyId = :apiKeyId " +
@@ -128,8 +136,27 @@ public interface ApiKeyUsageRepository extends JpaRepository<ApiKeyUsageEntity, 
            "AND u.statusCode >= 400")
     long countErrors(
             @Param("apiKeyId") String apiKeyId,
-            @Param("startTime") Instant startTime,
-            @Param("endTime") Instant endTime
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime
+    );
+    
+    /**
+     * Count requests by time bucket (hourly) for an API key.
+     * Groups requests into hourly buckets for time-series visualization.
+     * Uses LocalDateTime parameters (in IST) matching how other metrics handle timestamps.
+     * Since created_at is stored as TIMESTAMP (no timezone), we treat it as LocalDateTime in IST.
+     */
+    @Query(value = "SELECT DATE_TRUNC('hour', u.created_at) as time_bucket, COUNT(u.id) as count " +
+           "FROM api_key_usage u " +
+           "WHERE u.api_key_id = :apiKeyId " +
+           "AND u.created_at >= :startTime " +
+           "AND u.created_at < :endTime " +
+           "GROUP BY time_bucket " +
+           "ORDER BY time_bucket ASC", nativeQuery = true)
+    List<Object[]> countByApiKeyIdGroupedByHour(
+            @Param("apiKeyId") String apiKeyId,
+            @Param("startTime") java.time.LocalDateTime startTime,
+            @Param("endTime") java.time.LocalDateTime endTime
     );
     
     /**

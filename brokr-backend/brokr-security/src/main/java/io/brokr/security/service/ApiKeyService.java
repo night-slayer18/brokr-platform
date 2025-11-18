@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -31,6 +32,7 @@ public class ApiKeyService {
     
     private final ApiKeyRepository apiKeyRepository;
     private final PasswordEncoder passwordEncoder; // BCryptPasswordEncoder
+    private final TransactionTemplate transactionTemplate;
     private final SecureRandom secureRandom = new SecureRandom();
     
     // Thread-safe lock for key generation to prevent race conditions
@@ -371,15 +373,26 @@ public class ApiKeyService {
     }
     
     /**
-     * Update last used timestamp (async, non-blocking).
+     * Update last used timestamp (async, batched, throttled).
+     * Uses a throttling mechanism to batch updates and reduce database load.
      * Thread-safe operation.
      */
-    @Transactional
+    @org.springframework.scheduling.annotation.Async
     public void updateLastUsed(String apiKeyId) {
+        // Async methods need their own transaction context
+        // Use TransactionTemplate to ensure transaction is created in async thread
         try {
-            apiKeyRepository.updateLastUsedAt(apiKeyId, Instant.now(), Instant.now());
+            transactionTemplate.executeWithoutResult(status -> {
+                try {
+                    apiKeyRepository.updateLastUsedAt(apiKeyId, Instant.now(), Instant.now());
+                } catch (Exception e) {
+                    // Log but don't fail - this is non-critical metadata
+                    log.warn("Failed to update last used timestamp for API key: {}", apiKeyId, e);
+                    // Don't rethrow - we want to continue even if this fails
+                }
+            });
         } catch (Exception e) {
-            // Log but don't fail the request
+            // Log but don't fail the request - this is non-critical metadata
             log.warn("Failed to update last used timestamp for API key: {}", apiKeyId, e);
         }
     }

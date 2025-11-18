@@ -220,6 +220,118 @@ public class KafkaAdminService {
         }
     }
 
+    /**
+     * Batch get detailed topic information for multiple topics.
+     * PERFORMANCE OPTIMIZATION: Reduces N+1 query problem.
+     * Instead of 3N Kafka API calls, makes only 3 calls total.
+     * 
+     * For metrics collection with 1000 topics:
+     * - Old way: 3000+ Kafka API calls (3 per topic)
+     * - New way: 3 Kafka API calls (batch all topics)
+     * 
+     * @param cluster The Kafka cluster
+     * @param topicNames List of topic names to fetch details for
+     * @return Map of topic name to Topic with full details
+     */
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
+    public Map<String, Topic> getTopicsBatch(KafkaCluster cluster, List<String> topicNames) {
+        try {
+            if (topicNames == null || topicNames.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+            
+            // Step 1: Batch describe ALL topics in one call
+            DescribeTopicsResult describeTopicsResult = adminClient.describeTopics(topicNames);
+            Map<String, TopicDescription> descriptions = describeTopicsResult.allTopicNames().get();
+            
+            // Step 2: Collect ALL partition offset specs across ALL topics
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> allEarliestSpecs = new HashMap<>();
+            Map<org.apache.kafka.common.TopicPartition, OffsetSpec> allLatestSpecs = new HashMap<>();
+            
+            for (Map.Entry<String, TopicDescription> entry : descriptions.entrySet()) {
+                String topicName = entry.getKey();
+                TopicDescription description = entry.getValue();
+                
+                for (var partition : description.partitions()) {
+                    org.apache.kafka.common.TopicPartition tp = 
+                            new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
+                    allEarliestSpecs.put(tp, OffsetSpec.earliest());
+                    allLatestSpecs.put(tp, OffsetSpec.latest());
+                }
+            }
+            
+            // Step 3: Batch get ALL earliest offsets in one call
+            ListOffsetsResult earliestOffsetsResult = adminClient.listOffsets(allEarliestSpecs);
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> allEarliest =
+                    earliestOffsetsResult.all().get();
+            
+            // Step 4: Batch get ALL latest offsets in one call
+            ListOffsetsResult latestOffsetsResult = adminClient.listOffsets(allLatestSpecs);
+            Map<org.apache.kafka.common.TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> allLatest =
+                    latestOffsetsResult.all().get();
+            
+            // Step 5: Build Topic objects with partition info from pre-fetched data
+            Map<String, Topic> result = new HashMap<>();
+            
+            for (Map.Entry<String, TopicDescription> entry : descriptions.entrySet()) {
+                String topicName = entry.getKey();
+                TopicDescription description = entry.getValue();
+                
+                // Build partition info list using pre-fetched offsets
+                List<PartitionInfo> partitionsInfo = new ArrayList<>();
+                for (var partition : description.partitions()) {
+                    org.apache.kafka.common.TopicPartition tp = 
+                            new org.apache.kafka.common.TopicPartition(topicName, partition.partition());
+                    
+                    ListOffsetsResult.ListOffsetsResultInfo earliestInfo = allEarliest.get(tp);
+                    ListOffsetsResult.ListOffsetsResultInfo latestInfo = allLatest.get(tp);
+                    
+                    if (earliestInfo == null || latestInfo == null) {
+                        log.warn("Missing offset info for partition {}:{}", topicName, partition.partition());
+                        continue;
+                    }
+                    
+                    long earliestOffset = earliestInfo.offset();
+                    long latestOffset = latestInfo.offset();
+                    long size = latestOffset - earliestOffset;
+                    
+                    partitionsInfo.add(PartitionInfo.builder()
+                            .id(partition.partition())
+                            .leader(partition.leader().id())
+                            .replicas(partition.replicas().stream().map(Node::id).collect(Collectors.toList()))
+                            .isr(partition.isr().stream().map(Node::id).collect(Collectors.toList()))
+                            .earliestOffset(earliestOffset)
+                            .latestOffset(latestOffset)
+                            .size(size)
+                            .build());
+                }
+                
+                Topic topic = Topic.builder()
+                        .name(topicName)
+                        .partitions(description.partitions().size())
+                        .replicationFactor(!description.partitions().isEmpty() ? 
+                                description.partitions().get(0).replicas().size() : 0)
+                        .isInternal(description.isInternal())
+                        .partitionsInfo(partitionsInfo)
+                        .build();
+                
+                result.put(topicName, topic);
+            }
+            
+            return result;
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to batch get topics for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            throw new RuntimeException("Failed to batch get topics", e);
+        }
+    }
+
     @Retryable(
             value = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
@@ -330,35 +442,48 @@ public class KafkaAdminService {
                     .map(GroupListing::groupId)
                     .collect(Collectors.toList());
 
-            // Step 2: Filter to only consumer groups by attempting to describe each one
-            // Non-consumer groups (connect, schema-registry, etc.) will throw IllegalArgumentException
+            // Step 2: PERFORMANCE FIX - Batch describe ALL consumer groups at once
+            // Old way: N separate Kafka API calls (one per group)
+            // New way: 1 Kafka API call for all groups
+            // For 100 consumer groups: 100 calls -> 1 call!
             Map<String, ConsumerGroupDescription> consumerGroupDescriptions = new HashMap<>();
             
-            for (String groupId : allGroupIds) {
-                try {
-                    // Try to describe as a consumer group
-                    DescribeConsumerGroupsResult describeResult = 
-                            adminClient.describeConsumerGroups(Collections.singletonList(groupId));
-                    Map<String, ConsumerGroupDescription> descriptions = describeResult.all().get();
-                    consumerGroupDescriptions.putAll(descriptions);
-                } catch (ExecutionException e) {
-                    // Check if the underlying exception is IllegalArgumentException (non-consumer group)
-                    Throwable cause = e.getCause();
-                    if (cause instanceof IllegalArgumentException) {
-                        log.debug("Skipping non-consumer group: {} ({})", groupId, cause.getMessage());
-                    } else {
-                        // Re-throw if it's a different error
-                        log.warn("Failed to describe group {}: {}", groupId, e.getMessage());
+            try {
+                // Batch describe ALL groups at once (Kafka API supports this)
+                DescribeConsumerGroupsResult describeResult = 
+                        adminClient.describeConsumerGroups(allGroupIds);
+                
+                // Handle results per group (some may fail if not consumer groups)
+                for (String groupId : allGroupIds) {
+                    try {
+                        ConsumerGroupDescription description = describeResult.describedGroups().get(groupId).get();
+                        consumerGroupDescriptions.put(groupId, description);
+                    } catch (ExecutionException e) {
+                        // Check if the underlying exception is IllegalArgumentException (non-consumer group)
+                        Throwable cause = e.getCause();
+                        if (cause instanceof IllegalArgumentException) {
+                            log.debug("Skipping non-consumer group: {} ({})", groupId, cause.getMessage());
+                        } else {
+                            // Log warning but continue with other groups
+                            log.warn("Failed to describe group {}: {}", groupId, e.getMessage());
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while describing consumer groups", e);
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while describing consumer groups", e);
                 }
+            } catch (Exception e) {
+                // If batch describe fails entirely, log error and return empty
+                log.error("Failed to batch describe consumer groups for cluster: {}", cluster.getName(), e);
+                return Collections.emptyList();
             }
 
             if (consumerGroupDescriptions.isEmpty()) {
                 return Collections.emptyList();
             }
+
+            log.debug("Successfully described {} consumer groups in cluster: {} using batch operation", 
+                    consumerGroupDescriptions.size(), cluster.getName());
 
             // Step 3: Convert to domain model
             return consumerGroupDescriptions.entrySet().stream()

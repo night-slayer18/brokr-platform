@@ -336,6 +336,7 @@ export interface ApiKeyUsageStatistics {
     errorRate: number
     averageResponseTimeMs?: number | null
     statusCodeCounts?: Record<string, number> | null
+    timeSeriesData?: Record<string, number> | null
 }
 
 export interface RateLimitConfig {

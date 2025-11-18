@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * JPA entity for API key usage tracking.
@@ -71,7 +71,7 @@ public class ApiKeyUsageEntity {
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
-    private Instant createdAt = Instant.now();
+    private LocalDateTime createdAt = LocalDateTime.now();
     
     public ApiKeyUsage toDomain() {
         return ApiKeyUsage.builder()
@@ -107,7 +107,7 @@ public class ApiKeyUsageEntity {
                 .requestSizeBytes(usage.getRequestSizeBytes())
                 .responseSizeBytes(usage.getResponseSizeBytes())
                 .errorMessage(usage.getErrorMessage())
-                .createdAt(usage.getCreatedAt() != null ? usage.getCreatedAt() : Instant.now())
+                .createdAt(usage.getCreatedAt() != null ? usage.getCreatedAt() : LocalDateTime.now())
                 .build();
     }
 }

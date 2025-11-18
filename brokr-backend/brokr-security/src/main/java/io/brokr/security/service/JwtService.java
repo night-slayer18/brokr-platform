@@ -5,20 +5,24 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+@Slf4j
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:mySecretKey}")
+    @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration:86400}")
@@ -26,6 +30,83 @@ public class JwtService {
 
     @Value("${jwt.challenge-expiration:300}") // 5 minutes for MFA challenge token
     private long challengeExpiration;
+    
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+    
+    /**
+     * Validates JWT secret configuration on application startup.
+     * CRITICAL SECURITY: Prevents using default or weak secrets in production.
+     */
+    @PostConstruct
+    public void validateJwtSecret() {
+        // List of forbidden weak secrets
+        String[] forbiddenSecrets = {
+            "mySecretKey",
+            "secret",
+            "changeme",
+            "password",
+            "test",
+            "dev",
+            "localhost"
+        };
+        
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: JWT secret (jwt.secret) is not configured. " +
+                "Application cannot start without a valid JWT secret. " +
+                "Set jwt.secret in application.yml or via environment variable."
+            );
+        }
+        
+        // Check if using forbidden weak secrets
+        String trimmedSecret = secret.trim();
+        for (String forbidden : forbiddenSecrets) {
+            if (trimmedSecret.equalsIgnoreCase(forbidden)) {
+                throw new IllegalStateException(
+                    "CRITICAL SECURITY ERROR: JWT secret is set to a forbidden weak value: '" + forbidden + "'. " +
+                    "This is a severe security vulnerability that allows authentication bypass. " +
+                    "Generate a strong secret using: openssl rand -base64 64"
+                );
+            }
+        }
+        
+        // Validate secret length (should be at least 256 bits = 32 bytes for HMAC-SHA256)
+        byte[] decodedKey;
+        try {
+            decodedKey = Base64.getDecoder().decode(trimmedSecret);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: JWT secret is not valid Base64. " +
+                "The secret must be Base64-encoded. " +
+                "Generate a valid secret using: openssl rand -base64 64"
+            );
+        }
+        
+        if (decodedKey.length < 32) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: JWT secret is too short (" + decodedKey.length + " bytes). " +
+                "HMAC-SHA256 requires at least 256 bits (32 bytes) for security. " +
+                "Current secret provides only " + (decodedKey.length * 8) + " bits. " +
+                "Generate a secure secret using: openssl rand -base64 64"
+            );
+        }
+        
+        // Warn if not in production but secret looks weak
+        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
+        if (!isDev && decodedKey.length < 64) {
+            log.warn(
+                "WARNING: JWT secret is only {} bytes ({} bits). " +
+                "For production, recommend at least 512 bits (64 bytes). " +
+                "Generate with: openssl rand -base64 64",
+                decodedKey.length, decodedKey.length * 8
+            );
+        }
+        
+        log.info("JWT secret validation passed: {} bytes ({} bits) - Active profile: {}", 
+                decodedKey.length, decodedKey.length * 8, 
+                activeProfile.isEmpty() ? "default" : activeProfile);
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);

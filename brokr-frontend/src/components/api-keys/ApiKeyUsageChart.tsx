@@ -4,8 +4,8 @@ import {GET_API_KEY_USAGE} from '@/graphql/queries'
 import type {GetApiKeyUsageQuery, GetApiKeyUsageQueryVariables} from '@/graphql/types'
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery'
 import {TimeRangeSelector} from '@/components/metrics/TimeRangeSelector'
-import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer} from 'recharts'
-import {subDays} from 'date-fns'
+import {AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer} from 'recharts'
+import {subDays, format} from 'date-fns'
 import {Loader2} from 'lucide-react'
 
 interface ApiKeyUsageChartProps {
@@ -77,13 +77,6 @@ export function ApiKeyUsageChart({apiKeyId, apiKeyName}: ApiKeyUsageChartProps) 
         )
     }
     
-    const statusCodeData = usage.statusCodeCounts
-        ? Object.entries(usage.statusCodeCounts).map(([code, count]) => ({
-              code: code.toString(),
-              count: Number(count),
-          }))
-        : []
-    
     return (
         <div className="space-y-6">
             <Card>
@@ -134,24 +127,61 @@ export function ApiKeyUsageChart({apiKeyId, apiKeyName}: ApiKeyUsageChartProps) 
                         </div>
                     )}
                     
-                    {statusCodeData.length > 0 && (
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold">Status Code Distribution</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={statusCodeData}>
-                                    <CartesianGrid strokeDasharray="3 3"/>
-                                    <XAxis dataKey="code"/>
-                                    <YAxis/>
-                                    <Tooltip/>
-                                    <Legend/>
-                                    <Bar dataKey="count" fill="hsl(var(--primary))"/>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                    {/* Usage Over Time Chart */}
+                    {usage.timeSeriesData && Object.keys(usage.timeSeriesData).length > 0 && (
+                        <ResponsiveContainer width="100%" height={400}>
+                            <AreaChart data={generateTimeSeriesDataFromBackend(usage.timeSeriesData)}>
+                                <CartesianGrid strokeDasharray="3 3"/>
+                                <XAxis 
+                                    dataKey="time"
+                                    tick={{ fontSize: 12 }}
+                                    interval="preserveStartEnd"
+                                />
+                                <YAxis 
+                                    tick={{ fontSize: 12 }}
+                                    tickFormatter={(value) => value.toLocaleString()}
+                                    label={{ value: 'Requests', angle: -90, position: 'insideLeft' }}
+                                />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                                    labelFormatter={(value) => `Time: ${value}`}
+                                    formatter={(value: number) => [value.toLocaleString(), 'Requests']}
+                                />
+                                <Legend/>
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="requests" 
+                                    stroke="#8884d8" 
+                                    fill="#8884d8" 
+                                    fillOpacity={0.6}
+                                    name="Requests"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     )}
                 </CardContent>
             </Card>
         </div>
     )
+}
+
+// Generate time-series data points from backend data
+// Matches exactly how other metrics charts format timestamps
+function generateTimeSeriesDataFromBackend(
+    timeSeriesData: Record<string, number>
+) {
+    // Convert backend data (epoch milliseconds -> counts) to chart format
+    // Backend returns epoch milliseconds, matching how other metrics work
+    // Format timestamps exactly like TopicMetricsChart, ClusterMetricsChart, etc.
+    return Object.entries(timeSeriesData)
+        .map(([epochMillisStr, count]) => {
+            const timestamp = Number(epochMillisStr);
+            return {
+                time: format(new Date(timestamp), 'HH:mm:ss'),
+                timestamp: timestamp,
+                requests: Number(count)
+            };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp);
 }
 

@@ -73,26 +73,87 @@ public class KafkaConsumerPoolService {
 
     public KafkaConsumer<String, String> getOrCreateConsumer(String clusterId, Properties props) {
         String groupId = (String) props.get("group.id");
-        String key = clusterId + "-" + groupId;
+        
+        // Security: Include security-sensitive properties in pool key to prevent cross-tenant data leakage
+        // Different credentials, SSL configs, or isolation settings should get separate consumer instances
+        String securityContext = buildSecurityContextHash(props);
+        String key = clusterId + "-" + groupId + "-" + securityContext;
 
         ConsumerEntry entry = consumerPool.compute(key, (k, existing) -> {
             if (existing != null) {
                 existing.lastUsed = Instant.now();
                 return existing;
             }
-            log.info("Creating new consumer for cluster: {}, group: {}", clusterId, groupId);
+            log.info("Creating new consumer for cluster: {}, group: {}, securityContext: {}", 
+                    clusterId, groupId, securityContext);
             return new ConsumerEntry(new KafkaConsumer<>(props));
         });
 
         return entry.consumer;
     }
+    
+    /**
+     * Build a hash of security-sensitive properties to include in pool key.
+     * This ensures different security contexts get separate consumer instances.
+     */
+    private String buildSecurityContextHash(Properties props) {
+        StringBuilder sb = new StringBuilder();
+        // Include security protocol
+        sb.append(props.getProperty("security.protocol", ""));
+        // Include SASL mechanism and credentials
+        sb.append("|").append(props.getProperty("sasl.mechanism", ""));
+        sb.append("|").append(props.getProperty("sasl.jaas.config", ""));
+        // Include SSL configs
+        sb.append("|").append(props.getProperty("ssl.truststore.location", ""));
+        sb.append("|").append(props.getProperty("ssl.keystore.location", ""));
+        // Hash to keep it short and avoid storing credentials in key
+        return String.valueOf(sb.toString().hashCode());
+    }
 
-    public void returnConsumer(String clusterId, String groupId) {
-        String key = clusterId + "-" + groupId;
+    /**
+     * Return a consumer to the pool and update its last used timestamp.
+     * CRITICAL FIX: Must include security context in key to match getOrCreateConsumer.
+     * 
+     * @param clusterId The cluster ID
+     * @param props The same Properties used to create the consumer (includes security context)
+     */
+    public void returnConsumer(String clusterId, Properties props) {
+        String groupId = (String) props.get("group.id");
+        
+        // CRITICAL FIX: Include security context in key (same as getOrCreateConsumer)
+        // This ensures the key matches and the consumer can be properly tracked
+        String securityContext = buildSecurityContextHash(props);
+        String key = clusterId + "-" + groupId + "-" + securityContext;
+        
         ConsumerEntry entry = consumerPool.get(key);
         if (entry != null) {
             entry.lastUsed = Instant.now();
+            log.debug("Returned consumer to pool: {}", key);
+        } else {
+            log.warn("Consumer not found in pool when returning: {}", key);
         }
+    }
+    
+    /**
+     * Legacy method for backward compatibility.
+     * @deprecated Use returnConsumer(String, Properties) instead
+     */
+    @Deprecated
+    public void returnConsumer(String clusterId, String groupId) {
+        // Best effort: search for any consumer matching cluster + group
+        // This won't work correctly if multiple security contexts exist
+        String prefix = clusterId + "-" + groupId + "-";
+        for (String key : consumerPool.keySet()) {
+            if (key.startsWith(prefix)) {
+                ConsumerEntry entry = consumerPool.get(key);
+                if (entry != null) {
+                    entry.lastUsed = Instant.now();
+                    log.debug("Returned consumer to pool (legacy): {}", key);
+                    return;
+                }
+            }
+        }
+        log.warn("Consumer not found in pool when returning (legacy): {}-{}", clusterId, groupId);
     }
 
     private void cleanupIdleConsumers() {

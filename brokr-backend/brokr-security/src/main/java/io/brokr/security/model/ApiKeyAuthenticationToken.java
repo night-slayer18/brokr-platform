@@ -34,7 +34,9 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         this.userDetails = userDetails;
         this.apiKeyId = apiKeyId;
         this.scopes = scopes != null ? Set.copyOf(scopes) : Set.of();
-        this.credentials = credentials;
+        // Security: Clear credentials after authentication to prevent memory leaks
+        // Store only for initial logging, then null it
+        this.credentials = null; // Don't store credentials in memory
         setAuthenticated(true); // Mark as authenticated
     }
     
@@ -45,7 +47,9 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     
     @Override
     public Object getCredentials() {
-        return credentials; // API key (for logging only)
+        // Security: Return null after authentication to prevent credential leakage
+        // Credentials should not be stored in security context
+        return null;
     }
     
     public String getApiKeyId() {

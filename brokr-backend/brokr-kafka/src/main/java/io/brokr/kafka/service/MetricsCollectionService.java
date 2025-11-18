@@ -174,24 +174,48 @@ public class MetricsCollectionService {
     }
     
     /**
-     * Collect topic metrics for a cluster - batch operation
+     * Collect topic metrics for a cluster - OPTIMIZED batch operation
+     * PERFORMANCE FIX: Eliminated N+1 query problem
+     * 
+     * Old implementation: 3N Kafka API calls (3 per topic)
+     * New implementation: 3 Kafka API calls total (batch all topics)
+     * 
+     * For 1000 topics: 3000+ calls -> 3 calls (1000x improvement!)
      */
     private List<TopicMetrics> collectTopicMetrics(KafkaCluster cluster) {
         try {
-            // Batch fetch all topics in one call
+            // Batch fetch all topics (basic info)
             List<Topic> topics = kafkaAdminService.listTopics(cluster);
             
             if (topics.isEmpty()) {
                 return Collections.emptyList();
             }
             
+            // Extract topic names for batch fetch
+            List<String> topicNames = topics.stream()
+                    .map(Topic::getName)
+                    .collect(Collectors.toList());
+            
+            // PERFORMANCE FIX: Batch fetch detailed info for ALL topics at once
+            // This makes only 3 Kafka API calls instead of 3N
+            Map<String, Topic> detailedTopics = kafkaAdminService.getTopicsBatch(cluster, topicNames);
+            
             LocalDateTime now = LocalDateTime.now();
             List<TopicMetrics> metricsList = new ArrayList<>();
             
-            // Process all topics and calculate metrics
+            // Process all topics and calculate metrics using pre-fetched data
             for (Topic topic : topics) {
                 try {
-                    TopicMetrics metrics = calculateTopicMetrics(cluster, topic, now);
+                    // Get detailed topic from batch-fetched map (no additional Kafka calls!)
+                    Topic detailedTopic = detailedTopics.get(topic.getName());
+                    
+                    if (detailedTopic == null || detailedTopic.getPartitionsInfo() == null) {
+                        log.warn("No detailed info for topic: {} in cluster: {}", 
+                                topic.getName(), cluster.getName());
+                        continue;
+                    }
+                    
+                    TopicMetrics metrics = calculateTopicMetrics(cluster, detailedTopic, now);
                     if (metrics != null) {
                         metricsList.add(metrics);
                     }
@@ -201,6 +225,9 @@ public class MetricsCollectionService {
                     // Continue with other topics
                 }
             }
+            
+            log.debug("Collected metrics for {} topics in cluster: {} using batch operation", 
+                    metricsList.size(), cluster.getName());
             
             return metricsList;
         } catch (Exception e) {
@@ -212,13 +239,16 @@ public class MetricsCollectionService {
     /**
      * Calculate topic metrics - stores current state and calculates throughput
      * Throughput is calculated by comparing with previous metrics snapshot
+     * 
+     * @param cluster The Kafka cluster
+     * @param topic The topic with full partition info (from batch fetch)
+     * @param timestamp The timestamp for this metrics collection
+     * @return TopicMetrics object or null if calculation fails
      */
     private TopicMetrics calculateTopicMetrics(KafkaCluster cluster, Topic topic, LocalDateTime timestamp) {
         try {
-            // Get detailed topic info with partition data
-            Topic detailedTopic = kafkaAdminService.getTopic(cluster, topic.getName());
-            
-            if (detailedTopic == null || detailedTopic.getPartitionsInfo() == null) {
+            // Topic already has detailed partition info from batch fetch
+            if (topic == null || topic.getPartitionsInfo() == null) {
                 return null;
             }
             
@@ -228,7 +258,7 @@ public class MetricsCollectionService {
             long totalSize = 0;
             long totalLatestOffset = 0;
             
-            for (PartitionInfo partition : detailedTopic.getPartitionsInfo()) {
+            for (PartitionInfo partition : topic.getPartitionsInfo()) {
                 String partitionKey = String.valueOf(partition.getId());
                 long size = partition.getSize();
                 long latestOffset = partition.getLatestOffset();

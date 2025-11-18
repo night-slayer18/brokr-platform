@@ -3,7 +3,9 @@ package io.brokr.security.config;
 import io.brokr.security.service.ApiKeyAuthenticationFilter;
 import io.brokr.security.service.JwtAuthenticationFilter;
 import io.brokr.security.service.UserDetailsServiceImpl;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,6 +28,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -96,6 +99,45 @@ public class SecurityConfig {
 
     @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
     private String allowedOrigins;
+    
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+    
+    /**
+     * Validates CORS configuration on application startup.
+     * SECURITY: Prevents localhost origins in production environments.
+     */
+    @PostConstruct
+    public void validateCorsConfiguration() {
+        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
+        
+        // Check if localhost is in allowed origins in non-dev environment
+        if (!isDev && allowedOrigins != null) {
+            String lowerOrigins = allowedOrigins.toLowerCase();
+            if (lowerOrigins.contains("localhost") || lowerOrigins.contains("127.0.0.1")) {
+                throw new IllegalStateException(
+                    "CRITICAL SECURITY ERROR: CORS configuration contains localhost origins in production environment. " +
+                    "Current allowed origins: " + allowedOrigins + ". " +
+                    "Active profile: " + (activeProfile.isEmpty() ? "default" : activeProfile) + ". " +
+                    "Set cors.allowed-origins in application-prod.yml to production domains only. " +
+                    "Never allow localhost in production as it can enable CSRF attacks."
+                );
+            }
+        }
+        
+        // Warn if using default in production
+        if (!isDev && "http://localhost:3000,http://localhost:8080".equals(allowedOrigins)) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: CORS configuration is using default localhost values in production. " +
+                "Active profile: " + (activeProfile.isEmpty() ? "default" : activeProfile) + ". " +
+                "You MUST set cors.allowed-origins in application-prod.yml to your production domain(s). " +
+                "Example: cors.allowed-origins=https://yourdomain.com"
+            );
+        }
+        
+        log.info("CORS configuration validated: {} - Active profile: {}", 
+                allowedOrigins, activeProfile.isEmpty() ? "default" : activeProfile);
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

@@ -57,15 +57,8 @@ public class OrganizationEntity {
     }
 
     public static OrganizationEntity fromDomain(Organization organization) {
-        // FIX: Check for null before streaming.
-        List<EnvironmentEntity> envEntities = new ArrayList<>();
-        if (organization.getEnvironments() != null) {
-            envEntities = organization.getEnvironments().stream()
-                    .map(EnvironmentEntity::fromDomain)
-                    .toList();
-        }
-
-        return OrganizationEntity.builder()
+        // Create organization entity first
+        OrganizationEntity orgEntity = OrganizationEntity.builder()
                 .id(organization.getId())
                 .name(organization.getName())
                 .description(organization.getDescription())
@@ -73,7 +66,22 @@ public class OrganizationEntity {
                 .mfaRequired(organization.isMfaRequired())
                 .mfaGracePeriodDays(organization.getMfaGracePeriodDays())
                 .mfaRequiredSince(organization.getMfaRequiredSince())
-                .environments(envEntities)
                 .build();
+        
+        // Build environment entities and set organization reference
+        List<EnvironmentEntity> envEntities = new ArrayList<>();
+        if (organization.getEnvironments() != null) {
+            envEntities = organization.getEnvironments().stream()
+                    .map(env -> {
+                        EnvironmentEntity envEntity = EnvironmentEntity.fromDomain(env);
+                        // Set organization reference to establish bidirectional relationship
+                        envEntity.setOrganization(orgEntity);
+                        return envEntity;
+                    })
+                    .toList();
+        }
+        
+        orgEntity.setEnvironments(envEntities);
+        return orgEntity;
     }
 }

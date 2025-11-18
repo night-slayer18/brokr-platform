@@ -9,8 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,26 +29,27 @@ import java.util.concurrent.locks.ReentrantLock;
 @Service
 @RequiredArgsConstructor
 public class ApiKeyRateLimitService {
-    
+
     @Value("${api-key.rate-limit.default.per-second:10}")
     private int defaultPerSecond;
-    
+
     @Value("${api-key.rate-limit.default.per-minute:100}")
     private int defaultPerMinute;
-    
+
     @Value("${api-key.rate-limit.default.per-hour:1000}")
     private int defaultPerHour;
-    
+
     @Value("${api-key.rate-limit.default.per-day:10000}")
     private int defaultPerDay;
-    
+
     private final ApiKeyRateLimitRepository rateLimitRepository;
-    
+    private final ApiKeyRateLimitConfigService rateLimitConfigService;
+
     // In-memory rate limit counters (thread-safe)
     private final Map<String, RateLimitWindow> inMemoryCounters = new ConcurrentHashMap<>();
     private final ReentrantLock cleanupLock = new ReentrantLock();
     private ScheduledExecutorService cleanupExecutor;
-    
+
     @PostConstruct
     public void init() {
         // Start cleanup thread for in-memory counters
@@ -59,17 +58,17 @@ public class ApiKeyRateLimitService {
             t.setDaemon(true);
             return t;
         });
-        
+
         cleanupExecutor.scheduleAtFixedRate(
                 this::cleanupExpiredCounters,
                 1,
                 1,
                 TimeUnit.MINUTES
         );
-        
+
         log.info("API key rate limiting service started (in-memory)");
     }
-    
+
     @PreDestroy
     public void shutdown() {
         if (cleanupExecutor != null) {
@@ -85,31 +84,32 @@ public class ApiKeyRateLimitService {
         }
         log.info("API key rate limiting service stopped");
     }
-    
+
     /**
      * Check if request is within rate limit.
      * Thread-safe, in-memory sliding window algorithm.
-     * 
+     *
      * @param apiKeyId API key ID
-     * @param request HTTP request
+     * @param request  HTTP request
      * @return true if within limit, false if exceeded
      */
     public boolean checkRateLimit(String apiKeyId, HttpServletRequest request) {
         // Get rate limit configurations for this API key (cached)
-        List<ApiKeyRateLimitEntity> configs = getRateLimitConfigs(apiKeyId);
-        
+        // Use separate service to ensure cache proxying works
+        List<ApiKeyRateLimitEntity> configs = rateLimitConfigService.getRateLimitConfigs(apiKeyId);
+
         // Check each rate limit type
         for (ApiKeyRateLimitEntity config : configs) {
             if (!checkSingleRateLimit(apiKeyId, config)) {
-                log.warn("Rate limit exceeded for API key: {}, type: {}, limit: {}", 
+                log.warn("Rate limit exceeded for API key: {}, type: {}, limit: {}",
                         apiKeyId, config.getLimitType(), config.getLimitValue());
                 return false;
             }
         }
-        
+
         return true;
     }
-    
+
     /**
      * Check a single rate limit (per second, per minute, etc.).
      * Thread-safe operation using in-memory sliding window.
@@ -118,7 +118,7 @@ public class ApiKeyRateLimitService {
         String key = apiKeyId + ":" + config.getLimitType();
         return checkRateLimitInMemory(key, config);
     }
-    
+
     /**
      * Check rate limit using in-memory counter (thread-safe).
      * Sliding window algorithm.
@@ -128,36 +128,10 @@ public class ApiKeyRateLimitService {
                 key,
                 k -> new RateLimitWindow(config.getWindowSeconds())
         );
-        
+
         return window.incrementAndCheck(config.getLimitValue());
     }
-    
-    /**
-     * Get default rate limits for an API key.
-     */
-    private List<ApiKeyRateLimitEntity> getDefaultRateLimits(String apiKeyId) {
-        return List.of(
-                createRateLimitEntity(apiKeyId, "per_second", defaultPerSecond, 1),
-                createRateLimitEntity(apiKeyId, "per_minute", defaultPerMinute, 60),
-                createRateLimitEntity(apiKeyId, "per_hour", defaultPerHour, 3600),
-                createRateLimitEntity(apiKeyId, "per_day", defaultPerDay, 86400)
-        );
-    }
-    
-    private ApiKeyRateLimitEntity createRateLimitEntity(
-            String apiKeyId,
-            String limitType,
-            int limitValue,
-            int windowSeconds
-    ) {
-        return ApiKeyRateLimitEntity.builder()
-                .apiKeyId(apiKeyId)
-                .limitType(limitType)
-                .limitValue(limitValue)
-                .windowSeconds(windowSeconds)
-                .build();
-    }
-    
+
     /**
      * Cleanup expired in-memory counters.
      */
@@ -170,7 +144,7 @@ public class ApiKeyRateLimitService {
             cleanupLock.unlock();
         }
     }
-    
+
     /**
      * Thread-safe rate limit window for in-memory rate limiting.
      * Implements sliding window algorithm.
@@ -180,12 +154,12 @@ public class ApiKeyRateLimitService {
         private final AtomicLong count = new AtomicLong(0);
         private volatile Instant windowStart;
         private final ReentrantLock lock = new ReentrantLock();
-        
+
         RateLimitWindow(int windowSeconds) {
             this.windowSeconds = windowSeconds;
             this.windowStart = Instant.now();
         }
-        
+
         /**
          * Increment counter and check if within limit.
          * Thread-safe, sliding window.
@@ -194,13 +168,13 @@ public class ApiKeyRateLimitService {
             lock.lock();
             try {
                 Instant now = Instant.now();
-                
+
                 // Reset window if expired
                 if (windowStart.plusSeconds(windowSeconds).isBefore(now)) {
                     count.set(0);
                     windowStart = now;
                 }
-                
+
                 // Increment and check
                 long current = count.incrementAndGet();
                 return current <= limit;
@@ -208,37 +182,28 @@ public class ApiKeyRateLimitService {
                 lock.unlock();
             }
         }
-        
+
         boolean isExpired(Instant now) {
             return windowStart.plusSeconds(windowSeconds * 2).isBefore(now);
         }
     }
-    
+
     /**
      * Get rate limit configurations for an API key (cached).
-     * Cache evicted when configs are updated.
+     * Delegates to separate service to ensure cache proxying works.
      */
-    @Cacheable(value = "rateLimitConfigs", key = "#apiKeyId", unless = "#result.isEmpty()")
     public List<ApiKeyRateLimitEntity> getRateLimitConfigs(String apiKeyId) {
-        List<ApiKeyRateLimitEntity> configs = rateLimitRepository.findByApiKeyId(apiKeyId);
-        
-        // If no custom config, use defaults
-        if (configs.isEmpty()) {
-            configs = getDefaultRateLimits(apiKeyId);
-        }
-        
-        return configs;
+        return rateLimitConfigService.getRateLimitConfigs(apiKeyId);
     }
-    
+
     /**
      * Configure rate limits for an API key.
      * Evicts cache after update.
      */
-    @CacheEvict(value = "rateLimitConfigs", key = "#apiKeyId")
     public void configureRateLimits(String apiKeyId, List<RateLimitConfig> configs) {
         // Delete existing configs
         rateLimitRepository.deleteByApiKeyId(apiKeyId);
-        
+
         // Save new configs
         for (RateLimitConfig config : configs) {
             ApiKeyRateLimitEntity entity = ApiKeyRateLimitEntity.fromDomain(config);
@@ -246,15 +211,18 @@ public class ApiKeyRateLimitService {
             entity.setApiKeyId(apiKeyId);
             rateLimitRepository.save(entity);
         }
-        
+
+        // Evict cache - delegate to config service
+        rateLimitConfigService.evictCache(apiKeyId);
+
         log.info("Configured rate limits for API key: {}", apiKeyId);
     }
-    
+
     /**
      * Get rate limit configuration for an API key.
      */
     public List<RateLimitConfig> getRateLimits(String apiKeyId) {
-        return getRateLimitConfigs(apiKeyId).stream()
+        return rateLimitConfigService.getRateLimitConfigs(apiKeyId).stream()
                 .map(ApiKeyRateLimitEntity::toDomain)
                 .toList();
     }

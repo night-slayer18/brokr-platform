@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,10 +44,14 @@ public class ApiKeyUsageService {
     @Value("${api-key.usage-tracking.enabled:true}")
     private boolean enabled;
     
+    @Value("${api-key.usage-tracking.queue-capacity:10000}")
+    private int queueCapacity;
+    
     private final ApiKeyUsageRepository usageRepository;
     
-    // Thread-safe queue for batch processing
-    private final BlockingQueue<ApiKeyUsageEntity> usageQueue = new LinkedBlockingQueue<>();
+    // Thread-safe queue for batch processing - bounded to prevent memory exhaustion
+    // Initialize lazily in @PostConstruct after @Value injection
+    private BlockingQueue<ApiKeyUsageEntity> usageQueue;
     private ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     
@@ -57,6 +62,10 @@ public class ApiKeyUsageService {
             return;
         }
         
+        // Initialize bounded queue after @Value injection
+        // Use bounded queue to prevent memory exhaustion during DB outages or traffic spikes
+        this.usageQueue = new LinkedBlockingQueue<>(queueCapacity);
+        
         running.set(true);
         executorService = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "api-key-usage-processor");
@@ -65,7 +74,7 @@ public class ApiKeyUsageService {
         });
         
         executorService.submit(this::processUsageQueue);
-        log.info("API key usage tracking service started");
+        log.info("API key usage tracking service started with queue capacity: {}", queueCapacity);
     }
     
     @PreDestroy
@@ -104,9 +113,10 @@ public class ApiKeyUsageService {
                     null // Response not available in async context
             );
             
-            // Add to queue (non-blocking)
+            // Add to queue (non-blocking) - drop if full to prevent memory exhaustion
             if (!usageQueue.offer(usage)) {
-                log.warn("Usage queue is full, dropping usage record for API key: {}", apiKeyId);
+                log.warn("Usage queue is full (capacity: {}), dropping usage record for API key: {}", 
+                        queueCapacity, apiKeyId);
             }
         } catch (Exception e) {
             log.error("Failed to record API key usage", e);
@@ -138,9 +148,10 @@ public class ApiKeyUsageService {
                     response
             );
             
-            // Add to queue (non-blocking)
+            // Add to queue (non-blocking) - drop if full to prevent memory exhaustion
             if (!usageQueue.offer(usage)) {
-                log.warn("Usage queue is full, dropping usage record for API key: {}", apiKeyId);
+                log.warn("Usage queue is full (capacity: {}), dropping usage record for API key: {}", 
+                        queueCapacity, apiKeyId);
             }
         } catch (Exception e) {
             log.error("Failed to record API key usage", e);
@@ -236,7 +247,7 @@ public class ApiKeyUsageService {
                 .responseTimeMs(responseTimeMs > 0 ? responseTimeMs : null)
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)
-                .createdAt(Instant.now())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
     
@@ -276,18 +287,28 @@ public class ApiKeyUsageService {
             Instant startTime,
             Instant endTime
     ) {
+        // Convert Instant to LocalDateTime in system default timezone (IST)
+        // Matching exactly how other metrics handle timestamps
+        LocalDateTime startLocal = LocalDateTime.ofInstant(startTime, java.time.ZoneId.systemDefault());
+        LocalDateTime endLocal = LocalDateTime.ofInstant(endTime, java.time.ZoneId.systemDefault());
+        
         long totalRequests = usageRepository.countByApiKeyIdAndCreatedAtBetween(
-                apiKeyId, startTime, endTime
+                apiKeyId, startLocal, endLocal
         );
         
-        long errorCount = usageRepository.countErrors(apiKeyId, startTime, endTime);
+        long errorCount = usageRepository.countErrors(apiKeyId, startLocal, endLocal);
         
         Double avgResponseTime = usageRepository.getAverageResponseTime(
-                apiKeyId, startTime, endTime
+                apiKeyId, startLocal, endLocal
         );
         
         List<Object[]> statusCodeCounts = usageRepository.countByApiKeyIdAndStatusCode(
-                apiKeyId, startTime, endTime
+                apiKeyId, startLocal, endLocal
+        );
+        
+        // Get time-series data (hourly buckets)
+        List<Object[]> timeSeriesData = usageRepository.countByApiKeyIdGroupedByHour(
+                apiKeyId, startLocal, endLocal
         );
         
         return ApiKeyUsageStatistics.builder()
@@ -300,6 +321,7 @@ public class ApiKeyUsageService {
                 .errorRate(totalRequests > 0 ? (double) errorCount / totalRequests : 0.0)
                 .averageResponseTimeMs(avgResponseTime != null ? avgResponseTime.intValue() : null)
                 .statusCodeCounts(parseStatusCodeCounts(statusCodeCounts))
+                .timeSeriesData(parseTimeSeriesData(timeSeriesData))
                 .build();
     }
     
@@ -307,6 +329,31 @@ public class ApiKeyUsageService {
         Map<Integer, Long> result = new HashMap<>();
         for (Object[] count : counts) {
             result.put((Integer) count[0], (Long) count[1]);
+        }
+        return result;
+    }
+    
+    private Map<String, Long> parseTimeSeriesData(List<Object[]> timeSeriesData) {
+        Map<String, Long> result = new HashMap<>();
+        for (Object[] data : timeSeriesData) {
+            // data[0] is the timestamp (java.sql.Timestamp or LocalDateTime), data[1] is the count
+            // The SQL query converts to IST timezone, so we need to interpret it as LocalDateTime in IST
+            java.time.LocalDateTime localDateTime;
+            if (data[0] instanceof java.sql.Timestamp) {
+                java.sql.Timestamp ts = (java.sql.Timestamp) data[0];
+                localDateTime = ts.toLocalDateTime();
+            } else if (data[0] instanceof java.time.LocalDateTime) {
+                localDateTime = (java.time.LocalDateTime) data[0];
+            } else {
+                continue; // Skip invalid entries
+            }
+            Long count = ((Number) data[1]).longValue();
+            // Convert LocalDateTime (in IST) to epoch milliseconds, matching other metrics
+            // This matches how TopicMetrics, ClusterMetrics etc. handle timestamps
+            long epochMillis = localDateTime.atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
+            result.put(String.valueOf(epochMillis), count);
         }
         return result;
     }
@@ -326,6 +373,7 @@ public class ApiKeyUsageService {
         private double errorRate;
         private Integer averageResponseTimeMs;
         private Map<Integer, Long> statusCodeCounts;
+        private Map<String, Long> timeSeriesData; // Map of ISO timestamp string to request count
     }
 }
 

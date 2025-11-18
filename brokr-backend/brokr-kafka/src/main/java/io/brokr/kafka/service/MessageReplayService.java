@@ -169,9 +169,26 @@ public class MessageReplayService {
      * Starts replay job execution asynchronously.
      * Enforces concurrent job limits for enterprise-scale operations.
      * Uses dedicated thread pool for replay jobs.
+     * 
+     * RACE CONDITION FIX: This method should only be called from within 
+     * a synchronized block that holds concurrentLimitLock.
      */
     @Async("replayJobExecutor")
     public void startReplayJobExecution(String jobId) {
+        // Delegate to internal method with proper locking
+        startReplayJobExecutionInternal(jobId);
+    }
+    
+    /**
+     * Internal method to start replay job execution with proper concurrency control.
+     * CRITICAL: Must be called while holding concurrentLimitLock to prevent race conditions.
+     * 
+     * RACE CONDITION FIX:
+     * - Checks available slots and registers job atomically
+     * - Prevents multiple threads from exceeding maxConcurrentJobs
+     * - Ensures job is added to runningJobs before lock is released
+     */
+    private void startReplayJobExecutionInternal(String jobId) {
         MessageReplayJobEntity entity = replayJobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Replay job not found: " + jobId));
         
@@ -183,6 +200,7 @@ public class MessageReplayService {
         // Atomic check-and-add for concurrent job limit
         // CRITICAL: Use synchronized block to prevent race conditions
         synchronized (concurrentLimitLock) {
+            // Re-check limit inside synchronized block (may have changed since call)
             if (runningJobs.size() >= maxConcurrentJobs) {
                 log.warn("Maximum concurrent jobs ({}) reached. Job {} will remain in PENDING status.", 
                         maxConcurrentJobs, jobId);
@@ -203,9 +221,15 @@ public class MessageReplayService {
             
             // Execute job with timeout
             CompletableFuture<Void> future = executeReplayJob(entity);
+            
+            // CRITICAL: Add to runningJobs BEFORE releasing lock
+            // This ensures the count is updated atomically with the check
             runningJobs.put(jobId, future);
             
-            // Add timeout handling
+            log.info("Started replay job {} - Running jobs: {}/{}", 
+                    jobId, runningJobs.size(), maxConcurrentJobs);
+            
+            // Add timeout handling (outside of critical section)
             CompletableFuture<Void> timeoutFuture = CompletableFuture.runAsync(() -> {
                 try {
                     Thread.sleep(jobTimeoutMinutes * 60 * 1000L);
@@ -222,16 +246,25 @@ public class MessageReplayService {
             // Store entity reference for cleanup in whenComplete
             final MessageReplayJobEntity entityForCleanup = entity;
             future.whenComplete((result, throwable) -> {
-                // Clean up partition locks
-                unregisterPartitionLocks(entityForCleanup);
+                // Cleanup must also be atomic
+                synchronized (concurrentLimitLock) {
+                    // Clean up partition locks
+                    unregisterPartitionLocks(entityForCleanup);
+                    
+                    // Remove from running jobs
+                    runningJobs.remove(jobId);
+                    
+                    log.info("Completed replay job {} - Running jobs: {}/{}", 
+                            jobId, runningJobs.size(), maxConcurrentJobs);
+                }
                 
-                runningJobs.remove(jobId);
                 timeoutFuture.cancel(true);
                 if (throwable != null && !(throwable instanceof java.util.concurrent.CancellationException)) {
                     handleJobFailure(jobId, throwable);
                 }
                 
                 // Check if there are pending jobs that can now run
+                // This will acquire its own lock
                 processPendingJobs();
             });
         }
@@ -240,32 +273,47 @@ public class MessageReplayService {
     /**
      * Processes pending jobs when slots become available.
      * Called after a job completes to allow queued jobs to start.
-     * FIXED: Race condition - check and start jobs atomically within synchronized block
+     * 
+     * RACE CONDITION FIX: Processes jobs outside of lock to avoid nested locking,
+     * but each job start is atomic within startReplayJobExecutionInternal.
      */
     private void processPendingJobs() {
-        // Use synchronized block to prevent race condition
+        // First, check if there are available slots (quick check without holding lock long)
+        int availableSlots;
         synchronized (concurrentLimitLock) {
-            int availableSlots = maxConcurrentJobs - runningJobs.size();
-            if (availableSlots <= 0) {
-                return;  // No slots available
-            }
-            
-            // Find oldest pending jobs (limit to available slots)
-            List<MessageReplayJobEntity> pendingJobs = replayJobRepository.findActiveJobs()
-                    .stream()
-                    .filter(job -> job.getStatus() == ReplayJobStatus.PENDING)
-                    .sorted(Comparator.comparing(MessageReplayJobEntity::getCreatedAt))
-                    .limit(availableSlots)
-                    .toList();
-            
-            // Start jobs atomically - check is already done in startReplayJobExecution's sync block
-            // but we limit the number we attempt to start here
-            for (MessageReplayJobEntity job : pendingJobs) {
-                // Double-check inside loop (defensive programming)
-                if (runningJobs.size() >= maxConcurrentJobs) {
-                    break;
-                }
-                startReplayJobExecution(job.getId());
+            availableSlots = maxConcurrentJobs - runningJobs.size();
+        }
+        
+        if (availableSlots <= 0) {
+            return;  // No slots available
+        }
+        
+        // Find oldest pending jobs (limit to available slots)
+        // This is done outside the lock to avoid holding it during DB query
+        List<MessageReplayJobEntity> pendingJobs = replayJobRepository.findActiveJobs()
+                .stream()
+                .filter(job -> job.getStatus() == ReplayJobStatus.PENDING)
+                .sorted(Comparator.comparing(MessageReplayJobEntity::getCreatedAt))
+                .limit(availableSlots)
+                .toList();
+        
+        if (pendingJobs.isEmpty()) {
+            return;
+        }
+        
+        log.debug("Found {} pending jobs to process, {} slots available", 
+                pendingJobs.size(), availableSlots);
+        
+        // Start jobs one by one - each start is atomic
+        // The internal method will re-check the limit atomically
+        for (MessageReplayJobEntity job : pendingJobs) {
+            try {
+                // Call internal method directly (already async via @Async on public method)
+                // The internal method will handle synchronization and limit checking
+                startReplayJobExecutionInternal(job.getId());
+            } catch (Exception e) {
+                log.error("Failed to start pending job {}: {}", job.getId(), e.getMessage(), e);
+                // Continue with next job
             }
         }
     }

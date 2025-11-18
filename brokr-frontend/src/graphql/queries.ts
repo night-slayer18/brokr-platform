@@ -971,6 +971,7 @@ export const GET_API_KEY_USAGE = gql`
             errorRate
             averageResponseTimeMs
             statusCodeCounts
+            timeSeriesData
         }
     }
 `

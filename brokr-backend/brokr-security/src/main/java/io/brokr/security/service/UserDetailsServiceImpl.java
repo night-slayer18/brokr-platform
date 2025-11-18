@@ -30,4 +30,20 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         return new BrokrUserDetails(user);
     }
+
+    /**
+     * Load user details by user ID (UUID).
+     * Used for API key authentication where we have the user ID but not the email.
+     */
+    @Transactional(readOnly = true)
+    public UserDetails loadUserById(String userId) throws UsernameNotFoundException {
+        User user = userRepository.findById(userId)
+                .map(entity -> {
+                    Hibernate.initialize(entity.getAccessibleEnvironmentIds());
+                    return entity.toDomain();
+                })
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+
+        return new BrokrUserDetails(user);
+    }
 }

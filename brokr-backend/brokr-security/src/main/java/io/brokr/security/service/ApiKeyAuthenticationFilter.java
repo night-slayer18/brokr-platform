@@ -12,7 +12,6 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -33,7 +32,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     private final ApiKeyService apiKeyService;
     private final ApiKeyUsageService usageService;
     private final ApiKeyRateLimitService rateLimitService;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsServiceImpl userDetailsService;
     
     @Override
     protected void doFilterInternal(
@@ -90,8 +89,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             
-            // Load user details
-            UserDetails userDetails = userDetailsService.loadUserByUsername(validation.getUserId());
+            // Load user details by ID (API key validation returns userId, not email)
+            UserDetails userDetails = userDetailsService.loadUserById(validation.getUserId());
             
             // Create API key authentication token
             ApiKeyAuthenticationToken authentication = new ApiKeyAuthenticationToken(

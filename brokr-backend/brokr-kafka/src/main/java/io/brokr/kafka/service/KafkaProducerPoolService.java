@@ -139,10 +139,13 @@ public class KafkaProducerPoolService {
                 props.put(org.apache.kafka.common.config.SaslConfigs.SASL_MECHANISM, cluster.getSaslMechanism());
             }
             // Build JAAS config from username/password if available
+            // Security: Sanitize credentials to prevent injection attacks
             if (cluster.getSaslUsername() != null && cluster.getSaslPassword() != null) {
+                String sanitizedUsername = sanitizeJaasValue(cluster.getSaslUsername());
+                String sanitizedPassword = sanitizeJaasValue(cluster.getSaslPassword());
                 String jaasConfig = String.format(
                     "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                    cluster.getSaslUsername(), cluster.getSaslPassword());
+                    sanitizedUsername, sanitizedPassword);
                 props.put(org.apache.kafka.common.config.SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
             }
         }
@@ -181,6 +184,20 @@ public class KafkaProducerPoolService {
         if (entry != null) {
             entry.lastUsed = Instant.now();
         }
+    }
+    
+    /**
+     * Sanitize JAAS config values to prevent injection attacks.
+     * Escapes quotes, backslashes, and semicolons that could break the JAAS config.
+     */
+    private String sanitizeJaasValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        // Escape backslashes first, then quotes, then semicolons
+        return value.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace(";", "\\;");
     }
     
     private void cleanupIdleProducers() {

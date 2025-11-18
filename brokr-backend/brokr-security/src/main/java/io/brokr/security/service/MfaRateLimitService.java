@@ -114,7 +114,7 @@ public class MfaRateLimitService {
     /**
      * Inner class to track attempt information
      */
-    private static class AttemptInfo {
+    private class AttemptInfo {
         private final LocalDateTime firstAttemptTime;
         private volatile LocalDateTime lastAttemptTime;
         private final AtomicInteger attemptCount;
@@ -143,7 +143,8 @@ public class MfaRateLimitService {
         }
 
         public boolean isLockedOut() {
-            return attemptCount.get() >= 5; // Lockout threshold
+            // Use configurable maxAttempts instead of hardcoded value
+            return attemptCount.get() >= maxAttempts;
         }
     }
 }

@@ -1,5 +1,6 @@
 package io.brokr.security.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,14 +30,79 @@ public class EncryptionService {
 
     @Value("${mfa.encryption.key:}")
     private String encryptionKeyBase64;
+    
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
 
     private volatile SecretKey secretKey;
     private final Object keyLock = new Object();
+    
+    /**
+     * Validates MFA encryption key configuration on application startup.
+     * CRITICAL SECURITY: Ensures MFA secrets can be properly encrypted/decrypted.
+     */
+    @PostConstruct
+    public void validateAndInitializeKey() {
+        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
+        
+        if (encryptionKeyBase64 == null || encryptionKeyBase64.trim().isEmpty()) {
+            if (!isDev) {
+                throw new IllegalStateException(
+                    "CRITICAL SECURITY ERROR: MFA encryption key (mfa.encryption.key) is not configured. " +
+                    "MFA secrets cannot be encrypted without a persistent key. " +
+                    "In production, this key MUST be set via environment variable or application.yml. " +
+                    "Generate a key using: openssl rand -base64 32"
+                );
+            }
+            
+            // Only allow temporary key generation in dev/test environments
+            log.warn("========================================");
+            log.warn("WARNING: MFA encryption key not configured!");
+            log.warn("Generating a TEMPORARY key for dev/test only.");
+            log.warn("MFA secrets will be LOST on restart!");
+            log.warn("Set mfa.encryption.key in production.");
+            log.warn("Generate using: openssl rand -base64 32");
+            log.warn("========================================");
+            
+            try {
+                KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+                keyGenerator.init(AES_KEY_SIZE);
+                secretKey = keyGenerator.generateKey();
+                return;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to generate temporary encryption key", e);
+            }
+        }
+        
+        // Validate the provided key
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(encryptionKeyBase64.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: MFA encryption key is not valid Base64. " +
+                "The key must be Base64-encoded. " +
+                "Generate a valid key using: openssl rand -base64 32", e
+            );
+        }
+        
+        if (keyBytes.length != AES_KEY_SIZE / 8) {
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: MFA encryption key is " + keyBytes.length + " bytes. " +
+                "AES-256 requires exactly 32 bytes (256 bits). " +
+                "Current key provides only " + (keyBytes.length * 8) + " bits. " +
+                "Generate a correct key using: openssl rand -base64 32"
+            );
+        }
+        
+        secretKey = new SecretKeySpec(keyBytes, "AES");
+        log.info("MFA encryption key validated successfully: 256-bit AES-GCM - Active profile: {}", 
+                activeProfile.isEmpty() ? "default" : activeProfile);
+    }
 
     /**
-     * Initialize the encryption key from configuration or generate a new one.
-     * In production, the key should be provided via environment variable or secure vault.
-     * Thread-safe initialization using double-checked locking pattern.
+     * Get the secret key for encryption/decryption.
+     * Thread-safe access using double-checked locking.
      */
     private SecretKey getSecretKey() {
         if (secretKey != null) {
@@ -47,32 +113,11 @@ public class EncryptionService {
             if (secretKey != null) {
                 return secretKey;
             }
-
-        if (encryptionKeyBase64 == null || encryptionKeyBase64.isEmpty()) {
-            log.warn("MFA encryption key not configured. Generating a temporary key. " +
-                    "This should be set via mfa.encryption.key property in production!");
-            // Generate a temporary key (not recommended for production)
-            try {
-                KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-                keyGenerator.init(AES_KEY_SIZE);
-                secretKey = keyGenerator.generateKey();
-                log.warn("Generated temporary encryption key. MFA secrets will be lost on restart!");
-                return secretKey;
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to generate encryption key", e);
-            }
-        }
-
-        try {
-            byte[] keyBytes = Base64.getDecoder().decode(encryptionKeyBase64);
-            if (keyBytes.length != AES_KEY_SIZE / 8) {
-                throw new IllegalArgumentException("Encryption key must be " + (AES_KEY_SIZE / 8) + " bytes (256 bits)");
-            }
-            secretKey = new SecretKeySpec(keyBytes, "AES");
-            return secretKey;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize encryption key", e);
-        }
+            
+            // This should never happen if @PostConstruct ran successfully
+            throw new IllegalStateException(
+                "Encryption key not initialized. This indicates a critical initialization failure."
+            );
         }
     }
 
