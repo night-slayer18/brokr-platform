@@ -31,12 +31,9 @@ public class JwtService {
     @Value("${jwt.challenge-expiration:300}") // 5 minutes for MFA challenge token
     private long challengeExpiration;
     
-    @Value("${spring.profiles.active:}")
-    private String activeProfile;
-    
     /**
      * Validates JWT secret configuration on application startup.
-     * CRITICAL SECURITY: Prevents using default or weak secrets in production.
+     * CRITICAL SECURITY: Prevents using default or weak secrets.
      */
     @PostConstruct
     public void validateJwtSecret() {
@@ -92,20 +89,18 @@ public class JwtService {
             );
         }
         
-        // Warn if not in production but secret looks weak
-        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
-        if (!isDev && decodedKey.length < 64) {
+        // Warn if secret is less than recommended 512 bits
+        if (decodedKey.length < 64) {
             log.warn(
                 "WARNING: JWT secret is only {} bytes ({} bits). " +
-                "For production, recommend at least 512 bits (64 bytes). " +
+                "Recommend at least 512 bits (64 bytes) for enhanced security. " +
                 "Generate with: openssl rand -base64 64",
                 decodedKey.length, decodedKey.length * 8
             );
         }
         
-        log.info("JWT secret validation passed: {} bytes ({} bits) - Active profile: {}", 
-                decodedKey.length, decodedKey.length * 8, 
-                activeProfile.isEmpty() ? "default" : activeProfile);
+        log.info("JWT secret validation passed: {} bytes ({} bits)", 
+                decodedKey.length, decodedKey.length * 8);
     }
 
     public String extractUsername(String token) {
@@ -134,14 +129,21 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    public String generateToken(User user) {
+    /**
+     * Generate a full JWT token for an authenticated user.
+     * 
+     * @param user The authenticated user
+     * @param mfaVerified Whether MFA was verified (true if MFA was verified, or if MFA is not required/enabled)
+     * @return JWT token string
+     */
+    public String generateToken(User user, boolean mfaVerified) {
         Map<String, Object> claims = new HashMap<>();
         // Use email as subject for authentication (email is unique and used for login)
         claims.put("sub", user.getEmail());
         claims.put("roles", user.getRole().name());
         claims.put("organizationId", user.getOrganizationId());
         claims.put("accessibleEnvironmentIds", user.getAccessibleEnvironmentIds());
-        claims.put("mfaVerified", true); // Full token means MFA is verified
+        claims.put("mfaVerified", mfaVerified);
 
         return createToken(claims, user.getEmail());
     }

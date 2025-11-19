@@ -40,12 +40,15 @@ public class ApiKeyRateLimitConfigService {
      * Get rate limit configurations for an API key (cached).
      * Cache evicted when configs are updated.
      * This method is in a separate bean so Spring's cache proxy can intercept it.
+     * 
+     * Always caches results (including defaults) to avoid repeated DB queries.
+     * If no custom configs exist in DB, defaults are computed and cached.
      */
-    @Cacheable(value = "rateLimitConfigs", key = "#apiKeyId", unless = "#result.isEmpty()")
+    @Cacheable(value = "rateLimitConfigs", key = "#apiKeyId")
     public List<ApiKeyRateLimitEntity> getRateLimitConfigs(String apiKeyId) {
         List<ApiKeyRateLimitEntity> configs = rateLimitRepository.findByApiKeyId(apiKeyId);
         
-        // If no custom config, use defaults
+        // If no custom config, use defaults (these will be cached to avoid repeated DB queries)
         if (configs.isEmpty()) {
             configs = getDefaultRateLimits(apiKeyId);
         }

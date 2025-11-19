@@ -72,6 +72,15 @@ jwt:
   secret: ${JWT_SECRET:XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==}
   expiration: ${JWT_EXPIRATION:86400}
 
+# Security Configuration
+security:
+  password:
+    bcrypt:
+      # BCrypt strength (rounds). Higher values are more secure but slower.
+      # Recommended: 10-12 for most applications, 13-15 for high-security environments
+      # Note: Each increment doubles the computation time
+      strength: ${BCRYPT_STRENGTH:10}
+
 # MFA Configuration
 mfa:
   encryption:
@@ -117,10 +126,10 @@ api-key:
   
   rate-limit:
     default:
-      per-second: ${API_KEY_RATE_LIMIT_PER_SECOND:1}
-      per-minute: ${API_KEY_RATE_LIMIT_PER_MINUTE:10}
-      per-hour: ${API_KEY_RATE_LIMIT_PER_HOUR:100}
-      per-day: ${API_KEY_RATE_LIMIT_PER_DAY:1000}
+      per-second: ${API_KEY_RATE_LIMIT_PER_SECOND:10}
+      per-minute: ${API_KEY_RATE_LIMIT_PER_MINUTE:100}
+      per-hour: ${API_KEY_RATE_LIMIT_PER_HOUR:1000}
+      per-day: ${API_KEY_RATE_LIMIT_PER_DAY:10000}
   
   usage-tracking:
     enabled: ${API_KEY_USAGE_TRACKING_ENABLED:true}

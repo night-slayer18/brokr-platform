@@ -659,8 +659,9 @@ export const GET_ORGANIZATION = gql`
 `
 
 export const GET_USERS = gql`
-    query GetUsers($organizationId: String) {
-        users(organizationId: $organizationId) {
+    query GetUsers($organizationId: String, $page: Int, $size: Int) {
+        users(organizationId: $organizationId, page: $page, size: $size) {
+            content {
             id
             username
             email
@@ -670,6 +671,11 @@ export const GET_USERS = gql`
             organizationId
             accessibleEnvironmentIds
             isActive
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
         }
     }
 `

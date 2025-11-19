@@ -22,14 +22,35 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final long USER_CACHE_TTL_SECONDS = 300; // 5 minutes
+    
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    
+    // Cache for user details: email -> (userDetails, expirationTime)
+    private final ConcurrentHashMap<String, CacheEntry> userCache = new ConcurrentHashMap<>();
+    
+    private static class CacheEntry {
+        final UserDetails userDetails;
+        final long expirationTime;
+        
+        CacheEntry(UserDetails userDetails, long expirationTime) {
+            this.userDetails = userDetails;
+            this.expirationTime = expirationTime;
+        }
+        
+        boolean isExpired() {
+            return System.currentTimeMillis() > expirationTime;
+        }
+    }
 
     @Override
     protected void doFilterInternal(
@@ -76,7 +97,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 
                 // Process JWT token - always set authentication if valid (overrides anonymous/null)
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                // Use cached user details to avoid database query on every request
+                UserDetails userDetails = loadUserDetailsCached(userEmail);
 
                 if (jwtService.validateToken(jwt, userDetails)) {
                     // Reject challenge tokens - only accept fully verified tokens
@@ -99,16 +121,67 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (SignatureException e) {
-            // Invalid token signature - treat as unauthenticated and continue filter chain
-            // User will be redirected to login by Spring Security
+            // Invalid token signature - security issue, log for monitoring
+            log.warn("Invalid JWT signature for token from IP: {}", getClientIpAddress(request));
         } catch (ExpiredJwtException e) {
-            // Token expired - treat as unauthenticated and continue filter chain
+            // Token expired - log for monitoring (may indicate token refresh issues)
+            log.debug("Expired JWT token for user: {}", e.getClaims().getSubject());
         } catch (JwtException e) {
-            // Any other JWT exception - treat as unauthenticated and continue filter chain
+            // Other JWT exceptions - log for monitoring
+            log.warn("JWT validation failed: {}", e.getMessage());
         } catch (Exception e) {
-            // Unexpected error - treat as unauthenticated and continue filter chain
+            // Unexpected error - log for debugging
+            log.error("Unexpected error processing JWT authentication", e);
         }
 
         filterChain.doFilter(request, response);
+    }
+    
+    /**
+     * Load user details with caching to avoid database queries on every JWT request.
+     * Cache TTL is 5 minutes to balance performance and data freshness.
+     */
+    private UserDetails loadUserDetailsCached(String email) {
+        long now = System.currentTimeMillis();
+        
+        // Check cache
+        CacheEntry entry = userCache.get(email);
+        if (entry != null && !entry.isExpired()) {
+            return entry.userDetails;
+        }
+        
+        // Cache miss or expired - load from database
+        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+        
+        // Update cache
+        long expirationTime = now + TimeUnit.SECONDS.toMillis(USER_CACHE_TTL_SECONDS);
+        userCache.put(email, new CacheEntry(userDetails, expirationTime));
+        
+        // Periodic cleanup of expired entries (simple approach - clean on cache miss)
+        if (userCache.size() > 1000) {
+            userCache.entrySet().removeIf(e -> e.getValue().isExpired());
+        }
+        
+        return userDetails;
+    }
+    
+    /**
+     * Get client IP address from request for logging purposes.
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        
+        // Handle comma-separated IPs (X-Forwarded-For can have multiple)
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        
+        return ip != null ? ip : "unknown";
     }
 }

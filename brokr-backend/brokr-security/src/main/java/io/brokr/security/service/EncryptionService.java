@@ -5,8 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -30,9 +30,6 @@ public class EncryptionService {
 
     @Value("${mfa.encryption.key:}")
     private String encryptionKeyBase64;
-    
-    @Value("${spring.profiles.active:}")
-    private String activeProfile;
 
     private volatile SecretKey secretKey;
     private final Object keyLock = new Object();
@@ -40,38 +37,17 @@ public class EncryptionService {
     /**
      * Validates MFA encryption key configuration on application startup.
      * CRITICAL SECURITY: Ensures MFA secrets can be properly encrypted/decrypted.
+     * Always requires a properly configured key - no temporary keys allowed.
      */
     @PostConstruct
     public void validateAndInitializeKey() {
-        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
-        
         if (encryptionKeyBase64 == null || encryptionKeyBase64.trim().isEmpty()) {
-            if (!isDev) {
-                throw new IllegalStateException(
-                    "CRITICAL SECURITY ERROR: MFA encryption key (mfa.encryption.key) is not configured. " +
-                    "MFA secrets cannot be encrypted without a persistent key. " +
-                    "In production, this key MUST be set via environment variable or application.yml. " +
-                    "Generate a key using: openssl rand -base64 32"
-                );
-            }
-            
-            // Only allow temporary key generation in dev/test environments
-            log.warn("========================================");
-            log.warn("WARNING: MFA encryption key not configured!");
-            log.warn("Generating a TEMPORARY key for dev/test only.");
-            log.warn("MFA secrets will be LOST on restart!");
-            log.warn("Set mfa.encryption.key in production.");
-            log.warn("Generate using: openssl rand -base64 32");
-            log.warn("========================================");
-            
-            try {
-                KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-                keyGenerator.init(AES_KEY_SIZE);
-                secretKey = keyGenerator.generateKey();
-                return;
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to generate temporary encryption key", e);
-            }
+            throw new IllegalStateException(
+                "CRITICAL SECURITY ERROR: MFA encryption key (mfa.encryption.key) is not configured. " +
+                "MFA secrets cannot be encrypted without a persistent key. " +
+                "This key MUST be set via environment variable or application.yml. " +
+                "Generate a key using: openssl rand -base64 32"
+            );
         }
         
         // Validate the provided key
@@ -96,8 +72,7 @@ public class EncryptionService {
         }
         
         secretKey = new SecretKeySpec(keyBytes, "AES");
-        log.info("MFA encryption key validated successfully: 256-bit AES-GCM - Active profile: {}", 
-                activeProfile.isEmpty() ? "default" : activeProfile);
+        log.info("MFA encryption key validated successfully: 256-bit AES-GCM");
     }
 
     /**
@@ -194,6 +169,10 @@ public class EncryptionService {
             
             byte[] plaintextBytes = cipher.doFinal(ciphertext);
             return new String(plaintextBytes, StandardCharsets.UTF_8);
+        } catch (AEADBadTagException e) {
+            // GCM authentication failure - indicates tampering or invalid key
+            log.error("GCM authentication failed - encrypted data may have been tampered with or key is incorrect", e);
+            throw new RuntimeException("Decryption failed: authentication error", e);
         } catch (IllegalArgumentException e) {
             log.error("Invalid encrypted data format", e);
             throw new RuntimeException("Invalid encrypted data format", e);

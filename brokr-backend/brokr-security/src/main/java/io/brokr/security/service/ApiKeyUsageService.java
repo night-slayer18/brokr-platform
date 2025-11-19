@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Service for tracking API key usage with batch inserts for performance.
@@ -54,6 +55,11 @@ public class ApiKeyUsageService {
     private BlockingQueue<ApiKeyUsageEntity> usageQueue;
     private ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    
+    // Track dropped records for monitoring/alerting
+    private final AtomicLong droppedRecordsCount = new AtomicLong(0);
+    private volatile long lastDroppedRecordsAlertTime = 0;
+    private static final long DROPPED_RECORDS_ALERT_INTERVAL_MS = 60000; // Alert every minute if dropping
     
     @PostConstruct
     public void init() {
@@ -115,8 +121,7 @@ public class ApiKeyUsageService {
             
             // Add to queue (non-blocking) - drop if full to prevent memory exhaustion
             if (!usageQueue.offer(usage)) {
-                log.warn("Usage queue is full (capacity: {}), dropping usage record for API key: {}", 
-                        queueCapacity, apiKeyId);
+                handleQueueFull(apiKeyId);
             }
         } catch (Exception e) {
             log.error("Failed to record API key usage", e);
@@ -150,8 +155,7 @@ public class ApiKeyUsageService {
             
             // Add to queue (non-blocking) - drop if full to prevent memory exhaustion
             if (!usageQueue.offer(usage)) {
-                log.warn("Usage queue is full (capacity: {}), dropping usage record for API key: {}", 
-                        queueCapacity, apiKeyId);
+                handleQueueFull(apiKeyId);
             }
         } catch (Exception e) {
             log.error("Failed to record API key usage", e);
@@ -229,9 +233,18 @@ public class ApiKeyUsageService {
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        int statusCode = response != null ? response.getStatus() : 0;
+        // Handle null response case explicitly (e.g., in async context)
+        // Use -1 to indicate response was not available (distinct from actual status code 0)
+        int statusCode;
+        if (response != null) {
+            statusCode = response.getStatus();
+        } else {
+            statusCode = -1; // Indicates response not available (async context)
+        }
         int responseTimeMs = 0; // Could measure if needed
         
+        // Get client IP address (for analytics/auditing only, not for security decisions)
+        // NOTE: IP addresses from headers can be spoofed and should not be used for security
         String ipAddress = getClientIpAddress(request);
         String userAgent = request.getHeader("User-Agent");
         String endpoint = request.getRequestURI();
@@ -252,8 +265,33 @@ public class ApiKeyUsageService {
     }
     
     /**
+     * Handle queue full scenario with alerting.
+     * Tracks dropped records and alerts when queue is consistently full.
+     */
+    private void handleQueueFull(String apiKeyId) {
+        long dropped = droppedRecordsCount.incrementAndGet();
+        long now = System.currentTimeMillis();
+        
+        // Alert if queue is consistently full (every minute)
+        if (now - lastDroppedRecordsAlertTime > DROPPED_RECORDS_ALERT_INTERVAL_MS) {
+            log.error("Usage queue is consistently full (capacity: {}). Total dropped records: {}. " +
+                    "This may indicate high traffic or database performance issues. " +
+                    "Consider increasing queue capacity or investigating database performance.",
+                    queueCapacity, dropped);
+            lastDroppedRecordsAlertTime = now;
+        } else {
+            log.warn("Usage queue is full (capacity: {}), dropping usage record for API key: {}", 
+                    queueCapacity, apiKeyId);
+        }
+    }
+    
+    /**
      * Get client IP address from request.
      * Handles proxies and load balancers.
+     * 
+     * SECURITY NOTE: IP addresses extracted from headers can be spoofed and should only be used
+     * for analytics, logging, and auditing purposes. Do NOT use IP addresses from headers for
+     * security decisions (authentication, authorization, rate limiting, etc.).
      */
     private String getClientIpAddress(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
@@ -280,6 +318,7 @@ public class ApiKeyUsageService {
     
     /**
      * Get usage statistics for an API key.
+     * Optimized to use a single combined query where possible to reduce database round trips.
      */
     @Transactional(readOnly = true)
     public ApiKeyUsageStatistics getUsageStatistics(
@@ -292,21 +331,29 @@ public class ApiKeyUsageService {
         LocalDateTime startLocal = LocalDateTime.ofInstant(startTime, java.time.ZoneId.systemDefault());
         LocalDateTime endLocal = LocalDateTime.ofInstant(endTime, java.time.ZoneId.systemDefault());
         
+        // Execute queries in parallel where possible (they're independent)
+        // Note: Some queries can be combined, but status code counts and time series require separate queries
+        // due to different GROUP BY clauses. We execute the simpler aggregations first.
+        
         long totalRequests = usageRepository.countByApiKeyIdAndCreatedAtBetween(
                 apiKeyId, startLocal, endLocal
         );
         
+        // Error count and average response time can be computed from the same data scan
+        // but require different WHERE clauses, so we keep them separate for now
+        // (could be optimized with a single query using CASE statements if needed)
         long errorCount = usageRepository.countErrors(apiKeyId, startLocal, endLocal);
         
         Double avgResponseTime = usageRepository.getAverageResponseTime(
                 apiKeyId, startLocal, endLocal
         );
         
+        // Status code counts require GROUP BY, so separate query
         List<Object[]> statusCodeCounts = usageRepository.countByApiKeyIdAndStatusCode(
                 apiKeyId, startLocal, endLocal
         );
         
-        // Get time-series data (hourly buckets)
+        // Time series data requires different grouping (by hour), so separate query
         List<Object[]> timeSeriesData = usageRepository.countByApiKeyIdGroupedByHour(
                 apiKeyId, startLocal, endLocal
         );

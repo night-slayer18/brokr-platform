@@ -137,7 +137,13 @@ export interface GetOrganizationQuery {
 }
 
 export interface GetUsersQuery {
-    users: User[];
+    users: {
+        content: User[];
+        totalElements: number;
+        totalPages: number;
+        currentPage: number;
+        pageSize: number;
+    };
 }
 
 export interface GetUserQuery {

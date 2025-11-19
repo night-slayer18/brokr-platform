@@ -429,7 +429,7 @@ public class AuditService {
                     if (strValue.startsWith("brokr_") && strValue.length() > 40) {
                         values.put(entry.getKey(), "***API_KEY_MASKED***");
                     } else if (strValue.length() > 20 && strValue.matches("^[A-Za-z0-9+/=]+$")) {
-                        values.put(entry.getKey(), "***MASKED***");
+                    values.put(entry.getKey(), "***MASKED***");
                     }
                 }
             }

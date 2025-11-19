@@ -28,8 +28,10 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public List<UserDto> getAllUsers() {
-        return userApiService.listUsers(null).stream() // Pass null to get all users (if authorized)
+    public List<UserDto> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return userApiService.listUsers(null, page, size).getContent().stream() // Pass null to get all users (if authorized)
                 .map(UserDto::fromDomain)
                 .collect(Collectors.toList());
     }

@@ -12,6 +12,7 @@ public interface KafkaClusterRepository extends JpaRepository<KafkaClusterEntity
     List<KafkaClusterEntity> findByOrganizationId(String organizationId);
     List<KafkaClusterEntity> findByOrganizationIdIn(List<String> organizationIds);
     List<KafkaClusterEntity> findByOrganizationIdAndEnvironmentId(String organizationId, String environmentId);
+    List<KafkaClusterEntity> findByEnvironmentId(String environmentId);
     Optional<KafkaClusterEntity> findByNameAndOrganizationId(String name, String organizationId);
     boolean existsByNameAndOrganizationId(String name, String organizationId);
 }

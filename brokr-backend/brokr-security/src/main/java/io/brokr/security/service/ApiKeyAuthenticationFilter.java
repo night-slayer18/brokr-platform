@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * API Key authentication filter.
@@ -28,11 +30,30 @@ import java.io.IOException;
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     
     private static final String KEY_PREFIX = "brokr_";
+    private static final String GENERIC_ERROR_MESSAGE = "Invalid API key";
+    private static final long USER_CACHE_TTL_SECONDS = 300; // 5 minutes
     
     private final ApiKeyService apiKeyService;
     private final ApiKeyUsageService usageService;
     private final ApiKeyRateLimitService rateLimitService;
     private final UserDetailsServiceImpl userDetailsService;
+    
+    // Cache for user details: userId -> (userDetails, expirationTime)
+    private final ConcurrentHashMap<String, CacheEntry> userCache = new ConcurrentHashMap<>();
+    
+    private static class CacheEntry {
+        final UserDetails userDetails;
+        final long expirationTime;
+        
+        CacheEntry(UserDetails userDetails, long expirationTime) {
+            this.userDetails = userDetails;
+            this.expirationTime = expirationTime;
+        }
+        
+        boolean isExpired() {
+            return System.currentTimeMillis() > expirationTime;
+        }
+    }
     
     @Override
     protected void doFilterInternal(
@@ -63,11 +84,11 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             // Validate API key
             ApiKeyService.ApiKeyValidationResult validation = apiKeyService.validateApiKey(token);
             if (!validation.isValid()) {
-                // Invalid API key, return 401
+                // Invalid API key - use generic error message to prevent information leakage
                 response.setStatus(HttpStatus.UNAUTHORIZED.value());
                 response.setContentType("application/json");
                 response.getWriter().write(
-                        String.format("{\"error\":\"%s\"}", validation.getErrorMessage())
+                        String.format("{\"error\":\"%s\"}", GENERIC_ERROR_MESSAGE)
                 );
                 return;
             }
@@ -89,15 +110,15 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             
-            // Load user details by ID (API key validation returns userId, not email)
-            UserDetails userDetails = userDetailsService.loadUserById(validation.getUserId());
+            // Load user details by ID (cached to avoid database query on every request)
+            UserDetails userDetails = loadUserDetailsCached(validation.getUserId());
             
             // Create API key authentication token
+            // Note: Credentials (API key) are not stored in the token for security
             ApiKeyAuthenticationToken authentication = new ApiKeyAuthenticationToken(
                     userDetails,
                     validation.getApiKeyId(),
-                    validation.getScopes(),
-                    token // Store for logging (not used for validation)
+                    validation.getScopes()
             );
             
             // Set authentication in security context
@@ -116,16 +137,61 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             
             log.debug("API key authenticated: {}", validation.getApiKeyId());
             
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // Security-related exceptions (invalid key format, revoked key, etc.) - fail closed
+            log.warn("Security exception in API key authentication: {}", e.getMessage());
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    String.format("{\"error\":\"%s\"}", GENERIC_ERROR_MESSAGE)
+            );
+            return;
+        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+            // User not found - security issue, fail closed
+            log.warn("User not found for API key authentication: {}", e.getMessage());
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    String.format("{\"error\":\"%s\"}", GENERIC_ERROR_MESSAGE)
+            );
+            return;
         } catch (Exception e) {
-            // Log error but don't break the flow
-            log.error("Error processing API key authentication", e);
-            // Let JWT filter try (might be a JWT token that looks like API key)
+            // Other exceptions (database errors, etc.) - log and let JWT filter try
+            log.error("Unexpected error processing API key authentication", e);
             filterChain.doFilter(request, response);
             return;
         }
         
         // Continue filter chain
         filterChain.doFilter(request, response);
+    }
+    
+    /**
+     * Load user details with caching to avoid database queries on every API key request.
+     * Cache TTL is 5 minutes to balance performance and data freshness.
+     */
+    private UserDetails loadUserDetailsCached(String userId) {
+        long now = System.currentTimeMillis();
+        
+        // Check cache
+        CacheEntry entry = userCache.get(userId);
+        if (entry != null && !entry.isExpired()) {
+            return entry.userDetails;
+        }
+        
+        // Cache miss or expired - load from database
+        UserDetails userDetails = userDetailsService.loadUserById(userId);
+        
+        // Update cache
+        long expirationTime = now + TimeUnit.SECONDS.toMillis(USER_CACHE_TTL_SECONDS);
+        userCache.put(userId, new CacheEntry(userDetails, expirationTime));
+        
+        // Periodic cleanup of expired entries (simple approach - clean on cache miss)
+        if (userCache.size() > 1000) {
+            userCache.entrySet().removeIf(e -> e.getValue().isExpired());
+        }
+        
+        return userDetails;
     }
 }
 

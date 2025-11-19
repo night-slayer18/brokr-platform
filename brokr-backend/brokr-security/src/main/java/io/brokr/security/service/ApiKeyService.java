@@ -7,6 +7,7 @@ import io.brokr.storage.repository.ApiKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,8 @@ public class ApiKeyService {
     
     private static final String KEY_PREFIX = "brokr_";
     private static final int SECRET_LENGTH = 32; // 32 bytes = 256 bits
+    private static final int MAX_API_KEYS_PER_USER = 1000; // Maximum keys to return without pagination
+    private static final long LAST_USED_UPDATE_THROTTLE_SECONDS = 60; // Update max once per minute per key
     
     private final ApiKeyRepository apiKeyRepository;
     private final PasswordEncoder passwordEncoder; // BCryptPasswordEncoder
@@ -37,6 +41,10 @@ public class ApiKeyService {
     
     // Thread-safe lock for key generation to prevent race conditions
     private final ReentrantReadWriteLock keyGenerationLock = new ReentrantReadWriteLock();
+    
+    // Throttling map for lastUsed updates: keyId -> last update timestamp
+    // Using ConcurrentHashMap for thread-safe access
+    private final Map<String, Instant> lastUsedUpdateCache = new ConcurrentHashMap<>();
     
     /**
      * Generate a new API key.
@@ -98,7 +106,6 @@ public class ApiKeyService {
             
             ApiKeyEntity saved = apiKeyRepository.save(entity);
             
-            // Return full key (only shown once)
             String fullKey = keyPrefix + "_" + secret;
             
             log.info("Generated API key for user: {}, keyId: {}", userId, saved.getId());
@@ -117,7 +124,7 @@ public class ApiKeyService {
                             .createdAt(saved.getCreatedAt())
                             .updatedAt(saved.getUpdatedAt())
                             .build())
-                    .fullKey(fullKey) // Only in response, not stored
+                    .fullKey(fullKey)
                     .build();
         } finally {
             keyGenerationLock.writeLock().unlock();
@@ -177,20 +184,25 @@ public class ApiKeyService {
         
         ApiKeyEntity entity = entityOpt.get();
         
-        // Verify secret hash
+        // Verify secret hash against current secret
         boolean secretValid = passwordEncoder.matches(secret, entity.getSecretHash());
         
-        // Check old secret (for rotation grace period)
-        if (!secretValid && entity.getOldSecretHash() != null) {
-            secretValid = passwordEncoder.matches(secret, entity.getOldSecretHash());
-            if (secretValid) {
-                log.debug("API key validated using old secret (rotation grace period): {}", entity.getId());
-            }
+        // Always check old secret (for rotation grace period) to prevent timing attacks
+        // Even if current secret is valid, we check old secret to maintain constant-time behavior
+        boolean oldSecretValid = false;
+        if (entity.getOldSecretHash() != null) {
+            oldSecretValid = passwordEncoder.matches(secret, entity.getOldSecretHash());
         }
         
-        if (!secretValid) {
+        // Accept if either current or old secret is valid
+        if (!secretValid && !oldSecretValid) {
             log.warn("Invalid secret for API key: {}", entity.getId());
             return ApiKeyValidationResult.invalid("Invalid API key secret");
+        }
+        
+        // Log if old secret was used (for monitoring rotation grace period usage)
+        if (!secretValid && oldSecretValid) {
+            log.debug("API key validated using old secret (rotation grace period): {}", entity.getId());
         }
         
         // Return validation result
@@ -237,7 +249,6 @@ public class ApiKeyService {
             
             ApiKeyEntity saved = apiKeyRepository.save(entity);
             
-            // Return new full key
             String fullKey = saved.getKeyPrefix() + "_" + newSecret;
             
             log.info("Rotated API key: {}", apiKeyId);
@@ -360,12 +371,16 @@ public class ApiKeyService {
      * List API keys for a user.
      * Includes active, revoked, and expired keys (but excludes deleted keys).
      * This follows standard practice where revoked keys remain visible for audit purposes.
+     * 
+     * Note: For users with many API keys, consider using pagination to avoid loading all keys into memory.
+     * This method limits results to MAX_API_KEYS_PER_USER to prevent memory issues.
      */
     @Transactional(readOnly = true)
     public List<ApiKey> listApiKeysByUserId(String userId) {
-        // Use findByUserId which includes revoked keys but excludes deleted ones
-        // This allows users to see their revoked keys for audit/history purposes
-        return apiKeyRepository.findByUserId(userId, Pageable.unpaged())
+        // Use pagination to limit memory usage - fetch first page with reasonable limit
+        // This prevents loading thousands of keys into memory for users with many keys
+        Pageable pageable = Pageable.ofSize(MAX_API_KEYS_PER_USER);
+        return apiKeyRepository.findByUserId(userId, pageable)
                 .getContent()
                 .stream()
                 .map(ApiKeyEntity::toDomain)
@@ -373,27 +388,48 @@ public class ApiKeyService {
     }
     
     /**
-     * Update last used timestamp (async, batched, throttled).
-     * Uses a throttling mechanism to batch updates and reduce database load.
+     * Update last used timestamp (async, throttled).
+     * Uses throttling to prevent excessive database updates - updates max once per minute per key.
      * Thread-safe operation.
      */
-    @org.springframework.scheduling.annotation.Async
+    @Async
     public void updateLastUsed(String apiKeyId) {
+        Instant now = Instant.now();
+        
+        // Throttle: Only update if last update was more than THROTTLE_SECONDS ago
+        Instant lastUpdate = lastUsedUpdateCache.get(apiKeyId);
+        if (lastUpdate != null) {
+            long secondsSinceLastUpdate = now.getEpochSecond() - lastUpdate.getEpochSecond();
+            if (secondsSinceLastUpdate < LAST_USED_UPDATE_THROTTLE_SECONDS) {
+                // Skip update - too soon since last update
+                return;
+            }
+        }
+        
+        // Update cache timestamp (optimistic - before DB update)
+        lastUsedUpdateCache.put(apiKeyId, now);
+        
         // Async methods need their own transaction context
         // Use TransactionTemplate to ensure transaction is created in async thread
         try {
             transactionTemplate.executeWithoutResult(status -> {
                 try {
-                    apiKeyRepository.updateLastUsedAt(apiKeyId, Instant.now(), Instant.now());
+                    apiKeyRepository.updateLastUsedAt(apiKeyId, now, now);
                 } catch (Exception e) {
-                    // Log but don't fail - this is non-critical metadata
-                    log.warn("Failed to update last used timestamp for API key: {}", apiKeyId, e);
+                    // Remove from cache on failure so we can retry
+                    lastUsedUpdateCache.remove(apiKeyId);
+                    // Log transaction failure prominently for monitoring
+                    log.error("Transaction failed to update last used timestamp for API key: {} - {}", 
+                            apiKeyId, e.getMessage(), e);
                     // Don't rethrow - we want to continue even if this fails
                 }
             });
         } catch (Exception e) {
-            // Log but don't fail the request - this is non-critical metadata
-            log.warn("Failed to update last used timestamp for API key: {}", apiKeyId, e);
+            // Remove from cache on failure so we can retry
+            lastUsedUpdateCache.remove(apiKeyId);
+            // Log transaction failure prominently for monitoring
+            log.error("Failed to execute transaction for updating last used timestamp for API key: {} - {}", 
+                    apiKeyId, e.getMessage(), e);
         }
     }
     
@@ -419,7 +455,13 @@ public class ApiKeyService {
     @lombok.Builder
     public static class ApiKeyGenerationResult {
         private ApiKey apiKey;
-        private String fullKey; // Only shown once, not stored
+        private String fullKey;
+        
+        @Override
+        public String toString() {
+            // Never include fullKey in toString() to prevent accidental logging
+            return "ApiKeyGenerationResult(apiKey=" + apiKey + ", fullKey=***REDACTED***)";
+        }
     }
     
     /**

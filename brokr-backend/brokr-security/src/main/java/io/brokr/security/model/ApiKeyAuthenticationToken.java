@@ -14,7 +14,6 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     private final UserDetails userDetails;
     private final String apiKeyId;
     private final Set<String> scopes;
-    private final String credentials; // API key (for logging only, not stored)
     
     /**
      * Create authenticated API key token.
@@ -22,21 +21,16 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
      * @param userDetails User details from UserDetailsService
      * @param apiKeyId API key ID
      * @param scopes Set of permission scopes
-     * @param credentials Full API key (for logging, not stored)
      */
     public ApiKeyAuthenticationToken(
             UserDetails userDetails,
             String apiKeyId,
-            Set<String> scopes,
-            String credentials
+            Set<String> scopes
     ) {
         super(userDetails.getAuthorities());
         this.userDetails = userDetails;
         this.apiKeyId = apiKeyId;
         this.scopes = scopes != null ? Set.copyOf(scopes) : Set.of();
-        // Security: Clear credentials after authentication to prevent memory leaks
-        // Store only for initial logging, then null it
-        this.credentials = null; // Don't store credentials in memory
         setAuthenticated(true); // Mark as authenticated
     }
     

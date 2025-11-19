@@ -83,17 +83,19 @@ public class MfaController {
     @PreAuthorize("isAuthenticated()")
     public Map<String, Object> verifyMfaSetup(
             @RequestParam String deviceId,
-            @RequestParam String code) {
+            @RequestParam String code,
+            HttpServletRequest request) {
         String userId = authorizationService.getCurrentUser().getId();
         User user = authorizationService.getCurrentUser();
-        boolean wasInGracePeriod = authorizationService.isInGracePeriod();
+        boolean wasInGracePeriod = authorizationService.isInGracePeriod(request);
         
         MfaService.MfaSetupCompleteResult result = mfaService.verifyAndCompleteMfaSetup(userId, deviceId, code);
         
         // If user was in grace period, issue a full token now that MFA is enabled
         if (wasInGracePeriod) {
             user = authorizationService.getCurrentUser();
-            String fullToken = jwtService.generateToken(user);
+            // MFA was verified during setup, so mfaVerified is true
+            String fullToken = jwtService.generateToken(user, true);
             
             HttpServletResponse response = getResponse();
             if (response != null) {

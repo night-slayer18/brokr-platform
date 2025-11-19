@@ -91,7 +91,18 @@ public class MfaResolver {
     public Map<String, Object> verifyMfaSetup(@Argument String deviceId, @Argument String code) {
         String userId = authorizationService.getCurrentUser().getId();
         User user = authorizationService.getCurrentUser();
-        boolean wasInGracePeriod = authorizationService.isInGracePeriod();
+        
+        // Get request from RequestContextHolder for GraphQL
+        HttpServletRequest request = null;
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                request = attributes.getRequest();
+            }
+        } catch (Exception e) {
+            // RequestContextHolder not available
+        }
+        boolean wasInGracePeriod = authorizationService.isInGracePeriod(request);
         
         MfaService.MfaSetupCompleteResult result = mfaService.verifyAndCompleteMfaSetup(userId, deviceId, code);
         
@@ -107,8 +118,8 @@ public class MfaResolver {
             // Reload user to get updated MFA status (MFA is now enabled)
             user = authorizationService.getCurrentUser();
             
-            // Generate full JWT token (MFA is now enabled)
-            String fullToken = jwtService.generateToken(user);
+            // Generate full JWT token (MFA is now enabled and was verified during setup)
+            String fullToken = jwtService.generateToken(user, true);
             
             // Update cookie with full token
             HttpServletResponse response = getResponse();

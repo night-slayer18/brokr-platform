@@ -541,6 +541,14 @@ type AuditLogPage {
     pageSize: Int!
 }
 
+type UserPage {
+    content: [UserDto!]!
+    totalElements: Long!
+    totalPages: Int!
+    currentPage: Int!
+    pageSize: Int!
+}
+
 type ActionTypeCount {
     actionType: AuditActionType!
     count: Long!
@@ -940,7 +948,7 @@ input RateLimitConfigInput {
 type Query {
     # User queries
     me: UserDto
-    users(organizationId: String): [UserDto!]!
+    users(organizationId: String, page: Int, size: Int): UserPage!
     user(id: ID!): UserDto
     mfaStatus: MfaStatus!
 

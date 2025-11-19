@@ -7,6 +7,7 @@ import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.service.UserManagementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +29,8 @@ public class UserApiService {
     }
 
     @Transactional(readOnly = true)
-    public List<User> listUsers(String organizationId) {
-        return userManagementService.listUsers(organizationId);
+    public Page<User> listUsers(String organizationId, int page, int size) {
+        return userManagementService.listUsers(organizationId, page, size);
     }
 
     @Transactional(readOnly = true)

@@ -12,18 +12,22 @@ import io.brokr.storage.entity.SchemaRegistryEntity;
 import io.brokr.storage.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.Hibernate;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthorizationService {
 
-    private final UserRepository userRepository;
     private final KafkaClusterRepository clusterRepository;
     private final SchemaRegistryRepository schemaRegistryRepository;
     private final KafkaConnectRepository kafkaConnectRepository;
@@ -31,9 +35,41 @@ public class AuthorizationService {
     private final KsqlDBRepository ksqlDBRepository;
     private final JwtService jwtService;
 
+    // Cache for cluster-to-environment mappings to avoid N+1 queries
+    private final Map<String, ClusterMappingCacheEntry> clusterMappingCache = new ConcurrentHashMap<>();
+    private static final long CLUSTER_MAPPING_CACHE_TTL_SECONDS = 600; // 10 minutes
+
+    // Cache for resource-to-cluster mappings
+    private final Map<String, ResourceMappingCacheEntry> resourceMappingCache = new ConcurrentHashMap<>();
+    private static final long RESOURCE_MAPPING_CACHE_TTL_SECONDS = 600; // 10 minutes
+
+    private static class ClusterMappingCacheEntry {
+        final String environmentId;
+        final Instant expiresAt;
+
+        ClusterMappingCacheEntry(String environmentId, Instant expiresAt) {
+            this.environmentId = environmentId;
+            this.expiresAt = expiresAt;
+        }
+    }
+
+    private static class ResourceMappingCacheEntry {
+        final String clusterId;
+        final Instant expiresAt;
+
+        ResourceMappingCacheEntry(String clusterId, Instant expiresAt) {
+            this.clusterId = clusterId;
+            this.expiresAt = expiresAt;
+        }
+    }
+
 
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("No authenticated user found in security context");
+        }
         
         // Handle API key authentication
         if (authentication instanceof ApiKeyAuthenticationToken) {
@@ -42,14 +78,11 @@ public class AuthorizationService {
             if (principal instanceof BrokrUserDetails) {
                 return ((BrokrUserDetails) principal).getUser();
             }
-            // Fallback: extract from UserDetails
-            String email = authentication.getName();
-            return userRepository.findByEmail(email)
-                    .map(entity -> {
-                        Hibernate.initialize(entity.getAccessibleEnvironmentIds());
-                        return entity.toDomain();
-                    })
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            // This should never happen - ApiKeyAuthenticationFilter always sets BrokrUserDetails
+            throw new IllegalStateException(
+                    String.format("Unexpected principal type in API key authentication: %s. " +
+                            "Expected BrokrUserDetails. This indicates a bug in authentication setup.",
+                            principal != null ? principal.getClass().getName() : "null"));
         }
         
         // Handle JWT authentication (existing flow)
@@ -58,16 +91,11 @@ public class AuthorizationService {
             return ((BrokrUserDetails) principal).getUser();
         }
 
-        // Fallback for any other principal type (should not happen in normal flow)
-        // Note: authentication.getName() returns email since we use email for authentication
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .map(entity -> {
-                    // Explicitly initialize lazy collection
-                    Hibernate.initialize(entity.getAccessibleEnvironmentIds());
-                    return entity.toDomain();
-                })
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // This should never happen - JwtAuthenticationFilter always sets BrokrUserDetails
+        throw new IllegalStateException(
+                String.format("Unexpected principal type in JWT authentication: %s. " +
+                        "Expected BrokrUserDetails. This indicates a bug in authentication setup.",
+                        principal != null ? principal.getClass().getName() : "null"));
     }
     
     /**
@@ -139,11 +167,44 @@ public class AuthorizationService {
             return true;
         }
 
+        String environmentId = getClusterEnvironmentIdCached(clusterId);
+        return hasAccessToEnvironment(environmentId);
+    }
+
+    /**
+     * Get environment ID for a cluster with caching to avoid repeated database queries.
+     */
+    private String getClusterEnvironmentIdCached(String clusterId) {
+        Instant now = Instant.now();
+        
+        // Check cache first
+        ClusterMappingCacheEntry cached = clusterMappingCache.get(clusterId);
+        if (cached != null && cached.expiresAt.isAfter(now)) {
+            return cached.environmentId;
+        }
+        
+        // Load from database
         String environmentId = clusterRepository.findById(clusterId)
                 .map(KafkaClusterEntity::getEnvironmentId)
                 .orElseThrow(() -> new RuntimeException("Cluster not found for auth check"));
+        
+        // Cache the mapping
+        clusterMappingCache.put(clusterId, new ClusterMappingCacheEntry(environmentId, 
+                now.plusSeconds(CLUSTER_MAPPING_CACHE_TTL_SECONDS)));
+        
+        // Periodic cleanup of expired entries (when cache size exceeds threshold)
+        if (clusterMappingCache.size() > 1000) {
+            cleanupExpiredClusterMappingCacheEntries(now);
+        }
+        
+        return environmentId;
+    }
 
-        return hasAccessToEnvironment(environmentId);
+    /**
+     * Clean up expired cluster mapping cache entries.
+     */
+    private void cleanupExpiredClusterMappingCacheEntries(Instant now) {
+        clusterMappingCache.entrySet().removeIf(entry -> entry.getValue().expiresAt.isBefore(now));
     }
 
     public boolean hasAccessToSchemaRegistry(String schemaRegistryId) {
@@ -152,11 +213,18 @@ public class AuthorizationService {
             return true;
         }
 
-        String clusterId = schemaRegistryRepository.findById(schemaRegistryId)
-                .map(SchemaRegistryEntity::getClusterId)
-                .orElseThrow(() -> new RuntimeException("Schema Registry not found for auth check"));
-
+        String clusterId = getSchemaRegistryClusterIdCached(schemaRegistryId);
         return hasAccessToCluster(clusterId);
+    }
+
+    /**
+     * Get cluster ID for a schema registry with caching to avoid repeated database queries.
+     */
+    private String getSchemaRegistryClusterIdCached(String schemaRegistryId) {
+        return getResourceClusterIdCached("schemaRegistry", schemaRegistryId, 
+                () -> schemaRegistryRepository.findById(schemaRegistryId)
+                        .map(SchemaRegistryEntity::getClusterId)
+                        .orElseThrow(() -> new RuntimeException("Schema Registry not found for auth check")));
     }
 
     public boolean hasAccessToKafkaConnect(String kafkaConnectId) {
@@ -165,11 +233,18 @@ public class AuthorizationService {
             return true;
         }
 
-        String clusterId = kafkaConnectRepository.findById(kafkaConnectId)
-                .map(KafkaConnectEntity::getClusterId)
-                .orElseThrow(() -> new RuntimeException("Kafka Connect not found for auth check"));
-
+        String clusterId = getKafkaConnectClusterIdCached(kafkaConnectId);
         return hasAccessToCluster(clusterId);
+    }
+
+    /**
+     * Get cluster ID for a Kafka Connect instance with caching to avoid repeated database queries.
+     */
+    private String getKafkaConnectClusterIdCached(String kafkaConnectId) {
+        return getResourceClusterIdCached("kafkaConnect", kafkaConnectId,
+                () -> kafkaConnectRepository.findById(kafkaConnectId)
+                        .map(KafkaConnectEntity::getClusterId)
+                        .orElseThrow(() -> new RuntimeException("Kafka Connect not found for auth check")));
     }
 
     public boolean hasAccessToKafkaStreamsApp(String kafkaStreamsApplicationId) {
@@ -178,11 +253,18 @@ public class AuthorizationService {
             return true;
         }
 
-        String clusterId = kafkaStreamsApplicationRepository.findById(kafkaStreamsApplicationId)
-                .map(KafkaStreamsApplicationEntity::getClusterId)
-                .orElseThrow(() -> new RuntimeException("Kafka Streams Application not found for auth check"));
-
+        String clusterId = getKafkaStreamsAppClusterIdCached(kafkaStreamsApplicationId);
         return hasAccessToCluster(clusterId);
+    }
+
+    /**
+     * Get cluster ID for a Kafka Streams application with caching to avoid repeated database queries.
+     */
+    private String getKafkaStreamsAppClusterIdCached(String kafkaStreamsApplicationId) {
+        return getResourceClusterIdCached("kafkaStreamsApp", kafkaStreamsApplicationId,
+                () -> kafkaStreamsApplicationRepository.findById(kafkaStreamsApplicationId)
+                        .map(KafkaStreamsApplicationEntity::getClusterId)
+                        .orElseThrow(() -> new RuntimeException("Kafka Streams Application not found for auth check")));
     }
 
     public boolean hasAccessToKsqlDB(String ksqlDBId) {
@@ -191,11 +273,55 @@ public class AuthorizationService {
             return true;
         }
 
-        String clusterId = ksqlDBRepository.findById(ksqlDBId)
-                .map(KsqlDBEntity::getClusterId)
-                .orElseThrow(() -> new RuntimeException("ksqlDB instance not found for auth check"));
-
+        String clusterId = getKsqlDBClusterIdCached(ksqlDBId);
         return hasAccessToCluster(clusterId);
+    }
+
+    /**
+     * Get cluster ID for a ksqlDB instance with caching to avoid repeated database queries.
+     */
+    private String getKsqlDBClusterIdCached(String ksqlDBId) {
+        return getResourceClusterIdCached("ksqlDB", ksqlDBId,
+                () -> ksqlDBRepository.findById(ksqlDBId)
+                        .map(KsqlDBEntity::getClusterId)
+                        .orElseThrow(() -> new RuntimeException("ksqlDB instance not found for auth check")));
+    }
+
+    /**
+     * Generic method to get cluster ID for a resource with caching.
+     * Uses a prefix to avoid cache key collisions between different resource types.
+     */
+    private String getResourceClusterIdCached(String resourceType, String resourceId, 
+                                               java.util.function.Supplier<String> loader) {
+        String cacheKey = resourceType + ":" + resourceId;
+        Instant now = Instant.now();
+        
+        // Check cache first
+        ResourceMappingCacheEntry cached = resourceMappingCache.get(cacheKey);
+        if (cached != null && cached.expiresAt.isAfter(now)) {
+            return cached.clusterId;
+        }
+        
+        // Load from database
+        String clusterId = loader.get();
+        
+        // Cache the mapping
+        resourceMappingCache.put(cacheKey, new ResourceMappingCacheEntry(clusterId, 
+                now.plusSeconds(RESOURCE_MAPPING_CACHE_TTL_SECONDS)));
+        
+        // Periodic cleanup of expired entries (when cache size exceeds threshold)
+        if (resourceMappingCache.size() > 1000) {
+            cleanupExpiredResourceMappingCacheEntries(now);
+        }
+        
+        return clusterId;
+    }
+
+    /**
+     * Clean up expired resource mapping cache entries.
+     */
+    private void cleanupExpiredResourceMappingCacheEntries(Instant now) {
+        resourceMappingCache.entrySet().removeIf(entry -> entry.getValue().expiresAt.isBefore(now));
     }
 
 
@@ -292,10 +418,28 @@ public class AuthorizationService {
     /**
      * Check if current user is in MFA grace period (has grace period token).
      * Users in grace period can only perform MFA setup operations.
+     * 
+     * @param request Optional HttpServletRequest. If not provided, will attempt to extract from RequestContextHolder.
+     *                This allows the method to work in contexts where RequestContextHolder may not be available
+     *                (e.g., async, scheduled tasks).
+     * @return true if user is in grace period, false otherwise
      */
-    public boolean isInGracePeriod() {
+    public boolean isInGracePeriod(HttpServletRequest request) {
         try {
-            HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+            // If request not provided, try to get from RequestContextHolder
+            if (request == null) {
+                try {
+                    ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                    if (attributes != null) {
+                        request = attributes.getRequest();
+                    }
+                } catch (Exception e) {
+                    // RequestContextHolder not available (e.g., async context)
+                    log.debug("RequestContextHolder not available for grace period check: {}", e.getMessage());
+                    return false;
+                }
+            }
+
             if (request == null) {
                 return false;
             }
@@ -324,16 +468,18 @@ public class AuthorizationService {
             }
         } catch (Exception e) {
             // If we can't determine, assume not in grace period
+            log.debug("Error checking grace period: {}", e.getMessage());
         }
         return false;
     }
+
 
     /**
      * Check if user needs to complete MFA setup (in grace period or MFA not enabled when required).
      * Throws exception if user tries to access non-MFA operations while in grace period.
      */
-    public void checkMfaSetupRequired() {
-        if (isInGracePeriod()) {
+    public void checkMfaSetupRequired(HttpServletRequest request) {
+        if (isInGracePeriod(request)) {
             throw new RuntimeException("MFA setup is required. Please complete MFA setup to access this feature.");
         }
     }

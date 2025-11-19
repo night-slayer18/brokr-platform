@@ -33,6 +33,7 @@ public class MfaService {
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final MfaRateLimitService rateLimitService;
+    private final UserDetailsServiceImpl userDetailsService;
 
     /**
      * Initiate MFA setup - generates secret and QR code
@@ -44,8 +45,8 @@ public class MfaService {
         UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if user already has active MFA device (with lock to prevent race condition)
-        if (mfaDeviceRepository.existsByUserIdAndTypeAndIsActiveTrue(userId, MfaType.TOTP)) {
+        // Check if user already has active MFA device (use findBy* with lock instead of existsBy* to ensure pessimistic lock is acquired)
+        if (mfaDeviceRepository.findByUserIdAndTypeAndIsActiveTrue(userId, MfaType.TOTP).isPresent()) {
             throw new RuntimeException("MFA is already enabled for this user");
         }
 
@@ -137,6 +138,9 @@ public class MfaService {
         userEntity.setMfaEnabled(true);
         userEntity.setMfaType(MfaType.TOTP);
         userRepository.saveAndFlush(userEntity);
+        
+        // Invalidate cache to ensure subsequent authentication uses updated MFA status
+        userDetailsService.evictCacheForUser(userEntity.getEmail(), userId);
 
         // Generate backup codes
         List<String> backupCodes = backupCodeService.generateBackupCodes();
@@ -221,8 +225,16 @@ public class MfaService {
             throw new RuntimeException("Too many failed attempts. Please try again later.");
         }
 
-        // Load all unused codes with pessimistic lock to prevent concurrent use
-        List<BackupCodeEntity> unusedCodes = backupCodeRepository.findUnusedByUserId(userId);
+        // Load unused codes with limit to prevent loading excessive data
+        // Backup codes are typically generated in batches of 10, so limit to 20 to handle regeneration scenarios
+        // Using findByUserIdAndIsUsedFalse which is more efficient than custom query
+        List<BackupCodeEntity> unusedCodes = backupCodeRepository.findByUserIdAndIsUsedFalse(userId);
+        
+        // Limit to reasonable number to prevent performance issues if many codes exist
+        // This is a safety measure - normally users have ~10 backup codes
+        if (unusedCodes.size() > 20) {
+            unusedCodes = unusedCodes.subList(0, 20);
+        }
 
         if (unusedCodes.isEmpty()) {
             rateLimitService.recordFailedAttempt(userId);
@@ -230,12 +242,14 @@ public class MfaService {
         }
 
         // Use constant-time comparison to prevent timing attacks
-        // Always check all codes to maintain constant execution time
+        // Always check all codes to maintain constant execution time (no early break)
         BackupCodeEntity matchedCode = null;
         for (BackupCodeEntity codeEntity : unusedCodes) {
-            if (backupCodeService.verifyCode(code, codeEntity.getCodeHash())) {
+            // Always verify all codes to maintain constant execution time regardless of match position
+            boolean matches = backupCodeService.verifyCode(code, codeEntity.getCodeHash());
+            if (matches && matchedCode == null) {
+                // Only store first match, but continue checking all codes for constant time
                 matchedCode = codeEntity;
-                break; // Found match, but continue loop for constant time (optional optimization)
             }
         }
 
@@ -292,6 +306,9 @@ public class MfaService {
         userEntity.setMfaType(null);
         userEntity.setMfaEnforced(false);
         userRepository.saveAndFlush(userEntity);
+        
+        // Invalidate cache to ensure subsequent authentication uses updated MFA status
+        userDetailsService.evictCacheForUser(userEntity.getEmail(), userId);
     }
 
     /**

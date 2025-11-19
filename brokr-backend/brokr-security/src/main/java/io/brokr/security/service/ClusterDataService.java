@@ -6,6 +6,8 @@ import io.brokr.core.model.User;
 import io.brokr.storage.entity.KafkaClusterEntity;
 import io.brokr.storage.repository.KafkaClusterRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 public class ClusterDataService {
+
+    private static final int MAX_CLUSTERS_WITHOUT_FILTER = 1000; // Maximum clusters to return when no filter is applied
 
     private final KafkaClusterRepository clusterRepository;
     private final AuthorizationService authorizationService;
@@ -40,20 +44,21 @@ public class ClusterDataService {
 
         List<KafkaClusterEntity> clusters;
 
-        // 1. Fetch the raw cluster data from the repository
+        // 1. Fetch the raw cluster data from the repository using database queries (not in-memory filtering)
         if (isSuperAdmin && organizationId == null) {
-            // SUPER_ADMIN with no organizationId filter - get all clusters
+            // SUPER_ADMIN with no organizationId filter
             if (environmentId != null) {
-                // Filter by environment only
-                clusters = clusterRepository.findAll().stream()
-                        .filter(entity -> entity.getEnvironmentId().equals(environmentId))
-                        .toList();
+                // Filter by environment only - use database query instead of findAll() + stream filter
+                clusters = clusterRepository.findByEnvironmentId(environmentId);
             } else {
-                // Get all clusters
-                clusters = clusterRepository.findAll();
+                // Get all clusters with a reasonable limit to prevent OOM
+                // For production deployments with many clusters, pagination should be added at the API layer
+                Pageable pageable = PageRequest.of(0, MAX_CLUSTERS_WITHOUT_FILTER);
+                clusters = clusterRepository.findAll(pageable).getContent();
             }
         } else {
             // Regular users or SUPER_ADMIN with specific organizationId
+            // Use database queries with WHERE clauses for efficient filtering
             if (environmentId != null) {
                 clusters = clusterRepository.findByOrganizationIdAndEnvironmentId(organizationId, environmentId);
             } else {

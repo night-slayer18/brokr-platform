@@ -3,7 +3,6 @@ package io.brokr.security.config;
 import io.brokr.security.service.ApiKeyAuthenticationFilter;
 import io.brokr.security.service.JwtAuthenticationFilter;
 import io.brokr.security.service.UserDetailsServiceImpl;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -20,13 +19,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Slf4j
 @Configuration
@@ -44,7 +37,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/auth/**").permitAll()
@@ -58,18 +50,12 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
 
                         // Static resources for frontend (must be public for login page to load)
-                        .requestMatchers("/", "/index.html", "/assets/**", "/vite.svg", "/*.js", "/*.css", "/*.ico", "/*.png", "/*.jpg", "/*.svg").permitAll()
+                        // All JS/CSS files are in /assets/ directory, so no need for root-level /*.js or /*.css patterns
+                        .requestMatchers("/", "/index.html", "/assets/**", "/*.ico", "/*.png", "/*.jpg", "/*.svg").permitAll()
 
                         // Allow all other GET requests for SPA routing (they will be handled by WebMvcConfig to serve index.html)
                         // This allows routes like /clusters/123, /login, etc. to work on page reload
-                        .requestMatchers(request -> 
-                            request.getMethod().equals("GET") && 
-                            !request.getRequestURI().startsWith("/api/") &&
-                            !request.getRequestURI().startsWith("/actuator/") &&
-                            !request.getRequestURI().startsWith("/auth/") &&
-                            !request.getRequestURI().equals("/graphql") &&
-                            !request.getRequestURI().equals("/graphiql")
-                        ).permitAll()
+                        .requestMatchers(this::isSpaRouteRequest).permitAll()
 
                         // All other requests require authentication
                         .anyRequest().authenticated()
@@ -96,63 +82,25 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
-    private String allowedOrigins;
-    
-    @Value("${spring.profiles.active:}")
-    private String activeProfile;
-    
     /**
-     * Validates CORS configuration on application startup.
-     * SECURITY: Prevents localhost origins in production environments.
+     * Determines if a request is a SPA route that should be permitted.
+     * This allows client-side routing to work on page reload.
+     * 
+     * @param request the HTTP request
+     * @return true if the request is a GET request that should be handled by the SPA router
      */
-    @PostConstruct
-    public void validateCorsConfiguration() {
-        boolean isDev = activeProfile.contains("dev") || activeProfile.contains("test") || activeProfile.contains("local");
-        
-        // Check if localhost is in allowed origins in non-dev environment
-        if (!isDev && allowedOrigins != null) {
-            String lowerOrigins = allowedOrigins.toLowerCase();
-            if (lowerOrigins.contains("localhost") || lowerOrigins.contains("127.0.0.1")) {
-                throw new IllegalStateException(
-                    "CRITICAL SECURITY ERROR: CORS configuration contains localhost origins in production environment. " +
-                    "Current allowed origins: " + allowedOrigins + ". " +
-                    "Active profile: " + (activeProfile.isEmpty() ? "default" : activeProfile) + ". " +
-                    "Set cors.allowed-origins in application-prod.yml to production domains only. " +
-                    "Never allow localhost in production as it can enable CSRF attacks."
-                );
-            }
+    private boolean isSpaRouteRequest(HttpServletRequest request) {
+        if (!"GET".equals(request.getMethod())) {
+            return false;
         }
         
-        // Warn if using default in production
-        if (!isDev && "http://localhost:3000,http://localhost:8080".equals(allowedOrigins)) {
-            throw new IllegalStateException(
-                "CRITICAL SECURITY ERROR: CORS configuration is using default localhost values in production. " +
-                "Active profile: " + (activeProfile.isEmpty() ? "default" : activeProfile) + ". " +
-                "You MUST set cors.allowed-origins in application-prod.yml to your production domain(s). " +
-                "Example: cors.allowed-origins=https://yourdomain.com"
-            );
-        }
+        String requestURI = request.getRequestURI();
         
-        log.info("CORS configuration validated: {} - Active profile: {}", 
-                allowedOrigins, activeProfile.isEmpty() ? "default" : activeProfile);
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        // Parse allowed origins from configuration (comma-separated)
-        // Default: dev origins (localhost:3000, localhost:8080)
-        // Production: Set via environment variable or application-prod.yml
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        // Exclude API and backend endpoints
+        return !requestURI.startsWith("/api/") &&
+               !requestURI.startsWith("/actuator/") &&
+               !requestURI.startsWith("/auth/") &&
+               !requestURI.equals("/graphql") &&
+               !requestURI.equals("/graphiql");
     }
 }

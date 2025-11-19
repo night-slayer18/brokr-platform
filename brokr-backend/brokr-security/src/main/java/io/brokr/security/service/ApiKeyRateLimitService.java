@@ -19,11 +19,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Service for API key rate limiting using in-memory storage.
  * Thread-safe, sliding window algorithm, no race conditions.
+ * 
+ * NOTE: This implementation uses in-memory storage. In a distributed system with multiple instances,
+ * each instance maintains separate counters, which could allow rate limit bypass by distributing
+ * requests across instances. For production multi-instance deployments, consider using a distributed
+ * cache (e.g., Redis) for shared rate limit counters.
  */
 @Slf4j
 @Service
@@ -46,8 +52,9 @@ public class ApiKeyRateLimitService {
     private final ApiKeyRateLimitConfigService rateLimitConfigService;
 
     // In-memory rate limit counters (thread-safe)
+    // NOTE: In distributed deployments, use Redis or similar for shared counters
     private final Map<String, RateLimitWindow> inMemoryCounters = new ConcurrentHashMap<>();
-    private final ReentrantLock cleanupLock = new ReentrantLock();
+    private final ReadWriteLock cleanupLock = new ReentrantReadWriteLock();
     private ScheduledExecutorService cleanupExecutor;
 
     @PostConstruct
@@ -124,24 +131,41 @@ public class ApiKeyRateLimitService {
      * Sliding window algorithm.
      */
     private boolean checkRateLimitInMemory(String key, ApiKeyRateLimitEntity config) {
-        RateLimitWindow window = inMemoryCounters.computeIfAbsent(
-                key,
-                k -> new RateLimitWindow(config.getWindowSeconds())
-        );
+        // Use read lock for cleanup to avoid blocking rate limit checks
+        cleanupLock.readLock().lock();
+        try {
+            RateLimitWindow window = inMemoryCounters.computeIfAbsent(
+                    key,
+                    k -> new RateLimitWindow(config.getWindowSeconds())
+            );
 
-        return window.incrementAndCheck(config.getLimitValue());
+            return window.incrementAndCheck(config.getLimitValue());
+        } finally {
+            cleanupLock.readLock().unlock();
+        }
     }
 
     /**
      * Cleanup expired in-memory counters.
+     * Uses write lock to prevent concurrent cleanup and ensure thread safety.
+     * Read locks allow rate limit checks to proceed during cleanup.
      */
     private void cleanupExpiredCounters() {
-        cleanupLock.lock();
+        // Try to acquire write lock, but don't block if cleanup is already running
+        if (!cleanupLock.writeLock().tryLock()) {
+            // Cleanup already in progress, skip this iteration
+            return;
+        }
         try {
             Instant now = Instant.now();
+            int beforeSize = inMemoryCounters.size();
             inMemoryCounters.entrySet().removeIf(entry -> entry.getValue().isExpired(now));
+            int afterSize = inMemoryCounters.size();
+            if (beforeSize != afterSize) {
+                log.debug("Cleaned up {} expired rate limit counters", beforeSize - afterSize);
+            }
         } finally {
-            cleanupLock.unlock();
+            cleanupLock.writeLock().unlock();
         }
     }
 
@@ -153,11 +177,14 @@ public class ApiKeyRateLimitService {
         private final int windowSeconds;
         private final AtomicLong count = new AtomicLong(0);
         private volatile Instant windowStart;
-        private final ReentrantLock lock = new ReentrantLock();
+        private volatile Instant lastAccessTime;
+        private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
         RateLimitWindow(int windowSeconds) {
             this.windowSeconds = windowSeconds;
-            this.windowStart = Instant.now();
+            Instant now = Instant.now();
+            this.windowStart = now;
+            this.lastAccessTime = now;
         }
 
         /**
@@ -165,9 +192,10 @@ public class ApiKeyRateLimitService {
          * Thread-safe, sliding window.
          */
         boolean incrementAndCheck(int limit) {
-            lock.lock();
+            lock.writeLock().lock();
             try {
                 Instant now = Instant.now();
+                lastAccessTime = now;
 
                 // Reset window if expired
                 if (windowStart.plusSeconds(windowSeconds).isBefore(now)) {
@@ -179,12 +207,28 @@ public class ApiKeyRateLimitService {
                 long current = count.incrementAndGet();
                 return current <= limit;
             } finally {
-                lock.unlock();
+                lock.writeLock().unlock();
             }
         }
 
+        /**
+         * Check if this window is expired and safe to remove.
+         * Uses windowSeconds * 3 to ensure we don't remove active entries,
+         * and also checks last access time for additional safety.
+         */
         boolean isExpired(Instant now) {
-            return windowStart.plusSeconds(windowSeconds * 2).isBefore(now);
+            lock.readLock().lock();
+            try {
+                // Use windowSeconds * 3 to ensure we don't remove entries that might still be active
+                // Also check last access time - if accessed recently, keep it
+                Instant expirationTime = windowStart.plusSeconds(windowSeconds * 3);
+                Instant lastAccessExpiration = lastAccessTime.plusSeconds(windowSeconds * 2);
+                
+                // Expire only if both window and last access are expired
+                return expirationTime.isBefore(now) && lastAccessExpiration.isBefore(now);
+            } finally {
+                lock.readLock().unlock();
+            }
         }
     }
 

@@ -15,26 +15,48 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
 
+    private static final long ORGANIZATION_CACHE_TTL_SECONDS = 300; // 5 minutes
+    
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
-    private final UserManagementService userManagementService; // Correct dependency
+    private final UserManagementService userManagementService;
     private final MfaService mfaService;
+    
+    // Cache for organization MFA settings: organizationId -> (organization, expirationTime)
+    private final ConcurrentHashMap<String, OrganizationCacheEntry> organizationCache = new ConcurrentHashMap<>();
+    
+    private static class OrganizationCacheEntry {
+        final OrganizationEntity organization;
+        final long expirationTime;
+        
+        OrganizationCacheEntry(OrganizationEntity organization, long expirationTime) {
+            this.organization = organization;
+            this.expirationTime = expirationTime;
+        }
+        
+        boolean isExpired() {
+            return System.currentTimeMillis() > expirationTime;
+        }
+    }
 
     public Map<String, Object> register(User user) {
         // Delegate user creation and validation to the centralized UserManagementService
         User savedUser = userManagementService.createUser(user);
 
         // After successful creation, generate a token
-        String jwtToken = jwtService.generateToken(savedUser);
+        // New users don't have MFA enabled yet, so mfaVerified is true (no MFA required)
+        String jwtToken = jwtService.generateToken(savedUser, true);
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwtToken);
@@ -55,8 +77,8 @@ public class AuthenticationService {
 
         // Check organization MFA policy with grace period support
         if (user.getOrganizationId() != null) {
-            // Use findById with optional to avoid NPE
-            OrganizationEntity org = organizationRepository.findById(user.getOrganizationId()).orElse(null);
+            // Use cached organization lookup to avoid database query on every authentication
+            OrganizationEntity org = getOrganizationCached(user.getOrganizationId());
             if (org != null && org.isMfaRequired() && !user.isMfaEnabled()) {
                 // Check if user is within grace period
                 java.time.LocalDateTime mfaRequiredSince = org.getMfaRequiredSince();
@@ -93,6 +115,8 @@ public class AuthenticationService {
                             user.getOrganizationId());
                     org.setMfaRequiredSince(java.time.LocalDateTime.now());
                     organizationRepository.save(org);
+                    // Invalidate cache after update to ensure fresh data
+                    organizationCache.remove(user.getOrganizationId());
                     
                     // Allow login with grace period
                     String gracePeriodToken = jwtService.generateGracePeriodToken(user);
@@ -122,7 +146,8 @@ public class AuthenticationService {
         }
 
         // No MFA - generate full JWT token
-        String jwtToken = jwtService.generateToken(user);
+        // MFA is not enabled, so mfaVerified is true (no MFA required)
+        String jwtToken = jwtService.generateToken(user, true);
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwtToken);
@@ -147,19 +172,32 @@ public class AuthenticationService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Verify MFA code
-        boolean isValid;
-        if (isBackupCode) {
-            isValid = mfaService.verifyBackupCode(userId, mfaCode);
-        } else {
-            isValid = mfaService.verifyMfaCode(userId, mfaCode);
+        // Use generic error message to prevent information leakage about rate limiting vs invalid code
+        try {
+            boolean isValid;
+            if (isBackupCode) {
+                isValid = mfaService.verifyBackupCode(userId, mfaCode);
+            } else {
+                isValid = mfaService.verifyMfaCode(userId, mfaCode);
+            }
+
+            if (!isValid) {
+                // Use generic message - don't reveal whether it's invalid code or rate limiting
+                throw new RuntimeException("Authentication failed");
+            }
+        } catch (RuntimeException e) {
+            // Catch rate limiting exceptions and other MFA errors
+            // Use generic message to prevent information leakage
+            if (e.getMessage() != null && e.getMessage().contains("Too many failed attempts")) {
+                // Rate limiting - use generic message
+                throw new RuntimeException("Authentication failed");
+            }
+            // Re-throw other exceptions (like "No active MFA device found")
+            throw e;
         }
 
-        if (!isValid) {
-            throw new RuntimeException("Invalid MFA code");
-        }
-
-        // Generate full JWT token
-        String jwtToken = jwtService.generateToken(user);
+        // Generate full JWT token - MFA was verified, so mfaVerified is true
+        String jwtToken = jwtService.generateToken(user, true);
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwtToken);
@@ -209,5 +247,35 @@ public class AuthenticationService {
             log.error("Password verification failed with exception for user: {}", email, e);
             return false;
         }
+    }
+    
+    /**
+     * Get organization with caching to avoid database queries on every authentication.
+     * Cache TTL is 5 minutes to balance performance and data freshness.
+     */
+    private OrganizationEntity getOrganizationCached(String organizationId) {
+        long now = System.currentTimeMillis();
+        
+        // Check cache
+        OrganizationCacheEntry entry = organizationCache.get(organizationId);
+        if (entry != null && !entry.isExpired()) {
+            return entry.organization;
+        }
+        
+        // Cache miss or expired - load from database
+        OrganizationEntity organization = organizationRepository.findById(organizationId).orElse(null);
+        
+        // Update cache (even if null, to avoid repeated lookups for non-existent orgs)
+        if (organization != null) {
+            long expirationTime = now + TimeUnit.SECONDS.toMillis(ORGANIZATION_CACHE_TTL_SECONDS);
+            organizationCache.put(organizationId, new OrganizationCacheEntry(organization, expirationTime));
+        }
+        
+        // Periodic cleanup of expired entries
+        if (organizationCache.size() > 1000) {
+            organizationCache.entrySet().removeIf(e -> e.getValue().isExpired());
+        }
+        
+        return organization;
     }
 }

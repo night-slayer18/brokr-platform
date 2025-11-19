@@ -84,11 +84,18 @@ public class TotpService {
 
     /**
      * Verify a TOTP code
+     * 
+     * @param secretKey The TOTP secret key
+     * @param code The code to verify
+     * @return true if code is valid, false otherwise
      */
     public boolean verifyCode(String secretKey, String code) {
         try {
             return codeVerifier.isValidCode(secretKey, code);
         } catch (Exception e) {
+            // Log exception for monitoring - this helps identify issues with TOTP verification
+            // (e.g., invalid secret format, code generation failures, etc.)
+            log.warn("TOTP code verification failed with exception: {}", e.getMessage(), e);
             return false;
         }
     }

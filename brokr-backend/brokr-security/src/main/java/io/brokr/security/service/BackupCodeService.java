@@ -62,11 +62,19 @@ public class BackupCodeService {
 
     /**
      * Verify a backup code against its hash
+     * Uses BCrypt for constant-time comparison to prevent timing attacks.
+     * 
+     * @param code The backup code to verify
+     * @param hash The BCrypt hash to verify against
+     * @return true if code matches hash, false otherwise
      */
     public boolean verifyCode(String code, String hash) {
         try {
             return passwordEncoder.matches(code, hash);
         } catch (Exception e) {
+            // Log exception for monitoring - this helps identify issues with backup code verification
+            // (e.g., invalid hash format, BCrypt encoding issues, etc.)
+            log.warn("Backup code verification failed with exception: {}", e.getMessage(), e);
             return false;
         }
     }

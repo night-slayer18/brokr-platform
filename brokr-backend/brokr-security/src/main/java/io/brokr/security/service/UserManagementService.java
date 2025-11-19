@@ -10,6 +10,9 @@ import io.brokr.storage.entity.UserEntity;
 import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +30,7 @@ public class UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final PasswordValidator passwordValidator;
     private final AuthorizationService authorizationService;
+    private final UserDetailsServiceImpl userDetailsService;
 
     public User getUserById(String id) {
         return userRepository.findById(id)
@@ -34,22 +38,33 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
 
-    public List<User> listUsers(String organizationId) {
+    /**
+     * List users with pagination support.
+     * 
+     * @param organizationId Organization ID to filter by (null for all users, super admin only)
+     * @param page Page number (0-indexed)
+     * @param size Page size (default: 100, max: 1000)
+     * @return Page of users
+     */
+    public Page<User> listUsers(String organizationId, int page, int size) {
+        // Enforce maximum page size to prevent OOM
+        int pageSize = Math.min(Math.max(size, 1), 1000);
+        Pageable pageable = PageRequest.of(page, pageSize);
+        
         if (organizationId != null) {
-            return userRepository.findByOrganizationId(organizationId).stream()
-                    .map(UserEntity::toDomain)
-                    .toList();
+            return userRepository.findByOrganizationId(organizationId, pageable)
+                    .map(UserEntity::toDomain);
         }
 
         // Only super admins can list all users
         if (authorizationService.getCurrentUser().getRole() == Role.SUPER_ADMIN) {
-            return userRepository.findAll().stream()
-                    .map(UserEntity::toDomain)
-                    .toList();
+            return userRepository.findAll(pageable)
+                    .map(UserEntity::toDomain);
         }
 
         throw new AccessDeniedException("Access denied");
     }
+
 
     public Map<String, List<User>> getUsersForOrganizations(List<String> organizationIds) {
         return userRepository.findByOrganizationIdIn(organizationIds).stream()
@@ -62,7 +77,9 @@ public class UserManagementService {
         
         // ADMIN can only create users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
-            if (!currentUser.getOrganizationId().equals(user.getOrganizationId())) {
+            // Add null check before comparison
+            if (currentUser.getOrganizationId() == null || user.getOrganizationId() == null ||
+                    !currentUser.getOrganizationId().equals(user.getOrganizationId())) {
                 throw new AccessDeniedException("ADMIN can only create users in their own organization");
             }
             
@@ -103,12 +120,16 @@ public class UserManagementService {
         
         // ADMIN can only update users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
-            if (!currentUser.getOrganizationId().equals(existingUser.getOrganizationId())) {
+            // Add null check before comparison
+            if (currentUser.getOrganizationId() == null || existingUser.getOrganizationId() == null ||
+                    !currentUser.getOrganizationId().equals(existingUser.getOrganizationId())) {
                 throw new AccessDeniedException("ADMIN can only update users in their own organization");
             }
             
             // ADMIN cannot change organizationId
-            if (!userUpdates.getOrganizationId().equals(existingUser.getOrganizationId())) {
+            // Add null check for userUpdates.getOrganizationId()
+            if (userUpdates.getOrganizationId() == null || existingUser.getOrganizationId() == null ||
+                    !userUpdates.getOrganizationId().equals(existingUser.getOrganizationId())) {
                 throw new AccessDeniedException("ADMIN cannot change user's organization");
             }
             
@@ -150,7 +171,16 @@ public class UserManagementService {
         entity.setAccessibleEnvironmentIds(userUpdates.getAccessibleEnvironmentIds());
         entity.setActive(userUpdates.isActive());
 
-        return userRepository.save(entity).toDomain();
+        User updatedUser = userRepository.save(entity).toDomain();
+        
+        // Invalidate cache to ensure subsequent authentication uses updated user data
+        userDetailsService.evictCacheForUser(existingUser.getEmail(), id);
+        // If email changed, also evict the new email cache entry
+        if (!existingUser.getEmail().equals(updatedUser.getEmail())) {
+            userDetailsService.evictCacheByEmail(updatedUser.getEmail());
+        }
+        
+        return updatedUser;
     }
 
     public boolean deleteUser(String id) {
@@ -164,7 +194,9 @@ public class UserManagementService {
         
         // ADMIN can only delete users in their own organization
         if (currentUser.getRole() == Role.ADMIN) {
-            if (!currentUser.getOrganizationId().equals(userToDelete.getOrganizationId())) {
+            // Add null check before comparison
+            if (currentUser.getOrganizationId() == null || userToDelete.getOrganizationId() == null ||
+                    !currentUser.getOrganizationId().equals(userToDelete.getOrganizationId())) {
                 throw new AccessDeniedException("ADMIN can only delete users in their own organization");
             }
             
@@ -178,6 +210,9 @@ public class UserManagementService {
                 throw new AccessDeniedException("ADMIN cannot delete themselves");
             }
         }
+        
+        // Invalidate cache before deletion
+        userDetailsService.evictCacheForUser(userToDelete.getEmail(), id);
         
         userRepository.deleteById(id);
         return true;

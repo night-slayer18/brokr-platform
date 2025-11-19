@@ -29,6 +29,9 @@ public class BrokrUserDetails implements UserDetails {
 
     @Override
     public String getPassword() {
+        // Note: Password hash is required by DaoAuthenticationProvider during authentication.
+        // After authentication, JWT tokens are used and password is not stored in security context.
+        // The password hash is BCrypt-encrypted and only used for verification during login.
         return user.getPassword();
     }
 
@@ -39,16 +42,22 @@ public class BrokrUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
+        // TODO: Implement account expiration if needed (requires accountExpirationDate field in User entity)
+        // For now, accounts don't expire
         return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        // Account is considered locked if inactive
+        // This is consistent with isEnabled() which also checks isActive
+        return user.isActive();
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
+        // TODO: Implement credential expiration if needed (requires credentialsExpirationDate field in User entity)
+        // For now, credentials don't expire
         return true;
     }
 

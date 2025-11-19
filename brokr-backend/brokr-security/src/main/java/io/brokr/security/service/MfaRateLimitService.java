@@ -2,6 +2,7 @@ package io.brokr.security.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Rate limiting service for MFA operations to prevent brute force attacks.
  * Uses in-memory cache with automatic cleanup for enterprise-scale performance.
+ * 
+ * NOTE: This implementation uses in-memory storage. In a distributed system with multiple instances,
+ * each instance maintains separate rate limit counters, which could allow rate limit bypass by distributing
+ * requests across instances. For production multi-instance deployments, consider using a distributed
+ * cache (e.g., Redis) for shared rate limit counters.
  */
 @Slf4j
 @Service
@@ -27,10 +33,8 @@ public class MfaRateLimitService {
     private int lockoutMinutes;
 
     // In-memory rate limit tracking: userId -> AttemptInfo
+    // NOTE: In-memory storage - each instance has separate counters in distributed deployments
     private final Map<String, AttemptInfo> attemptCache = new ConcurrentHashMap<>();
-    
-    // Cleanup threshold - clean up old entries when cache size exceeds this
-    private static final int CLEANUP_THRESHOLD = 10000;
 
     /**
      * Check if user is rate limited (too many failed attempts)
@@ -58,8 +62,12 @@ public class MfaRateLimitService {
 
     /**
      * Record a failed MFA attempt
+     * Uses ConcurrentHashMap.compute() for atomic updates.
+     * AtomicInteger in AttemptInfo ensures thread-safe increment operations.
      */
     public void recordFailedAttempt(String userId) {
+        // compute() is atomic - ensures thread-safe creation and updates
+        // AtomicInteger in AttemptInfo prevents race conditions in incrementAttempt()
         attemptCache.compute(userId, (key, existing) -> {
             if (existing == null) {
                 return new AttemptInfo(LocalDateTime.now(), 1);
@@ -71,14 +79,10 @@ public class MfaRateLimitService {
             }
 
             // Increment attempt count and update last attempt time
+            // incrementAttempt() uses AtomicInteger for thread-safe increment
             existing.incrementAttempt();
             return existing;
         });
-
-        // Periodic cleanup to prevent memory leaks
-        if (attemptCache.size() > CLEANUP_THRESHOLD) {
-            cleanupExpiredEntries();
-        }
     }
 
     /**
@@ -100,15 +104,28 @@ public class MfaRateLimitService {
     }
 
     /**
-     * Clean up expired entries from cache
+     * Scheduled cleanup of expired entries from cache.
+     * Runs in background thread every 5 minutes to prevent memory leaks.
+     * This avoids latency spikes that would occur if cleanup ran synchronously during rate limit checks.
      */
-    private void cleanupExpiredEntries() {
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(windowMinutes + lockoutMinutes);
-        attemptCache.entrySet().removeIf(entry -> {
-            AttemptInfo info = entry.getValue();
-            return info.getFirstAttemptTime().isBefore(cutoff) && 
-                   (!info.isLockedOut() || info.getLastAttemptTime().plusMinutes(lockoutMinutes).isBefore(cutoff));
-        });
+    @Scheduled(fixedRate = 300000) // Run every 5 minutes
+    public void cleanupExpiredEntries() {
+        try {
+            LocalDateTime cutoff = LocalDateTime.now().minusMinutes(windowMinutes + lockoutMinutes);
+            int beforeSize = attemptCache.size();
+            attemptCache.entrySet().removeIf(entry -> {
+                AttemptInfo info = entry.getValue();
+                return info.getFirstAttemptTime().isBefore(cutoff) && 
+                       (!info.isLockedOut() || info.getLastAttemptTime().plusMinutes(lockoutMinutes).isBefore(cutoff));
+            });
+            int afterSize = attemptCache.size();
+            int removed = beforeSize - afterSize;
+            if (removed > 0) {
+                log.debug("Cleaned up {} expired rate limit entries. Cache size: {} -> {}", removed, beforeSize, afterSize);
+            }
+        } catch (Exception e) {
+            log.error("Error during rate limit cache cleanup", e);
+        }
     }
 
     /**

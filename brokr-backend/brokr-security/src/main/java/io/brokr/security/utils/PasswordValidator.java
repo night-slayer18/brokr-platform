@@ -6,12 +6,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Validates password strength according to security requirements.
+ * 
+ * Password Requirements:
+ * - Minimum 8 characters, maximum 128 characters
+ * - At least one lowercase letter (a-z)
+ * - At least one uppercase letter (A-Z)
+ * - At least one digit (0-9)
+ * - At least one special character from the allowed set
+ * - No whitespace characters (space, tab, newline, or any Unicode whitespace)
+ * 
+ * Allowed Special Characters:
+ * ! @ # $ % ^ & * ( ) _ + = - [ ] { } | \ : ; " ' < > , . ? / ~ `
+ */
 @Component
 public class PasswordValidator {
 
     private static final Pattern LOWER_CASE = Pattern.compile(".*[a-z].*");
     private static final Pattern UPPER_CASE = Pattern.compile(".*[A-Z].*");
     private static final Pattern DIGIT = Pattern.compile(".*\\d.*");
+    // Allowed special characters: !@#$%^&*()_+-=[]{}|\:;"'<>,.?/~`
     private static final Pattern SPECIAL_CHAR = Pattern.compile(".*[!@#$%^&*()_+=\\-\\[\\]{}|\\\\:;\"'<>,.?/~`]");
 
     public static final int MIN_LENGTH = 8;
@@ -26,8 +41,10 @@ public class PasswordValidator {
         boolean hasUpperCase = UPPER_CASE.matcher(password).find();
         boolean hasDigit = DIGIT.matcher(password).find();
         boolean hasSpecialChar = SPECIAL_CHAR.matcher(password).find();
+        // Check for any Unicode whitespace character
+        boolean hasWhitespace = password.chars().anyMatch(Character::isWhitespace);
 
-        return hasLowerCase && hasUpperCase && hasDigit && hasSpecialChar;
+        return hasLowerCase && hasUpperCase && hasDigit && hasSpecialChar && !hasWhitespace;
     }
 
     public List<String> validatePassword(String password) {
@@ -59,11 +76,13 @@ public class PasswordValidator {
         }
 
         if (!SPECIAL_CHAR.matcher(password).find()) {
-            errors.add("Password must contain at least one special character");
+            errors.add("Password must contain at least one special character (!@#$%^&*()_+-=[]{}|\\:;\"'<>,.?/~`)");
         }
 
-        if (password.contains(" ") || password.contains("\t") || password.contains("\n")) {
-            errors.add("Password cannot contain whitespace");
+        // Check for any Unicode whitespace character (space, tab, newline, non-breaking space, etc.)
+        boolean hasWhitespace = password.chars().anyMatch(Character::isWhitespace);
+        if (hasWhitespace) {
+            errors.add("Password cannot contain whitespace characters");
         }
 
         return errors;
