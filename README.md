@@ -198,9 +198,9 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 
 ```
                         ┌─────────────────────────────────────────────┐
-                        │         Frontend Layer                       │
+                        │         Frontend Layer                      │
                         │  React 19 + TypeScript 5.9 + Vite           │
-                        │  Tailwind CSS 4 + GraphQL                    │
+                        │  Tailwind CSS 4 + GraphQL                   │
                         │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
                         │  │  Pages   │ │Components│ │  Hooks   │     │
                         │  └──────────┘ └──────────┘ └──────────┘     │
@@ -208,33 +208,33 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
                                            │
                                            │ HTTP/GraphQL
                                            │
-                        ┌──────────────────▼──────────────────────────┐
-                        │            API Layer                         │
-                        │  Spring GraphQL + REST + Security + JWT     │
-                        │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
-                        │  │ GraphQL  │ │   REST   │ │ Security │     │
-                        │  │Resolvers │ │Controllers│ │ Filters │     │
-                        │  └──────────┘ └──────────┘ └──────────┘     │
-                        └──────────────────┬──────────────────────────┘
+                      ┌────────────────────▼────────────────────────┐
+                      │            API Layer                        │
+                      │  Spring GraphQL + REST + Security + JWT     │
+                      │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
+                      │  │ GraphQL  │ │   REST   │ │ Security │     │
+                      │  │Resolvers │ │Controllers│ │ Filters │     │
+                      │  └──────────┘ └──────────┘ └──────────┘     │
+                      └────────────────────┬────────────────────────┘
                                            │
                     ┌──────────────────────┼──────────────────────┐
                     │                      │                      │
-        ┌───────────▼──────────┐ ┌─────────▼──────────┐ ┌────────▼──────────┐
+        ┌───────────▼──────────┐ ┌─────────▼──────────┐ ┌─────────▼─────────┐
         │    Security Module   │ │   Kafka Module     │ │  Storage Module   │
-        │                      │ │                    │ │                    │
-        │  • Authentication   │ │  • Client          │ │  • JPA Entities    │
-        │  • JWT Tokens       │ │  • Metrics         │ │  • Repositories   │
-        │  • API Keys         │ │  • Monitoring      │ │  • Data Access    │
-        └───────────┬──────────┘ └─────────┬──────────┘ └────────┬──────────┘
+        │                      │ │                    │ │                   │
+        │  • Authentication    │ │  • Client          │ │  • JPA Entities   │
+        │  • JWT Tokens        │ │  • Metrics         │ │  • Repositories   │
+        │  • API Keys          │ │  • Monitoring      │ │  • Data Access    │
+        └───────────┬──────────┘ └─────────┬──────────┘ └─────────┬─────────┘
                     │                      │                      │
                     └──────────────────────┼──────────────────────┘
                                            │
                                 ┌──────────▼──────────┐
                                 │   PostgreSQL 16     │
                                 │                     │
-                                │  • Relational Data │
-                                │  • Time-Series     │
-                                │  • Audit Logs      │
+                                │  • Relational Data  │
+                                │  • Time-Series      │
+                                │  • Audit Logs       │
                                 └─────────────────────┘
 ```
 
