@@ -251,11 +251,9 @@ services:
       retries: 10
       start_period: 30s
 
-  # Brokr Platform Application (built from Dockerfile)
+  # Brokr Platform Application
   brokr-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: nightslayer/brokr-platform:2.0.0
     container_name: brokr-backend
     ports:
       - "8080:8080"
@@ -276,9 +274,52 @@ services:
       JWT_SECRET: XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==
       JWT_EXPIRATION: 86400
 
-      # Logging
+      # Security Configuration
+      BCRYPT_STRENGTH: 10
+
+      # MFA Configuration
+      MFA_ENCRYPTION_KEY: toIUKBWfqdYUG+2COEOSzH88vXYmqTfJPpkwthZOwxA=
+      MFA_TOTP_ISSUER: Brokr Platform
+      MFA_BACKUP_CODES_COUNT: 10
+      MFA_BACKUP_CODES_LENGTH: 8
+      MFA_RATE_LIMIT_MAX_ATTEMPTS: 5
+      MFA_RATE_LIMIT_WINDOW_MINUTES: 15
+      MFA_RATE_LIMIT_LOCKOUT_MINUTES: 30
+
+      # Message Replay Configuration
+      MESSAGE_REPLAY_MAX_MESSAGES: 10000000
+      MESSAGE_REPLAY_MAX_CONCURRENT: 5
+      MESSAGE_REPLAY_PROGRESS_INTERVAL: 1000
+      MESSAGE_REPLAY_TIMEOUT_MINUTES: 1440
+      MESSAGE_REPLAY_STREAMING_BATCH: 10000
+      MESSAGE_REPLAY_RATE_LIMIT: 0
+
+      # API Key Configuration
+      API_KEY_PREFIX: brokr_
+      API_KEY_SECRET_LENGTH: 32
+      API_KEY_DEFAULT_EXPIRATION_DAYS: 365
+      API_KEY_ROTATION_GRACE_PERIOD_DAYS: 7
+      API_KEY_RATE_LIMIT_PER_SECOND: 10
+      API_KEY_RATE_LIMIT_PER_MINUTE: 100
+      API_KEY_RATE_LIMIT_PER_HOUR: 1000
+      API_KEY_RATE_LIMIT_PER_DAY: 10000
+      API_KEY_USAGE_TRACKING_ENABLED: "true"
+      API_KEY_USAGE_BATCH_SIZE: 100
+      API_KEY_USAGE_BATCH_INTERVAL: 5
+      API_KEY_USAGE_RETENTION_DAYS: 90
+      API_KEY_BRUTE_FORCE_PROTECTION_ENABLED: "true"
+      API_KEY_BRUTE_FORCE_MAX_ATTEMPTS: 5
+      API_KEY_BRUTE_FORCE_LOCKOUT_MINUTES: 15
+      API_KEY_SUSPICIOUS_ACTIVITY_ENABLED: "true"
+      API_KEY_SUSPICIOUS_SPIKE_THRESHOLD: 10
+      API_KEY_SUSPICIOUS_NEW_IP_ALERT: "true"
+
+      # Logging Configuration
       LOGGING_LEVEL_ROOT: INFO
       LOGGING_LEVEL_IO_BROKR: INFO
+      LOGGING_LEVEL_IO_BROKR_KAFKA_SERVICE_KAFKACONSUMERSERVICE: INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_GRAPHQL: INFO
+      LOGGING_LEVEL_ORG_APACHE_KAFKA: WARN
     networks:
       - brokr-network
     restart: unless-stopped

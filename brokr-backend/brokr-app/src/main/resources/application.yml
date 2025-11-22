@@ -149,7 +149,8 @@ api-key:
 
 logging:
   level:
-    io.brokr: DEBUG
-    io.brokr.kafka.service.KafkaConsumerService: DEBUG
-    org.springframework.graphql: DEBUG
-    org.apache.kafka: DEBUG
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    io.brokr: ${LOGGING_LEVEL_IO_BROKR:DEBUG}
+    io.brokr.kafka.service.KafkaConsumerService: ${LOGGING_LEVEL_IO_BROKR_KAFKA_SERVICE_KAFKACONSUMERSERVICE:DEBUG}
+    org.springframework.graphql: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_GRAPHQL:DEBUG}
+    org.apache.kafka: ${LOGGING_LEVEL_ORG_APACHE_KAFKA:DEBUG}
