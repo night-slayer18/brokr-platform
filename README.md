@@ -196,46 +196,52 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 
 Brokr follows a modular, microservices-ready architecture with clear separation of concerns:
 
-```
-                        ┌─────────────────────────────────────────────┐
-                        │         Frontend Layer                      │
-                        │  React 19 + TypeScript 5.9 + Vite           │
-                        │  Tailwind CSS 4 + GraphQL                   │
-                        │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
-                        │  │  Pages   │ │Components│ │  Hooks   │     │
-                        │  └──────────┘ └──────────┘ └──────────┘     │
-                        └──────────────────┬──────────────────────────┘
-                                           │
-                                           │ HTTP/GraphQL
-                                           │
-                      ┌────────────────────▼────────────────────────┐
-                      │            API Layer                        │
-                      │  Spring GraphQL + REST + Security + JWT     │
-                      │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
-                      │  │ GraphQL  │ │   REST   │ │ Security │     │
-                      │  │Resolvers │ │Controllers│ │ Filters │     │
-                      │  └──────────┘ └──────────┘ └──────────┘     │
-                      └────────────────────┬────────────────────────┘
-                                           │
-                    ┌──────────────────────┼──────────────────────┐
-                    │                      │                      │
-        ┌───────────▼──────────┐ ┌─────────▼──────────┐ ┌─────────▼─────────┐
-        │    Security Module   │ │   Kafka Module     │ │  Storage Module   │
-        │                      │ │                    │ │                   │
-        │  • Authentication    │ │  • Client          │ │  • JPA Entities   │
-        │  • JWT Tokens        │ │  • Metrics         │ │  • Repositories   │
-        │  • API Keys          │ │  • Monitoring      │ │  • Data Access    │
-        └───────────┬──────────┘ └─────────┬──────────┘ └─────────┬─────────┘
-                    │                      │                      │
-                    └──────────────────────┼──────────────────────┘
-                                           │
-                                ┌──────────▼──────────┐
-                                │   PostgreSQL 16     │
-                                │                     │
-                                │  • Relational Data  │
-                                │  • Time-Series      │
-                                │  • Audit Logs       │
-                                └─────────────────────┘
+```mermaid
+graph TD
+    %% --- STYLING DEFINITIONS ---
+    classDef fe fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    classDef api fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
+    classDef mod fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    classDef db fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    
+    %% --- NODES & SUBGRAPHS ---
+    
+    subgraph FE_Layer [ 🖥️ Frontend Layer ]
+        direction TB
+        FE_Tech[<b>React 19 + TS 5.9</b><br/>Vite + Tailwind CSS 4]
+        FE_Arch[Pages • Components • Hooks]
+        FE_Tech --- FE_Arch
+    end
+
+    subgraph API_Layer [ ⚙️ API Gateway Layer ]
+        direction TB
+        API_Tech[<b>Spring GraphQL + REST</b><br/>Security + JWT Filters]
+        API_Arch[Resolvers • Controllers • Security]
+        API_Tech --- API_Arch
+    end
+
+    subgraph Modules [ 📦 Modular Services ]
+        direction LR
+        SEC[<b>Security Module</b><br/>Auth, JWT, API Keys]
+        KAF[<b>Kafka Module</b><br/>Streams, Metrics]
+        STO[<b>Storage Module</b><br/>JPA, Repositories]
+    end
+
+    Database[(<b>PostgreSQL 16</b><br/>Relational • Time-Series)]
+
+    %% --- CONNECTIONS ---
+    
+    FE_Layer == HTTP / GraphQL ==> API_Layer
+    API_Layer --> SEC
+    API_Layer --> KAF
+    API_Layer --> STO
+    STO == JDBC ==> Database
+
+    %% --- APPLY STYLES ---
+    class FE_Layer,FE_Tech,FE_Arch fe
+    class API_Layer,API_Tech,API_Arch api
+    class SEC,KAF,STO mod
+    class Database db
 ```
 
 ### Backend Modules
