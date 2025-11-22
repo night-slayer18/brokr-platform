@@ -96,35 +96,45 @@ export function ApiKeyUsageChart({apiKeyId, apiKeyName}: ApiKeyUsageChartProps) 
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Total Requests</p>
-                            <p className="text-2xl font-bold">{usage.totalRequests.toLocaleString()}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Success</p>
-                            <p className="text-2xl font-bold text-green-600">
-                                {usage.successCount.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Errors</p>
-                            <p className="text-2xl font-bold text-red-600">
-                                {usage.errorCount.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Error Rate</p>
-                            <p className="text-2xl font-bold">
-                                {(usage.errorRate * 100).toFixed(2)}%
-                            </p>
-                        </div>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Total Requests</CardDescription>
+                                <CardTitle className="text-2xl">{usage.totalRequests.toLocaleString()}</CardTitle>
+                            </CardHeader>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Success</CardDescription>
+                                <CardTitle className="text-2xl text-green-600">
+                                    {usage.successCount.toLocaleString()}
+                                </CardTitle>
+                            </CardHeader>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Errors</CardDescription>
+                                <CardTitle className="text-2xl text-red-600">
+                                    {usage.errorCount.toLocaleString()}
+                                </CardTitle>
+                            </CardHeader>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Error Rate</CardDescription>
+                                <CardTitle className="text-2xl">
+                                    {(usage.errorRate * 100).toFixed(2)}%
+                                </CardTitle>
+                            </CardHeader>
+                        </Card>
                     </div>
                     
                     {usage.averageResponseTimeMs && (
-                        <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Average Response Time</p>
-                            <p className="text-2xl font-bold">{usage.averageResponseTimeMs}ms</p>
-                        </div>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Average Response Time</CardDescription>
+                                <CardTitle className="text-2xl">{usage.averageResponseTimeMs}ms</CardTitle>
+                            </CardHeader>
+                        </Card>
                     )}
                     
                     {/* Usage Over Time Chart */}

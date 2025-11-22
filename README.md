@@ -66,6 +66,37 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - JWT-based authentication with secure token management
 - Email-based login system
 
+### 🔑 API Key Management
+- **Programmatic Access**: Create and manage API keys for automated access
+- **Fine-Grained Scopes**: Granular permission control with 18+ scopes:
+  - `clusters:read/write` - Cluster management
+  - `topics:read/write` - Topic operations
+  - `messages:read/write` - Message access
+  - `consumer-groups:read/write` - Consumer group management
+  - `metrics:read` - Metrics access
+  - `replay:read/write` - Replay job management
+  - `schema-registry:read/write` - Schema operations
+  - `kafka-connect:read/write` - Connect management
+  - `kafka-streams:read/write` - Streams operations
+  - `ksqldb:read/write` - ksqlDB queries
+- **Key Lifecycle Management**:
+  - Create, edit, rotate, revoke, and delete API keys
+  - Expiration date configuration
+  - Automatic secret rotation with grace period
+  - Soft delete for audit trail
+- **Usage Analytics**:
+  - Request count tracking (total, success, errors)
+  - Error rate calculation
+  - Average response time monitoring
+  - Time-series usage charts with customizable date ranges
+  - Last used timestamp tracking
+- **Security Features**:
+  - BCrypt hashed secrets (never stored in plain text)
+  - Key prefix for identification (`brokr_<uuid>`)
+  - Revocation with reason tracking
+  - Active/inactive status management
+  - Organization-scoped keys
+
 ### 📊 Kafka Cluster Management
 - Register and manage multiple Kafka clusters
 - Connection health monitoring with automatic status checks
@@ -166,31 +197,45 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 Brokr follows a modular, microservices-ready architecture with clear separation of concerns:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Frontend Layer                         │
-│  React + TypeScript + Vite + Tailwind CSS + GraphQL       │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       │ HTTP/GraphQL
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                      API Layer                              │
-│  Spring GraphQL + REST Controllers + Security              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        │              │              │
-┌───────▼──────┐ ┌────▼──────┐ ┌────▼──────┐
-│   Security   │ │   Kafka   │ │  Storage   │
-│   Module     │ │  Module   │ │  Module    │
-└──────────────┘ └───────────┘ └───────────┘
-        │              │              │
-        └──────────────┼──────────────┘
-                       │
-              ┌────────▼────────┐
-              │   PostgreSQL     │
-              │    Database      │
-              └──────────────────┘
+                        ┌─────────────────────────────────────────────┐
+                        │         Frontend Layer                       │
+                        │  React 19 + TypeScript 5.9 + Vite           │
+                        │  Tailwind CSS 4 + GraphQL                    │
+                        │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
+                        │  │  Pages   │ │Components│ │  Hooks   │     │
+                        │  └──────────┘ └──────────┘ └──────────┘     │
+                        └──────────────────┬──────────────────────────┘
+                                           │
+                                           │ HTTP/GraphQL
+                                           │
+                        ┌──────────────────▼──────────────────────────┐
+                        │            API Layer                         │
+                        │  Spring GraphQL + REST + Security + JWT     │
+                        │  ┌──────────┐ ┌──────────┐ ┌──────────┐     │
+                        │  │ GraphQL  │ │   REST   │ │ Security │     │
+                        │  │Resolvers │ │Controllers│ │ Filters │     │
+                        │  └──────────┘ └──────────┘ └──────────┘     │
+                        └──────────────────┬──────────────────────────┘
+                                           │
+                    ┌──────────────────────┼──────────────────────┐
+                    │                      │                      │
+        ┌───────────▼──────────┐ ┌─────────▼──────────┐ ┌────────▼──────────┐
+        │    Security Module   │ │   Kafka Module     │ │  Storage Module   │
+        │                      │ │                    │ │                    │
+        │  • Authentication   │ │  • Client          │ │  • JPA Entities    │
+        │  • JWT Tokens       │ │  • Metrics         │ │  • Repositories   │
+        │  • API Keys         │ │  • Monitoring      │ │  • Data Access    │
+        └───────────┬──────────┘ └─────────┬──────────┘ └────────┬──────────┘
+                    │                      │                      │
+                    └──────────────────────┼──────────────────────┘
+                                           │
+                                ┌──────────▼──────────┐
+                                │   PostgreSQL 16     │
+                                │                     │
+                                │  • Relational Data │
+                                │  • Time-Series     │
+                                │  • Audit Logs      │
+                                └─────────────────────┘
 ```
 
 ### Backend Modules
@@ -198,7 +243,7 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 1. **brokr-core**: Domain models and business logic
 2. **brokr-storage**: JPA entities and database repositories
 3. **brokr-kafka**: Kafka client integration and services (includes metrics collection)
-4. **brokr-security**: Authentication, authorization, and security services
+4. **brokr-security**: Authentication, authorization, API key management, and security services
 5. **brokr-api**: GraphQL resolvers and REST controllers
 6. **brokr-app**: Spring Boot application configuration and entry point
 
@@ -494,6 +539,20 @@ query GetClusterMetrics($clusterId: ID!, $timeRange: MetricsTimeRangeInput!) {
 }
 ```
 
+**Get API Key Usage**:
+```graphql
+query GetApiKeyUsage($id: ID!, $startTime: String!, $endTime: String!) {
+  apiKeyUsage(id: $id, startTime: $startTime, endTime: $endTime) {
+    totalRequests
+    successCount
+    errorCount
+    errorRate
+    averageResponseTimeMs
+    timeSeriesData
+  }
+}
+```
+
 **Execute ksqlDB Query**:
 ```graphql
 mutation ExecuteKsqlQuery($ksqlDBId: ID!, $query: String!) {
@@ -552,6 +611,16 @@ REST endpoints are available for standard CRUD operations:
 - `GET /api/v1/metrics/topics/{clusterId}/{topicName}` - Get topic metrics
 - `GET /api/v1/metrics/consumer-groups/{clusterId}/{groupId}` - Get consumer group metrics
 - `GET /api/v1/metrics/clusters/{clusterId}` - Get cluster metrics
+
+**API Keys**:
+- `GET /api/v1/api-keys` - List user's API keys
+- `GET /api/v1/api-keys/{id}` - Get API key details
+- `POST /api/v1/api-keys` - Create new API key
+- `PUT /api/v1/api-keys/{id}` - Update API key
+- `POST /api/v1/api-keys/{id}/rotate` - Rotate API key secret
+- `POST /api/v1/api-keys/{id}/revoke` - Revoke API key
+- `DELETE /api/v1/api-keys/{id}` - Delete API key
+- `GET /api/v1/api-keys/{id}/usage` - Get API key usage statistics
 
 ## Authentication & Authorization
 
