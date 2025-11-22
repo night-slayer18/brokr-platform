@@ -198,11 +198,12 @@ Brokr follows a modular, microservices-ready architecture with clear separation 
 
 ```mermaid
 graph TD
-    %% --- STYLING DEFINITIONS ---
-    classDef fe fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
-    classDef api fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100
-    classDef mod fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
-    classDef db fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    %% --- DARK MODE STYLING DEFINITIONS ---
+    %% Dark fills with bright, high-contrast borders and light text
+    classDef fe fill:#0d1b2a,stroke:#4cc9f0,stroke-width:2px,color:#e0e1dd,rx:5,ry:5
+    classDef api fill:#1b140a,stroke:#fb8500,stroke-width:2px,color:#e0e1dd,rx:5,ry:5
+    classDef mod fill:#1a0f1a,stroke:#c77dff,stroke-width:2px,color:#e0e1dd,rx:5,ry:5
+    classDef db fill:#0f1a15,stroke:#57cc99,stroke-width:2px,color:#e0e1dd
     
     %% --- NODES & SUBGRAPHS ---
     
@@ -229,8 +230,9 @@ graph TD
 
     Database[(<b>PostgreSQL 16</b><br/>Relational • Time-Series)]
 
-    %% --- CONNECTIONS ---
-    
+    %% --- CONNECTIONS (Bright White for contrast) ---
+    linkStyle default stroke:#ffffff,stroke-width:2px,fill:none;
+
     FE_Layer == HTTP / GraphQL ==> API_Layer
     API_Layer --> SEC
     API_Layer --> KAF
