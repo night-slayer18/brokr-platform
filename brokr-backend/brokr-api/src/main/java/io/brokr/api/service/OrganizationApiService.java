@@ -12,9 +12,13 @@ import io.brokr.core.model.Role;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.storage.entity.EnvironmentEntity;
 import io.brokr.storage.entity.OrganizationEntity;
+import io.brokr.storage.repository.ApiKeyRepository;
 import io.brokr.storage.repository.EnvironmentRepository;
+import io.brokr.storage.repository.KafkaClusterRepository;
 import io.brokr.storage.repository.OrganizationRepository;
+import io.brokr.storage.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,9 @@ public class OrganizationApiService {
 
     private final OrganizationRepository organizationRepository;
     private final EnvironmentRepository environmentRepository;
+    private final UserRepository userRepository;
+    private final ApiKeyRepository apiKeyRepository;
+    private final KafkaClusterRepository kafkaClusterRepository;
     private final AuthorizationService authorizationService;
 
     @Transactional(readOnly = true)
@@ -162,12 +169,45 @@ public class OrganizationApiService {
 
     @Transactional
     public boolean deleteOrganization(String id) {
-        if (organizationRepository.existsById(id)) {
-            organizationRepository.deleteById(id);
-            return true;
+        OrganizationEntity organization = organizationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found with id: " + id));
+
+        // Check for dependent entities that prevent deletion
+        List<String> blockingEntities = new java.util.ArrayList<>();
+        
+        // Check for users
+        long userCount = userRepository.findByOrganizationId(id).size();
+        if (userCount > 0) {
+            blockingEntities.add(String.format("%d user(s)", userCount));
         }
-        // Throw exception if not found, consistent with other methods
-        throw new ResourceNotFoundException("Organization not found with id: " + id);
+        
+        // Check for API keys
+        long apiKeyCount = apiKeyRepository.findByOrganizationId(id, PageRequest.of(0, 1)).getTotalElements();
+        if (apiKeyCount > 0) {
+            blockingEntities.add(String.format("%d API key(s)", apiKeyCount));
+        }
+        
+        // Check for Kafka clusters
+        long clusterCount = kafkaClusterRepository.findByOrganizationId(id).size();
+        if (clusterCount > 0) {
+            blockingEntities.add(String.format("%d Kafka cluster(s)", clusterCount));
+        }
+        
+        // If there are blocking entities, throw a validation exception
+        if (!blockingEntities.isEmpty()) {
+            String message = String.format(
+                "Cannot delete organization '%s' because it still has %s. " +
+                "Please delete all associated users, API keys, and clusters before deleting the organization.",
+                organization.getName(),
+                String.join(", ", blockingEntities)
+            );
+            throw new ValidationException(message);
+        }
+        
+        // All checks passed, safe to delete
+        // Environments will be cascade deleted automatically
+        organizationRepository.deleteById(id);
+        return true;
     }
 
     @Transactional
