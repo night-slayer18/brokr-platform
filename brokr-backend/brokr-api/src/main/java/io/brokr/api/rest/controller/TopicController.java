@@ -23,10 +23,14 @@ public class TopicController {
 
     @GetMapping
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
-    public List<TopicDto> getTopics(@PathVariable String clusterId) {
-        return topicApiService.listTopics(clusterId).stream()
-                .map(TopicDto::fromDomain)
-                .collect(Collectors.toList());
+    public org.springframework.data.domain.Page<TopicDto> getTopics(
+            @PathVariable String clusterId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(required = false) String search
+    ) {
+        return topicApiService.getTopicsPaginated(clusterId, page, size, search)
+                .map(TopicDto::fromDomain);
     }
 
     @GetMapping("/{name}")

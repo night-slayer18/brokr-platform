@@ -32,6 +32,10 @@ public class TopicApiService {
         return kafkaAdminService.listTopics(getCluster(clusterId));
     }
 
+    public org.springframework.data.domain.Page<Topic> getTopicsPaginated(String clusterId, int page, int size, String search) {
+        return kafkaAdminService.listTopicsPaginated(getCluster(clusterId), page, size, search);
+    }
+
     public Topic getTopic(String clusterId, String name) {
         return kafkaAdminService.getTopic(getCluster(clusterId), name);
     }

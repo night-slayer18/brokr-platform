@@ -51,7 +51,13 @@ export interface GetClusterOverviewQuery {
 }
 
 export interface GetTopicsQuery {
-    topics: Topic[]
+    topics: {
+        content: Topic[];
+        totalElements: number;
+        totalPages: number;
+        currentPage: number;
+        pageSize: number;
+    }
 }
 
 export interface GetTopicQuery {
@@ -274,6 +280,9 @@ export interface GetClusterOverviewVariables {
 
 export interface GetTopicsVariables {
     clusterId: string
+    page?: number
+    size?: number
+    search?: string
 }
 
 export interface GetTopicVariables {

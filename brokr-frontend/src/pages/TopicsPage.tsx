@@ -2,7 +2,7 @@ import {useState, useMemo} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {GET_TOPICS} from '@/graphql/queries';
 import {DELETE_TOPIC_MUTATION} from '@/graphql/mutations';
-import type {DeleteTopicMutation, GetTopicsQuery} from '@/graphql/types';
+import type {DeleteTopicMutation, GetTopicsQuery, GetTopicsVariables} from '@/graphql/types';
 import type {Topic} from '@/types';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
@@ -22,9 +22,18 @@ import {
     DialogHeader,
     DialogTitle
 } from "@/components/ui/dialog";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious
+} from "@/components/ui/pagination";
 import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
-import {useQueryClient} from '@tanstack/react-query';
+import {useQueryClient, keepPreviousData} from '@tanstack/react-query';
+import {useDebounce} from '@/hooks/useDebounce';
 
 export default function TopicsPage() {
     const {clusterId} = useParams<{ clusterId: string }>();
@@ -33,28 +42,36 @@ export default function TopicsPage() {
     const [isCreateTopicFormOpen, setIsCreateTopicFormOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
+    
+    // Pagination and Search State
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearch = useDebounce(searchQuery, 500);
 
     const queryClient = useQueryClient();
-    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetTopicsQuery, {clusterId: string}>(GET_TOPICS, 
-        clusterId ? {clusterId} : undefined,
+    
+    // Reset page when search changes
+    useMemo(() => {
+        setPage(1);
+    }, [debouncedSearch]);
+
+    const {data, isLoading: loading, error, refetch} = useGraphQLQuery<GetTopicsQuery, GetTopicsVariables>(GET_TOPICS, 
+        clusterId ? {
+            clusterId,
+            page: page - 1,
+            size: pageSize,
+            search: debouncedSearch
+        } : undefined,
         {
             enabled: !!clusterId,
+            placeholderData: keepPreviousData,
         }
     );
 
-    const allTopics = useMemo(() => data?.topics || [], [data?.topics]);
-    
-    // Filter topics based on search query
-    const topics = useMemo(() => {
-        if (!searchQuery.trim()) {
-            return allTopics;
-        }
-        const query = searchQuery.toLowerCase();
-        return allTopics.filter((topic: Topic) => 
-            topic.name.toLowerCase().includes(query)
-        );
-    }, [allTopics, searchQuery]);
+    const topics = data?.topics.content || [];
+    const totalElements = data?.topics.totalElements || 0;
+    const totalPages = data?.topics.totalPages || 0;
 
     const {mutate: deleteTopic} = useGraphQLMutation<DeleteTopicMutation, {clusterId: string; name: string}>(DELETE_TOPIC_MUTATION);
 
@@ -86,7 +103,7 @@ export default function TopicsPage() {
         return <div className="text-destructive">Cluster ID is missing. Please select a cluster.</div>;
     }
 
-    if (loading) {
+    if (loading && !data) {
         return (
             <div className="space-y-6">
                 <Skeleton className="h-10 w-64"/>
@@ -126,7 +143,7 @@ export default function TopicsPage() {
                 )}
             </div>
 
-            {topics.length === 0 ? (
+            {topics.length === 0 && !searchQuery ? (
                 <Card className="border-dashed border-2 border-primary/30 bg-card/30">
                     <CardContent className="flex flex-col items-center justify-center py-16">
                         <div className="relative mb-6">
@@ -155,7 +172,7 @@ export default function TopicsPage() {
                             <div>
                                 <CardTitle>All Topics</CardTitle>
                                 <CardDescription>
-                                    {searchQuery ? `${topics.length} of ${allTopics.length} topics` : `A list of all ${allTopics.length} topics in this cluster.`}
+                                    {searchQuery ? `Found ${totalElements} topics matching "${searchQuery}"` : `A list of all ${totalElements} topics in this cluster.`}
                                 </CardDescription>
                             </div>
                             <div className="relative w-64">
@@ -224,6 +241,88 @@ export default function TopicsPage() {
                                 )}
                             </TableBody>
                         </Table>
+                        
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="py-4 border-t">
+                                <Pagination>
+                                    <PaginationContent>
+                                        <PaginationItem>
+                                            <PaginationPrevious
+                                                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                                disabled={page === 1 || loading}
+                                            />
+                                        </PaginationItem>
+
+                                        {/* Show first page */}
+                                        {totalPages > 0 && (
+                                            <PaginationItem>
+                                                <PaginationLink
+                                                    onClick={() => setPage(1)}
+                                                    isActive={page === 1}
+                                                >
+                                                    1
+                                                </PaginationLink>
+                                            </PaginationItem>
+                                        )}
+
+                                        {/* Show ellipsis if current page is far from start */}
+                                        {page > 3 && totalPages > 5 && (
+                                            <PaginationItem>
+                                                <span className="px-4">...</span>
+                                            </PaginationItem>
+                                        )}
+
+                                        {/* Show pages around current page */}
+                                        {Array.from({length: totalPages}, (_, i) => i + 1)
+                                            .filter(p => {
+                                                if (totalPages <= 5) return p > 1 && p < totalPages;
+                                                return p > 1 && p < totalPages && Math.abs(p - page) <= 1;
+                                            })
+                                            .map(p => (
+                                                <PaginationItem key={p}>
+                                                    <PaginationLink
+                                                        onClick={() => setPage(p)}
+                                                        isActive={page === p}
+                                                    >
+                                                        {p}
+                                                    </PaginationLink>
+                                                </PaginationItem>
+                                            ))
+                                        }
+
+                                        {/* Show ellipsis if current page is far from end */}
+                                        {page < totalPages - 2 && totalPages > 5 && (
+                                            <PaginationItem>
+                                                <span className="px-4">...</span>
+                                            </PaginationItem>
+                                        )}
+
+                                        {/* Show last page */}
+                                        {totalPages > 1 && (
+                                            <PaginationItem>
+                                                <PaginationLink
+                                                    onClick={() => setPage(totalPages)}
+                                                    isActive={page === totalPages}
+                                                >
+                                                    {totalPages}
+                                                </PaginationLink>
+                                            </PaginationItem>
+                                        )}
+
+                                        <PaginationItem>
+                                            <PaginationNext
+                                                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                                disabled={page === totalPages || loading}
+                                            />
+                                        </PaginationItem>
+                                    </PaginationContent>
+                                </Pagination>
+                                <div className="text-center text-sm text-muted-foreground mt-2">
+                                    Page {page} of {totalPages}
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}

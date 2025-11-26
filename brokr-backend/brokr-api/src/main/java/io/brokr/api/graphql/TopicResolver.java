@@ -18,6 +18,7 @@ import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 import java.util.Map;
@@ -32,8 +33,26 @@ public class TopicResolver {
 
     @QueryMapping
     @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
-    public List<Topic> topics(@Argument String clusterId) {
-        return topicApiService.listTopics(clusterId);
+    public TopicPage topics(
+            @Argument String clusterId,
+            @Argument Integer page,
+            @Argument Integer size,
+            @Argument String search
+    ) {
+        Page<Topic> topicPage = topicApiService.getTopicsPaginated(
+            clusterId, 
+            page != null ? page : 0, 
+            size != null ? size : 20, 
+            search
+        );
+        
+        return new TopicPage(
+            topicPage.getContent(),
+            topicPage.getTotalElements(),
+            topicPage.getTotalPages(),
+            topicPage.getNumber(),
+            topicPage.getSize()
+        );
     }
 
     @QueryMapping
@@ -77,5 +96,27 @@ public class TopicResolver {
     @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.TOPIC, resourceIdParam = "name", resourceNameParam = "name")
     public boolean deleteTopic(@Argument String clusterId, @Argument String name) {
         return topicApiService.deleteTopic(clusterId, name);
+    }
+
+    public static class TopicPage {
+        private final List<Topic> content;
+        private final long totalElements;
+        private final int totalPages;
+        private final int currentPage;
+        private final int pageSize;
+
+        public TopicPage(List<Topic> content, long totalElements, int totalPages, int currentPage, int pageSize) {
+            this.content = content;
+            this.totalElements = totalElements;
+            this.totalPages = totalPages;
+            this.currentPage = currentPage;
+            this.pageSize = pageSize;
+        }
+
+        public List<Topic> getContent() { return content; }
+        public long getTotalElements() { return totalElements; }
+        public int getTotalPages() { return totalPages; }
+        public int getCurrentPage() { return currentPage; }
+        public int getPageSize() { return pageSize; }
     }
 }

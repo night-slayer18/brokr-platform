@@ -19,6 +19,7 @@ import {Loader2} from 'lucide-react';
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
 import {useQueryClient} from '@tanstack/react-query';
 import {GET_TOPICS} from '@/graphql/queries';
+import {print} from 'graphql';
 
 const topicSchema = z.object({
     name: z.string().min(1, 'Topic name is required'),
@@ -65,7 +66,7 @@ export function CreateTopicForm({clusterId, isOpen, onOpenChange, onTopicCreated
             {
                 onSuccess: () => {
                     toast.success(`Topic "${data.name}" created successfully`);
-                    queryClient.invalidateQueries({queryKey: ['graphql', GET_TOPICS]});
+                    queryClient.invalidateQueries({queryKey: ['graphql', print(GET_TOPICS)]});
                     onTopicCreated();
                     onOpenChange(false);
                     reset();

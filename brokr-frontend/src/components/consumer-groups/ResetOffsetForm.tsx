@@ -14,16 +14,13 @@ import {
 } from '@/components/ui/dialog';
 import {RESET_CONSUMER_OFFSET_MUTATION} from '@/graphql/mutations';
 import type {
-    GetTopicsQuery,
     ResetConsumerOffsetMutation
 } from '@/graphql/types';
-import {useGraphQLQuery} from '@/hooks/useGraphQLQuery';
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation';
 import {useQueryClient} from '@tanstack/react-query';
 import {GET_CONSUMER_GROUPS} from '@/graphql/queries';
 import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
-import {GET_TOPICS} from "@/graphql/queries";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 const resetOffsetSchema = z.object({
@@ -37,6 +34,7 @@ type ResetOffsetFormData = z.infer<typeof resetOffsetSchema>;
 interface ResetOffsetFormProps {
     clusterId: string;
     groupId: string;
+    topics: string[];
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     onOffsetReset: () => void;
@@ -45,18 +43,13 @@ interface ResetOffsetFormProps {
 export function ResetOffsetForm({
                                     clusterId,
                                     groupId,
+                                    topics,
                                     isOpen,
                                     onOpenChange,
                                     onOffsetReset,
                                 }: ResetOffsetFormProps) {
     const queryClient = useQueryClient();
     const {mutate: resetConsumerGroupOffset, isPending: mutationLoading} = useGraphQLMutation<ResetConsumerOffsetMutation, {clusterId: string; groupId: string; topic: string; partition: number; offset: number}>(RESET_CONSUMER_OFFSET_MUTATION);
-    const {data: topicsData, isLoading: topicsLoading} = useGraphQLQuery<GetTopicsQuery, {clusterId: string}>(GET_TOPICS, 
-        clusterId && isOpen ? {clusterId} : undefined,
-        {
-            enabled: !!clusterId && isOpen, // Only fetch when the dialog is open
-        }
-    );
 
     const {
         register,
@@ -97,7 +90,7 @@ export function ResetOffsetForm({
         );
     };
 
-    const loading = mutationLoading || topicsLoading;
+    const loading = mutationLoading;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -121,9 +114,9 @@ export function ResetOffsetForm({
                                 <SelectValue placeholder="Select a topic to reset"/>
                             </SelectTrigger>
                             <SelectContent>
-                                {topicsData?.topics?.map((topic) => (
-                                    <SelectItem key={topic.name} value={topic.name}>
-                                        {topic.name}
+                                {topics.map((topic) => (
+                                    <SelectItem key={topic} value={topic}>
+                                        {topic}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

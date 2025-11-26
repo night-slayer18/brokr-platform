@@ -80,6 +80,71 @@ public class KafkaAdminService {
         }
     }
 
+    /**
+     * Get paginated list of topics with details.
+     * PERFORMANCE OPTIMIZATION:
+     * 1. Fetches ALL topic names (fast)
+     * 2. Filters and slices in memory
+     * 3. Fetches details ONLY for the page slice (batch call)
+     * 
+     * This avoids fetching details for thousands of topics when only showing 10.
+     */
+    @Retryable(
+            value = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
+    public org.springframework.data.domain.Page<Topic> listTopicsPaginated(KafkaCluster cluster, int page, int size, String search) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+            
+            // Step 1: Get ALL topic names (Fast - just strings)
+            ListTopicsResult topicsResult = adminClient.listTopics();
+            Set<String> allTopicNames = topicsResult.names().get();
+            
+            // Step 2: Filter and Sort in memory
+            List<String> filteredNames = allTopicNames.stream()
+                    .filter(name -> search == null || search.isEmpty() || name.toLowerCase().contains(search.toLowerCase()))
+                    .sorted()
+                    .collect(Collectors.toList());
+            
+            // Step 3: Calculate Page Slice
+            int total = filteredNames.size();
+            int start = Math.min(page * size, total);
+            int end = Math.min(start + size, total);
+            
+            if (start >= total) {
+                return new org.springframework.data.domain.PageImpl<>(
+                        Collections.emptyList(), 
+                        org.springframework.data.domain.PageRequest.of(page, size), 
+                        total
+                );
+            }
+            
+            List<String> pageNames = filteredNames.subList(start, end);
+            
+            // Step 4: Fetch details ONLY for this page (The Optimization)
+            Map<String, Topic> detailsMap = getTopicsBatch(cluster, pageNames);
+            
+            // Preserve sort order
+            List<Topic> pageTopics = pageNames.stream()
+                    .map(detailsMap::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            
+            return new org.springframework.data.domain.PageImpl<>(
+                    pageTopics, 
+                    org.springframework.data.domain.PageRequest.of(page, size), 
+                    total
+            );
+            
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to list topics paginated for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            throw new RuntimeException("Failed to list topics", e);
+        }
+    }
+
     @Retryable(
             value = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,

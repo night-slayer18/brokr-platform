@@ -114,12 +114,18 @@ export const GET_CLUSTER_OVERVIEW = gql`
 `
 
 export const GET_TOPICS = gql`
-    query GetTopics($clusterId: ID!) {
-        topics(clusterId: $clusterId) {
-            name
-            partitions
-            replicationFactor
-            isInternal
+    query GetTopics($clusterId: ID!, $page: Int, $size: Int, $search: String) {
+        topics(clusterId: $clusterId, page: $page, size: $size, search: $search) {
+            content {
+                name
+                partitions
+                replicationFactor
+                isInternal
+            }
+            totalElements
+            totalPages
+            currentPage
+            pageSize
         }
     }
 `

@@ -140,6 +140,7 @@ export default function ConsumerGroupsPage() {
                 <ResetOffsetForm
                     clusterId={clusterId!}
                     groupId={selectedGroup}
+                    topics={Object.keys(consumerGroups.find(g => g.groupId === selectedGroup)?.topicOffsets || {})}
                     isOpen={isResetOffsetFormOpen}
                     onOpenChange={setIsResetOffsetFormOpen}
                     onOffsetReset={refetch}
