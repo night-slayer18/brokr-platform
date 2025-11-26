@@ -21,10 +21,10 @@
 - [Architecture](#architecture)
 - [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-  - [Running the Application](#running-the-application)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Configuration](#configuration)
+    - [Running the Application](#running-the-application)
 - [Project Structure](#project-structure)
 - [API Documentation](#api-documentation)
 - [Authentication & Authorization](#authentication--authorization)
@@ -35,9 +35,12 @@
 
 ## Overview
 
-**Brokr** is a comprehensive, enterprise-ready platform designed for managing and monitoring Apache Kafka clusters at scale. It provides a unified interface for organizations to manage multiple Kafka clusters, topics, consumer groups, and related infrastructure components across different environments.
+**Brokr** is a comprehensive, enterprise-ready platform designed for managing and monitoring Apache Kafka clusters at
+scale. It provides a unified interface for organizations to manage multiple Kafka clusters, topics, consumer groups, and
+related infrastructure components across different environments.
 
 The platform is built with a focus on:
+
 - **Multi-tenancy**: Support for multiple organizations with isolated data and access control
 - **Security**: Role-based access control (RBAC) with fine-grained permissions
 - **Scalability**: Modular architecture that scales with your infrastructure
@@ -46,11 +49,14 @@ The platform is built with a focus on:
 
 ### What Brokr Does
 
-Brokr connects to **external Kafka clusters** via bootstrap servers configured by administrators. It does not require Kafka to be part of its infrastructure—instead, it acts as a monitoring and management layer that connects to your existing Kafka deployments, whether they're on-premises, in the cloud, or hybrid environments.
+Brokr connects to **external Kafka clusters** via bootstrap servers configured by administrators. It does not require
+Kafka to be part of its infrastructure—instead, it acts as a monitoring and management layer that connects to your
+existing Kafka deployments, whether they're on-premises, in the cloud, or hybrid environments.
 
 ## Key Features
 
 ### 🏢 Multi-Organization Management
+
 - Create and manage multiple organizations with isolated data
 - Environment-based organization structure (Production, Development, Staging, etc.)
 - Hierarchical access control per organization
@@ -58,59 +64,63 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Admin dashboard for platform-wide overview
 
 ### 🔐 Advanced Security & Access Control
+
 - **Four Role Levels**:
-  - `SUPER_ADMIN`: Full platform access across all organizations
-  - `SERVER_ADMIN`: Server-level administrative access
-  - `ADMIN`: Organization-level administrative access
-  - `VIEWER`: Read-only access to assigned environments
+    - `SUPER_ADMIN`: Full platform access across all organizations
+    - `SERVER_ADMIN`: Server-level administrative access
+    - `ADMIN`: Organization-level administrative access
+    - `VIEWER`: Read-only access to assigned environments
 - Environment-based access restrictions for VIEWER users
 - JWT-based authentication with secure token management
 - Email-based login system
 
 ### 🔑 API Key Management
+
 - **Programmatic Access**: Create and manage API keys for automated access
 - **Fine-Grained Scopes**: Granular permission control with 18+ scopes:
-  - `clusters:read/write` - Cluster management
-  - `topics:read/write` - Topic operations
-  - `messages:read/write` - Message access
-  - `consumer-groups:read/write` - Consumer group management
-  - `metrics:read` - Metrics access
-  - `replay:read/write` - Replay job management
-  - `schema-registry:read/write` - Schema operations
-  - `kafka-connect:read/write` - Connect management
-  - `kafka-streams:read/write` - Streams operations
-  - `ksqldb:read/write` - ksqlDB queries
+    - `clusters:read/write` - Cluster management
+    - `topics:read/write` - Topic operations
+    - `messages:read/write` - Message access
+    - `consumer-groups:read/write` - Consumer group management
+    - `metrics:read` - Metrics access
+    - `replay:read/write` - Replay job management
+    - `schema-registry:read/write` - Schema operations
+    - `kafka-connect:read/write` - Connect management
+    - `kafka-streams:read/write` - Streams operations
+    - `ksqldb:read/write` - ksqlDB queries
 - **Key Lifecycle Management**:
-  - Create, edit, rotate, revoke, and delete API keys
-  - Expiration date configuration
-  - Automatic secret rotation with grace period
-  - Soft delete for audit trail
+    - Create, edit, rotate, revoke, and delete API keys
+    - Expiration date configuration
+    - Automatic secret rotation with grace period
+    - Soft delete for audit trail
 - **Usage Analytics**:
-  - Request count tracking (total, success, errors)
-  - Error rate calculation
-  - Average response time monitoring
-  - Time-series usage charts with customizable date ranges
-  - Last used timestamp tracking
+    - Request count tracking (total, success, errors)
+    - Error rate calculation
+    - Average response time monitoring
+    - Time-series usage charts with customizable date ranges
+    - Last used timestamp tracking
 - **Security Features**:
-  - BCrypt hashed secrets (never stored in plain text)
-  - Key prefix for identification (`brokr_<uuid>`)
-  - Revocation with reason tracking
-  - Active/inactive status management
-  - Organization-scoped keys
+    - BCrypt hashed secrets (never stored in plain text)
+    - Key prefix for identification (`brokr_<uuid>`)
+    - Revocation with reason tracking
+    - Active/inactive status management
+    - Organization-scoped keys
 
 ### 📊 Kafka Cluster Management
+
 - Register and manage multiple Kafka clusters
 - Connection health monitoring with automatic status checks
 - Support for various security protocols:
-  - PLAINTEXT
-  - SSL/TLS
-  - SASL_PLAINTEXT
-  - SASL_SSL
+    - PLAINTEXT
+    - SSL/TLS
+    - SASL_PLAINTEXT
+    - SASL_SSL
 - SASL authentication (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
 - SSL/TLS certificate management
 - Cluster reachability testing
 
 ### 📝 Topic Management
+
 - View all topics across clusters with search functionality
 - Topic details including partitions, replication factor, and configuration
 - Topic creation and configuration management
@@ -120,6 +130,7 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Real-time topic metrics and analytics
 
 ### 👥 Consumer Group Monitoring
+
 - Real-time consumer group status monitoring
 - Member information and partition assignments
 - Lag monitoring and offset tracking
@@ -127,6 +138,7 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Detailed consumer group metrics
 
 ### 📋 Schema Registry Integration
+
 - Connect and manage multiple Schema Registry instances
 - View and manage Avro schemas
 - Schema version history
@@ -134,18 +146,21 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Schema compatibility checking
 
 ### 🔌 Kafka Connect Management
+
 - Monitor Kafka Connect clusters
 - Connector status and configuration management
 - Task monitoring and management
 - Connector lifecycle operations (start, stop, restart, pause, resume)
 
 ### 🌊 Kafka Streams Monitoring
+
 - Monitor Kafka Streams applications
 - Thread and task metadata visualization
 - Application state tracking
 - Performance metrics
 
 ### 🔍 ksqlDB Integration
+
 - Connect and manage multiple ksqlDB instances
 - Interactive SQL query editor with CodeMirror 6 syntax highlighting
 - Execute queries and view formatted results
@@ -155,6 +170,7 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Real-time query execution with error handling
 
 ### 📈 Dashboard & Analytics
+
 - Organization-wide cluster overview
 - Real-time metrics and statistics
 - Visual representations of cluster health
@@ -165,33 +181,34 @@ Brokr connects to **external Kafka clusters** via bootstrap servers configured b
 - Cluster status indicators (Online/Offline)
 
 ### 📊 Time-Series Metrics & Analytics
+
 - **Topic Metrics**:
-  - Producer throughput (messages/sec in) over time
-  - Producer data transfer rates (bytes/sec in)
-  - Topic size growth tracking
-  - Partition-level metrics
-  - Note: Consumer metrics are tracked separately in ConsumerGroupMetrics
+    - Producer throughput (messages/sec in) over time
+    - Producer data transfer rates (bytes/sec in)
+    - Topic size growth tracking
+    - Partition-level metrics
+    - Note: Consumer metrics are tracked separately in ConsumerGroupMetrics
 - **Consumer Group Metrics**:
-  - Consumer lag trends (total, max, min, avg)
-  - Member count tracking
-  - Per-topic lag visualization
+    - Consumer lag trends (total, max, min, avg)
+    - Member count tracking
+    - Per-topic lag visualization
 - **Cluster Metrics**:
-  - Cluster-wide throughput aggregation
-  - Total data transfer across all topics
-  - Resource utilization (topics, partitions, brokers)
-  - Health status tracking
+    - Cluster-wide throughput aggregation
+    - Total data transfer across all topics
+    - Resource utilization (topics, partitions, brokers)
+    - Health status tracking
 - **Features**:
-  - Interactive charts with time range selection (1h, 6h, 24h, 7d, 30d, today)
-  - Tabbed interface for organized metric views (reduces page clutter)
-  - Automatic metrics collection every 30 seconds
-  - Historical data retention in PostgreSQL
-  - Enterprise-grade performance with:
-    - Batch processing (1000 topics/batch, 500 consumer groups/batch)
-    - Async execution with dedicated thread pools
-    - Connection pooling (HikariCP with 50 max connections)
-    - In-memory caching (Caffeine cache with 5-minute TTL)
-    - Throughput calculation via snapshot comparison
-    - Parallel metric collection across clusters
+    - Interactive charts with time range selection (1h, 6h, 24h, 7d, 30d, today)
+    - Tabbed interface for organized metric views (reduces page clutter)
+    - Automatic metrics collection every 30 seconds
+    - Historical data retention in PostgreSQL
+    - Enterprise-grade performance with:
+        - Batch processing (1000 topics/batch, 500 consumer groups/batch)
+        - Async execution with dedicated thread pools
+        - Connection pooling (HikariCP with 50 max connections)
+        - In-memory caching (Caffeine cache with 5-minute TTL)
+        - Throughput calculation via snapshot comparison
+        - Parallel metric collection across clusters
 
 ## Architecture
 
@@ -270,11 +287,14 @@ graph TD
 
 ### Deployment Architecture
 
-Brokr Platform is designed as a **Single-Jar Application** for production. The frontend is built and bundled as static resources within the Spring Boot backend JAR. This simplifies deployment to a single artifact that serves both the API and the UI.
+Brokr Platform is designed as a **Single-Jar Application** for production. The frontend is built and bundled as static
+resources within the Spring Boot backend JAR. This simplifies deployment to a single artifact that serves both the API
+and the UI.
 
 ## Technology Stack
 
 ### Backend
+
 - **Java 17**: Modern Java features and performance
 - **Spring Boot 3.x**: Enterprise application framework
 - **Spring Security**: Authentication and authorization
@@ -290,6 +310,7 @@ Brokr Platform is designed as a **Single-Jar Application** for production. The f
 - **Maven**: Build and dependency management
 
 ### Frontend
+
 - **React 19**: UI library
 - **TypeScript 5.9**: Type-safe JavaScript
 - **Vite**: Fast build tool and dev server
@@ -308,6 +329,7 @@ Brokr Platform is designed as a **Single-Jar Application** for production. The f
 - **date-fns**: Date formatting and manipulation
 
 ### Infrastructure
+
 - **Docker**: Containerization
 - **Docker Compose**: Multi-container orchestration
 - **PostgreSQL**: Database
@@ -334,7 +356,8 @@ cd brokr-platform
 
 #### 2. Build & Run (Production Mode)
 
-The easiest way to run the application is using Docker, which automatically builds the frontend and bundles it with the backend.
+The easiest way to run the application is using Docker, which automatically builds the frontend and bundles it with the
+backend.
 
 ```bash
 docker-compose up -d --build
@@ -344,33 +367,19 @@ This will start the entire platform (Database, Kafka, Backend+Frontend) in conta
 
 #### 3. Manual Build (Single Jar)
 
-If you prefer to run without Docker, you can build the single executable JAR:
+The project is configured to automatically build the frontend and copy the assets to the backend during the Maven build
+process.
 
-1.  **Build Frontend**:
-    ```bash
-    cd brokr-frontend
-    npm install
-    npm run build
-    ```
+1. **Build the Entire Project**:
+   From the root directory:
+   ```bash
+   mvn clean package -DskipTests
+   ```
 
-2.  **Copy Assets**:
-    Copy the build artifacts to the backend static resources:
-    ```bash
-    # Linux/Mac
-    mkdir -p ../brokr-backend/brokr-app/src/main/resources/static
-    cp -r dist/* ../brokr-backend/brokr-app/src/main/resources/static/
-    ```
-
-3.  **Build Backend**:
-    ```bash
-    cd ../brokr-backend
-    mvn clean package -DskipTests
-    ```
-
-4.  **Run**:
-    ```bash
-    java -jar brokr-app/target/brokr-app-2.0.1-SNAPSHOT.jar
-    ```
+2. **Run**:
+   ```bash
+   java -jar brokr-backend/brokr-app/target/brokr-app-2.0.1-SNAPSHOT.jar
+   ```
 
 The application will be available at `http://localhost:8080` (both UI and API).
 
@@ -386,7 +395,7 @@ spring:
     url: jdbc:postgresql://localhost:5432/brokr
     username: postgres
     password: your_password
-  
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -397,13 +406,16 @@ jwt:
   expiration: 86400000 # 24 hours in milliseconds
 ```
 
+**Note**: Flyway automatically runs database migrations on application startup. Ensure your database is accessible and has the necessary permissions.
+
 #### Frontend Configuration
 
-Create `brokr-frontend/.env`:
+No configuration is required for the default setup. The frontend automatically proxies requests to the backend at `/graphql`.
+
+If you need to override the endpoint, you can create `brokr-frontend/.env`:
 
 ```env
-VITE_API_URL=http://localhost:8080
-VITE_GRAPHQL_ENDPOINT=http://localhost:8080/graphql
+VITE_GRAPHQL_ENDPOINT=/custom-graphql-endpoint
 ```
 
 ### Running the Application
@@ -415,6 +427,7 @@ docker-compose up -d
 ```
 
 This will start:
+
 - PostgreSQL database
 - Backend application
 - Frontend application (if configured)
@@ -428,12 +441,14 @@ This will start:
 For development, you can run the backend and frontend separately to enable hot-reloading.
 
 **1. Start Backend**:
+
 ```bash
 cd brokr-backend
 mvn spring-boot:run
 ```
 
 **2. Start Frontend**:
+
 ```bash
 cd brokr-frontend
 npm run dev
@@ -481,113 +496,120 @@ brokr-platform/
 
 ### GraphQL API
 
-Brokr provides a comprehensive GraphQL API for flexible data querying. The GraphQL schema is available at `/graphql` endpoint.
+Brokr provides a comprehensive GraphQL API for flexible data querying. The GraphQL schema is available at `/graphql`
+endpoint.
 
 **Example Queries**:
 
 **Get Clusters**:
+
 ```graphql
 query GetClusters($organizationId: String) {
-  clusters(organizationId: $organizationId) {
-    id
-    name
-    bootstrapServers
-    isReachable
-    organization {
-      id
-      name
-    }
-    environment {
-      id
-      name
-      type
-    }
-    brokers {
-      id
-      host
-      port
-    }
-    topics {
-      name
-      partitions {
+    clusters(organizationId: $organizationId) {
         id
-        leader {
-          id
+        name
+        bootstrapServers
+        isReachable
+        organization {
+            id
+            name
         }
-      }
+        environment {
+            id
+            name
+            type
+        }
+        brokers {
+            id
+            host
+            port
+        }
+        topics {
+            name
+            partitions {
+                id
+                leader {
+                    id
+                }
+            }
+        }
     }
-  }
 }
 ```
 
 **Get Topic Metrics**:
+
 ```graphql
 query GetTopicMetrics($clusterId: ID!, $topicName: String!, $timeRange: MetricsTimeRangeInput!) {
-  topicMetrics(clusterId: $clusterId, topicName: $topicName, timeRange: $timeRange) {
-    id
-    timestamp
-    messagesPerSecondIn
-    bytesPerSecondIn
-    totalSizeBytes
-    partitionCount
-  }
+    topicMetrics(clusterId: $clusterId, topicName: $topicName, timeRange: $timeRange) {
+        id
+        timestamp
+        messagesPerSecondIn
+        bytesPerSecondIn
+        totalSizeBytes
+        partitionCount
+    }
 }
 ```
 
 **Get Consumer Group Metrics**:
+
 ```graphql
 query GetConsumerGroupMetrics($clusterId: ID!, $consumerGroupId: String!, $timeRange: MetricsTimeRangeInput!) {
-  consumerGroupMetrics(clusterId: $clusterId, consumerGroupId: $consumerGroupId, timeRange: $timeRange) {
-    id
-    timestamp
-    totalLag
-    maxLag
-    minLag
-    avgLag
-    memberCount
-    topicLags
-  }
+    consumerGroupMetrics(clusterId: $clusterId, consumerGroupId: $consumerGroupId, timeRange: $timeRange) {
+        id
+        timestamp
+        totalLag
+        maxLag
+        minLag
+        avgLag
+        memberCount
+        topicLags
+    }
 }
 ```
 
 **Get Cluster Metrics**:
+
 ```graphql
 query GetClusterMetrics($clusterId: ID!, $timeRange: MetricsTimeRangeInput!) {
-  clusterMetrics(clusterId: $clusterId, timeRange: $timeRange) {
-    id
-    timestamp
-    totalMessagesPerSecond
-    totalBytesPerSecond
-    totalTopics
-    totalPartitions
-    brokerCount
-    isHealthy
-  }
+    clusterMetrics(clusterId: $clusterId, timeRange: $timeRange) {
+        id
+        timestamp
+        totalMessagesPerSecond
+        totalBytesPerSecond
+        totalTopics
+        totalPartitions
+        brokerCount
+        isHealthy
+    }
 }
 ```
 
 **Get API Key Usage**:
+
 ```graphql
 query GetApiKeyUsage($id: ID!, $startTime: String!, $endTime: String!) {
-  apiKeyUsage(id: $id, startTime: $startTime, endTime: $endTime) {
-    totalRequests
-    successCount
-    errorCount
-    errorRate
-    averageResponseTimeMs
-    timeSeriesData
-  }
+    apiKeyUsage(id: $id, startTime: $startTime, endTime: $endTime) {
+        totalRequests
+        successCount
+        errorCount
+        errorRate
+        averageResponseTimeMs
+        timeSeriesData
+    }
 }
 ```
 
 **Execute ksqlDB Query**:
+
 ```graphql
 mutation ExecuteKsqlQuery($ksqlDBId: ID!, $query: String!) {
-  executeKsqlQuery(ksqlDBId: $ksqlDBId, query: $query) {
-    success
-    result
-    error
-  }
+    executeKsqlQuery(ksqlDBId: $ksqlDBId, query: $query) {
+        success
+        result
+        error
+    }
 }
 ```
 
@@ -596,10 +618,12 @@ mutation ExecuteKsqlQuery($ksqlDBId: ID!, $query: String!) {
 REST endpoints are available for standard CRUD operations:
 
 **Authentication**:
+
 - `POST /api/v1/auth/login` - User authentication
 - `POST /api/v1/auth/logout` - User logout
 
 **Clusters**:
+
 - `GET /api/v1/clusters` - List clusters
 - `GET /api/v1/clusters/{id}` - Get cluster details
 - `POST /api/v1/clusters` - Create cluster
@@ -607,27 +631,32 @@ REST endpoints are available for standard CRUD operations:
 - `DELETE /api/v1/clusters/{id}` - Delete cluster
 
 **Topics**:
+
 - `GET /api/v1/clusters/{clusterId}/topics` - List topics
 - `GET /api/v1/clusters/{clusterId}/topics/{topicName}` - Get topic details
 - `POST /api/v1/clusters/{clusterId}/topics` - Create topic
 - `DELETE /api/v1/clusters/{clusterId}/topics/{topicName}` - Delete topic
 
 **Consumer Groups**:
+
 - `GET /api/v1/clusters/{clusterId}/consumer-groups` - List consumer groups
 - `GET /api/v1/clusters/{clusterId}/consumer-groups/{groupId}` - Get consumer group details
 - `POST /api/v1/clusters/{clusterId}/consumer-groups/{groupId}/reset-offsets` - Reset offsets
 
 **Schema Registry**:
+
 - `POST /api/v1/schema-registry/test-connection` - Test Schema Registry connection
 - `GET /api/v1/schema-registry/{id}/subjects` - List subjects
 - `GET /api/v1/schema-registry/{id}/subjects/{subject}/versions` - Get schema versions
 
 **Kafka Connect**:
+
 - `POST /api/v1/kafka-connect/test-connection` - Test Kafka Connect connection
 - `GET /api/v1/kafka-connect/{id}/connectors` - List connectors
 - `POST /api/v1/kafka-connect/{id}/connectors/{connector}/restart` - Restart connector
 
 **ksqlDB**:
+
 - `POST /api/v1/ksqldb/test-connection` - Test ksqlDB connection
 - `POST /api/v1/ksqldb/{id}/execute` - Execute ksqlDB query
 - `GET /api/v1/ksqldb/{id}/streams` - List streams (via SHOW STREAMS query)
@@ -635,11 +664,13 @@ REST endpoints are available for standard CRUD operations:
 - `GET /api/v1/ksqldb/{id}/query-history` - Get query history
 
 **Metrics**:
+
 - `GET /api/v1/metrics/topics/{clusterId}/{topicName}` - Get topic metrics
 - `GET /api/v1/metrics/consumer-groups/{clusterId}/{groupId}` - Get consumer group metrics
 - `GET /api/v1/metrics/clusters/{clusterId}` - Get cluster metrics
 
 **API Keys**:
+
 - `GET /api/v1/api-keys` - List user's API keys
 - `GET /api/v1/api-keys/{id}` - Get API key details
 - `POST /api/v1/api-keys` - Create new API key
@@ -653,7 +684,8 @@ REST endpoints are available for standard CRUD operations:
 
 ### Authentication
 
-Brokr uses JWT (JSON Web Tokens) for authentication. Upon successful login, a JWT token is stored in an HttpOnly cookie for security.
+Brokr uses JWT (JSON Web Tokens) for authentication. Upon successful login, a JWT token is stored in an HttpOnly cookie
+for security.
 
 **Login Request**:
 
@@ -668,45 +700,49 @@ POST /api/v1/auth/login
 ### Authorization Roles
 
 1. **SUPER_ADMIN**
-   - Full access to all organizations and resources
-   - Can create and manage organizations
-   - Can manage all users across the platform
+    - Full access to all organizations and resources
+    - Can create and manage organizations
+    - Can manage all users across the platform
 
 2. **SERVER_ADMIN**
-   - Server-level administrative access
-   - Limited organization management
+    - Server-level administrative access
+    - Limited organization management
 
 3. **ADMIN**
-   - Organization-level administrative access
-   - Can manage users within their organization
-   - Can manage clusters, topics, and other resources in their organization
-   - Can update their own organization details
+    - Organization-level administrative access
+    - Can manage users within their organization
+    - Can manage clusters, topics, and other resources in their organization
+    - Can update their own organization details
 
 4. **VIEWER**
-   - Read-only access
-   - Limited to environments assigned to them
-   - Can view clusters, topics, consumer groups in accessible environments
+    - Read-only access
+    - Limited to environments assigned to them
+    - Can view clusters, topics, consumer groups in accessible environments
 
 ### Environment-Based Access Control
 
-VIEWER users are restricted to specific environments within their organization. They can only access clusters and resources in environments that have been explicitly assigned to them via `accessibleEnvironmentIds`.
+VIEWER users are restricted to specific environments within their organization. They can only access clusters and
+resources in environments that have been explicitly assigned to them via `accessibleEnvironmentIds`.
 
 ### Admin Features
 
 Brokr provides comprehensive administrative capabilities:
 
 **Organization Management**:
+
 - Create, update, and delete organizations
 - View organization details with user and environment lists
 - Manage organization settings and metadata
 
 **User Management**:
+
 - Create and manage users across organizations
 - Assign roles and permissions
 - Set environment access restrictions for VIEWER users
 - User profile management
 
 **Audit Logging**:
+
 - Comprehensive audit logs for all administrative actions
 - User management operations (create, update, delete)
 - Organization management
@@ -716,50 +752,7 @@ Brokr provides comprehensive administrative capabilities:
 - Recent activity feed available on dashboard
 - Filterable audit log pages with pagination
 
-## Deployment
 
-### Production Deployment
-
-1. **Build the Application**:
-
-```bash
-# Backend
-cd brokr-backend
-mvn clean package -DskipTests
-
-# Frontend
-cd brokr-frontend
-npm run build
-```
-
-2. **Docker Deployment**:
-
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-3. **Environment Variables**:
-
-Set the following environment variables:
-
-```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/brokr
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=secure_password
-JWT_SECRET=your-secret-key
-```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/brokr
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=secure_password
-JWT_SECRET=your-secret-key
-JWT_EXPIRATION=86400000
-```
-
-**Note**: In production, the frontend is served directly by the backend at the root path `/`. No separate web server is required for the frontend, though Nginx is recommended as a reverse proxy for SSL termination.
-
-### Database Migrations
-
-Flyway automatically runs database migrations on application startup. Ensure your database is accessible and has the necessary permissions.
 
 ## Development
 
@@ -779,7 +772,7 @@ cd brokr-frontend
 npm run dev
 ```
 
-The frontend will start on `http://localhost:5173` with hot module replacement.
+The frontend will start on `http://localhost:3000` with hot module replacement.
 
 ### Running Tests
 
@@ -816,15 +809,15 @@ npm test
 
 **Brokr Platform** is dual-licensed:
 
-1.  **Community Edition**: Licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
-    *   Free to use, modify, and distribute.
-    *   **Requires open-sourcing** of your own code if you use it to provide a service (SaaS).
-    *   See [LICENSE](LICENSE) for details.
+1. **Community Edition**: Licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+    * Free to use, modify, and distribute.
+    * **Requires open-sourcing** of your own code if you use it to provide a service (SaaS).
+    * See [LICENSE](LICENSE) for details.
 
-2.  **Commercial Edition**: Available for enterprises who want to use the software without AGPLv3 restrictions.
-    *   Allows proprietary use in closed-source applications.
-    *   Includes warranty and support.
-    *   See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details.
+2. **Commercial Edition**: Available for enterprises who want to use the software without AGPLv3 restrictions.
+    * Allows proprietary use in closed-source applications.
+    * Includes warranty and support.
+    * See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details.
 
 ### Contributing
 
