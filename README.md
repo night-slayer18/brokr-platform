@@ -10,6 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-Enabled-pink.svg)](https://graphql.org/)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 </div>
 
@@ -261,7 +262,15 @@ graph TD
 - **State Management**: Zustand for global state, React Query for server state
 - **Routing**: React Router with protected routes
 - **Form Handling**: React Hook Form with Zod validation
+- **Component-based**: Reusable UI components with Radix UI primitives
+- **State Management**: Zustand for global state, React Query for server state
+- **Routing**: React Router with protected routes
+- **Form Handling**: React Hook Form with Zod validation
 - **API Communication**: GraphQL with code generation
+
+### Deployment Architecture
+
+Brokr Platform is designed as a **Single-Jar Application** for production. The frontend is built and bundled as static resources within the Spring Boot backend JAR. This simplifies deployment to a single artifact that serves both the API and the UI.
 
 ## Technology Stack
 
@@ -323,23 +332,47 @@ git clone <repository-url>
 cd brokr-platform
 ```
 
-#### 2. Backend Setup
+#### 2. Build & Run (Production Mode)
+
+The easiest way to run the application is using Docker, which automatically builds the frontend and bundles it with the backend.
 
 ```bash
-cd brokr-backend
-mvn clean install -DskipTests
+docker-compose up -d --build
 ```
 
-#### 3. Frontend Setup
+This will start the entire platform (Database, Kafka, Backend+Frontend) in containers.
 
-```bash
-cd brokr-frontend
-npm install
-```
+#### 3. Manual Build (Single Jar)
 
-#### 4. Database Setup
+If you prefer to run without Docker, you can build the single executable JAR:
 
-The application uses Flyway for database migrations. The database schema will be automatically created on first startup.
+1.  **Build Frontend**:
+    ```bash
+    cd brokr-frontend
+    npm install
+    npm run build
+    ```
+
+2.  **Copy Assets**:
+    Copy the build artifacts to the backend static resources:
+    ```bash
+    # Linux/Mac
+    mkdir -p ../brokr-backend/brokr-app/src/main/resources/static
+    cp -r dist/* ../brokr-backend/brokr-app/src/main/resources/static/
+    ```
+
+3.  **Build Backend**:
+    ```bash
+    cd ../brokr-backend
+    mvn clean package -DskipTests
+    ```
+
+4.  **Run**:
+    ```bash
+    java -jar brokr-app/target/brokr-app-2.0.1-SNAPSHOT.jar
+    ```
+
+The application will be available at `http://localhost:8080` (both UI and API).
 
 ### Configuration
 
@@ -390,37 +423,23 @@ This will start:
 - Kafka Connect
 - ksqlDB Server
 
-#### Option 2: Manual Start
+#### Option 2: Development Mode (Hot Reload)
 
-**Start PostgreSQL** (if not using Docker):
+For development, you can run the backend and frontend separately to enable hot-reloading.
 
-```bash
-# Using Docker
-docker run -d \
-  --name brokr-postgres \
-  -e POSTGRES_DB=brokr \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 \
-  postgres:16
-```
-
-**Start Backend**:
-
+**1. Start Backend**:
 ```bash
 cd brokr-backend
 mvn spring-boot:run
 ```
 
-**Start Frontend**:
-
+**2. Start Frontend**:
 ```bash
 cd brokr-frontend
 npm run dev
 ```
 
-The application will be available at:
-- **Frontend**: http://localhost:5173
+- **Frontend**: http://localhost:5173 (Proxies API requests to backend)
 - **Backend API**: http://localhost:8080
 - **GraphQL Playground**: http://localhost:8080/graphql
 
@@ -728,8 +747,15 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/brokr
 SPRING_DATASOURCE_USERNAME=postgres
 SPRING_DATASOURCE_PASSWORD=secure_password
 JWT_SECRET=your-secret-key
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/brokr
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=secure_password
+JWT_SECRET=your-secret-key
 JWT_EXPIRATION=86400000
 ```
+
+**Note**: In production, the frontend is served directly by the backend at the root path `/`. No separate web server is required for the frontend, though Nginx is recommended as a reverse proxy for SSL termination.
 
 ### Database Migrations
 
@@ -788,7 +814,21 @@ npm test
 
 ## License
 
-This is proprietary software. All rights reserved. Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited.
+**Brokr Platform** is dual-licensed:
+
+1.  **Community Edition**: Licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+    *   Free to use, modify, and distribute.
+    *   **Requires open-sourcing** of your own code if you use it to provide a service (SaaS).
+    *   See [LICENSE](LICENSE) for details.
+
+2.  **Commercial Edition**: Available for enterprises who want to use the software without AGPLv3 restrictions.
+    *   Allows proprietary use in closed-source applications.
+    *   Includes warranty and support.
+    *   See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details.
+
+### Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 

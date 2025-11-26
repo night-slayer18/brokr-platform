@@ -22,6 +22,9 @@ CREATE TABLE environments (
 -- Index on organization_id for performance optimization
 CREATE INDEX idx_environments_organization_id ON environments(organization_id);
 
+-- Index for environment type filtering
+CREATE INDEX idx_environment_type ON environments(type);
+
 CREATE TRIGGER update_environments_updated_at
     BEFORE UPDATE ON environments
     FOR EACH ROW

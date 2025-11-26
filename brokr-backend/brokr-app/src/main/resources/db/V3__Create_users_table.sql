@@ -34,6 +34,9 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_mfa_enabled ON users(mfa_enabled);
 CREATE INDEX idx_users_mfa_enforced ON users(mfa_enforced);
 
+-- Composite index for active users in organization
+CREATE INDEX idx_user_org_active ON users(organization_id, is_active);
+
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW

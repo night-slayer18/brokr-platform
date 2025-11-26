@@ -45,6 +45,14 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_user_active ON api_keys(user_id, is_acti
 CREATE INDEX IF NOT EXISTS idx_api_keys_expires_at ON api_keys(expires_at) 
     WHERE expires_at IS NOT NULL;
 
+-- Composite index for active non-deleted keys
+CREATE INDEX IF NOT EXISTS idx_api_key_active_status ON api_keys(is_active, is_revoked, deleted_at);
+
+-- Partial index for active API keys only (reduces index size)
+CREATE INDEX IF NOT EXISTS idx_api_key_active_only 
+    ON api_keys(user_id, last_used_at DESC) 
+    WHERE is_active = true AND is_revoked = false AND deleted_at IS NULL;
+
 -- Trigger to update updated_at
 CREATE TRIGGER update_api_keys_updated_at
     BEFORE UPDATE ON api_keys

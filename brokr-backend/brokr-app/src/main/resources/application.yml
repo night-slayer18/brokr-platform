@@ -108,7 +108,6 @@ mfa:
     lockout-minutes: ${MFA_RATE_LIMIT_LOCKOUT_MINUTES:30}  # Lockout duration after max attempts
 
 # Message Replay Configuration
-# Optimized for enterprise-scale operations (LinkedIn-scale ready)
 message-replay:
   max-messages-per-job: ${MESSAGE_REPLAY_MAX_MESSAGES:10000000}  # 10 million messages per job (safety limit)
   max-concurrent-jobs: ${MESSAGE_REPLAY_MAX_CONCURRENT:5}  # Maximum concurrent replay jobs

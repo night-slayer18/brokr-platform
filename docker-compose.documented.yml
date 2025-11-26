@@ -1,0 +1,613 @@
+# =============================================================================
+# Brokr Platform - Complete Development Environment
+# =============================================================================
+# This Docker Compose file sets up a complete local development environment
+# for the Brokr Platform, including all supporting services.
+#
+# QUICK START:
+#   1. docker-compose -f docker-compose.documented.yml up -d
+#   2. Wait for all services to be healthy (check with: docker-compose ps)
+#   3. Access the platform at http://localhost:8080
+#
+# DEFAULT LOGIN CREDENTIALS:
+#   - Super Admin:    admin@brokr.io / admin123
+#   - Org Admin:      orgadmin@brokr.io / orgadmin123
+#   - Developer:      developer@brokr.io / developer123
+#
+# SERVICES INCLUDED:
+#   - PostgreSQL Database (port 5432)
+#   - 3-node Kafka cluster in KRaft mode (ports 9092, 9093, 9094)
+#   - Schema Registry (port 8081)
+#   - Kafka Connect (port 8083)
+#   - ksqlDB Server (port 8088)
+#   - Brokr Platform Application (port 8080)
+#
+# IMPORTANT NOTES:
+#   - The Kafka services are OPTIONAL and only for local testing/demo
+#   - The Brokr platform connects to EXTERNAL Kafka clusters via bootstrap
+#     servers configured by admins in the UI
+#   - All data is persisted in Docker volumes (see volumes section at bottom)
+#   - Services use health checks to ensure proper startup order
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  # Stores all Brokr Platform application data including:
+  # - User accounts, roles, and permissions
+  # - Cluster configurations and connection details
+  # - Topic metadata, consumer group information
+  # - Audit logs and API key management
+  # - Message replay job configurations
+  #
+  # Connection Details:
+  #   Host: localhost (from host) or postgres (from containers)
+  #   Port: 5432
+  #   Database: brokr
+  #   Username: postgres
+  #   Password: password
+  #
+  # Data Persistence:
+  #   - All data is stored in the 'postgres_data' Docker volume
+  #   - Data persists across container restarts
+  #   - To reset: docker volume rm brokr-platform_postgres_data
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: brokr-postgres
+    environment:
+      POSTGRES_DB: brokr                    # Database name
+      POSTGRES_USER: postgres                # Database superuser
+      POSTGRES_PASSWORD: password            # Database password (change in production!)
+    ports:
+      - "5432:5432"                          # Expose PostgreSQL port to host
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persistent data storage
+    networks:
+      - brokr-network                        # Connect to internal network
+    restart: unless-stopped                  # Auto-restart on failure
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]  # Check if DB is ready
+      interval: 10s                          # Check every 10 seconds
+      timeout: 5s                            # Timeout after 5 seconds
+      retries: 5                             # Retry 5 times before marking unhealthy
+
+  # ---------------------------------------------------------------------------
+  # Kafka Broker 1 (KRaft Mode)
+  # ---------------------------------------------------------------------------
+  # First node in a 3-node Kafka cluster running in KRaft mode (no Zookeeper).
+  # KRaft is the new consensus protocol that replaces Zookeeper.
+  #
+  # IMPORTANT: These Kafka services are OPTIONAL - only for testing/demo.
+  # The Brokr platform connects to EXTERNAL Kafka clusters via bootstrap
+  # servers configured by admins in the UI. This local cluster is just for
+  # local development and testing.
+  #
+  # Configuration:
+  #   - Node ID: 1
+  #   - Roles: Both broker and controller (KRaft mode)
+  #   - External Port: 9092 (accessible from host)
+  #   - Internal Port: 29092 (for inter-broker communication)
+  #   - Controller Port: 29093 (for KRaft controller communication)
+  #
+  # Cluster Setup:
+  #   - 3 brokers for high availability
+  #   - Replication factor: 3 (all topics replicated across all brokers)
+  #   - Min in-sync replicas: 2 (requires 2 brokers to be in sync)
+  #   - Same CLUSTER_ID across all brokers (required for KRaft)
+  #
+  # Data Persistence:
+  #   - Kafka data stored in 'kafka_data_1' Docker volume
+  #   - Topics, messages, and offsets persist across restarts
+  # ---------------------------------------------------------------------------
+  kafka-broker-1:
+    image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-1
+    ports:
+      - "9092:9092"                          # External access port
+    environment:
+      # KRaft Configuration
+      KAFKA_NODE_ID: 1                       # Unique node identifier
+      KAFKA_PROCESS_ROLES: 'broker,controller'  # This node acts as both broker and controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'  # All controller nodes
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'  # Controller listener name
+      
+      # Network Configuration
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-1:29092,CONTROLLER://kafka-broker-1:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      #   - PLAINTEXT://kafka-broker-1:29092: Internal broker communication
+      #   - CONTROLLER://kafka-broker-1:29093: KRaft controller communication
+      #   - PLAINTEXT_HOST://0.0.0.0:9092: External access from host
+      
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-1:29092,PLAINTEXT_HOST://kafka-broker-1:9092'
+      #   - Clients will connect using these addresses
+      
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      #   - All listeners use PLAINTEXT (no SSL/SASL in dev environment)
+      
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'  # Inter-broker communication protocol
+      
+      # Topic Configuration
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3      # Consumer offsets replicated 3x
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3  # Transaction state replicated 3x
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2         # Min in-sync replicas for transactions
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3            # Default replication for new topics
+      KAFKA_MIN_INSYNC_REPLICAS: 2                   # Minimum in-sync replicas required
+      
+      # Performance Configuration
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0      # No delay for consumer group rebalancing
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'          # Directory for Kafka logs (topics/partitions)
+      
+      # Cluster Configuration
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'           # Unique cluster ID (must match all brokers)
+    volumes:
+      - kafka_data_1:/var/lib/kafka/data             # Persistent Kafka data
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s                               # Allow 30s for initial startup
+
+  # ---------------------------------------------------------------------------
+  # Kafka Broker 2
+  # ---------------------------------------------------------------------------
+  # Second node in the 3-node Kafka cluster. Same configuration as broker 1,
+  # but with node ID 2 and port 9093 for external access.
+  # ---------------------------------------------------------------------------
+  kafka-broker-2:
+    image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-2
+    ports:
+      - "9093:9093"                          # External access port (different from broker 1)
+    environment:
+      KAFKA_NODE_ID: 2                       # Unique node identifier
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-2:29092,CONTROLLER://kafka-broker-2:29093,PLAINTEXT_HOST://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-2:29092,PLAINTEXT_HOST://kafka-broker-2:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'           # Same cluster ID as other brokers
+    volumes:
+      - kafka_data_2:/var/lib/kafka/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9093 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Kafka Broker 3
+  # ---------------------------------------------------------------------------
+  # Third node in the 3-node Kafka cluster. Same configuration as other brokers,
+  # but with node ID 3 and port 9094 for external access.
+  # ---------------------------------------------------------------------------
+  kafka-broker-3:
+    image: confluentinc/cp-kafka:8.1.0
+    container_name: brokr-kafka-3
+    ports:
+      - "9094:9094"                          # External access port
+    environment:
+      KAFKA_NODE_ID: 3                       # Unique node identifier
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker-1:29093,2@kafka-broker-2:29093,3@kafka-broker-3:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker-3:29092,CONTROLLER://kafka-broker-3:29093,PLAINTEXT_HOST://0.0.0.0:9094'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker-3:29092,PLAINTEXT_HOST://kafka-broker-3:9094'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'           # Same cluster ID as other brokers
+    volumes:
+      - kafka_data_3:/var/lib/kafka/data
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9094 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Schema Registry
+  # ---------------------------------------------------------------------------
+  # Confluent Schema Registry manages Avro, JSON Schema, and Protobuf schemas
+  # for Kafka topics. It provides schema versioning, compatibility checking,
+  # and centralized schema management.
+  #
+  # Access:
+  #   - REST API: http://localhost:8081
+  #   - Health Check: http://localhost:8081/subjects
+  #
+  # Dependencies:
+  #   - Requires all 3 Kafka brokers to be healthy before starting
+  #   - Uses Kafka as its storage backend (schemas stored in Kafka topics)
+  #
+  # Configuration:
+  #   - Replication factor: 3 (schemas replicated across all brokers)
+  #   - Bootstrap servers: All 3 Kafka brokers
+  # ---------------------------------------------------------------------------
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.1.0
+    container_name: brokr-schema-registry
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy              # Wait for broker 1 to be healthy
+      kafka-broker-2:
+        condition: service_healthy              # Wait for broker 2 to be healthy
+      kafka-broker-3:
+        condition: service_healthy              # Wait for broker 3 to be healthy
+    ports:
+      - "8081:8081"                            # Schema Registry REST API port
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092'
+      #   - List of Kafka brokers for schema storage
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 3  # Replicate schemas 3x
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1" ]
+      #   - Checks if Schema Registry API is responding
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Kafka Connect
+  # ---------------------------------------------------------------------------
+  # Kafka Connect is a framework for connecting Kafka with external systems
+  # such as databases, key-value stores, search indexes, and file systems.
+  # It supports both source connectors (import data) and sink connectors
+  # (export data).
+  #
+  # Access:
+  #   - REST API: http://localhost:8083
+  #   - Connectors endpoint: http://localhost:8083/connectors
+  #
+  # Dependencies:
+  #   - Requires all 3 Kafka brokers to be healthy
+  #   - Requires Schema Registry to be healthy (for Avro serialization)
+  #
+  # Configuration:
+  #   - Uses Avro converter with Schema Registry
+  #   - Connector configs, offsets, and status stored in Kafka topics
+  #   - All topics replicated 3x for high availability
+  #
+  # Connector Management:
+  #   - Install connectors via Confluent Hub
+  #   - Manage connectors via REST API or Brokr Platform UI
+  # ---------------------------------------------------------------------------
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:8.1.0
+    container_name: brokr-kafka-connect
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy              # Required for Avro serialization
+    ports:
+      - "8083:8083"                            # Kafka Connect REST API port
+    environment:
+      # Kafka Connection
+      CONNECT_BOOTSTRAP_SERVERS: 'kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092'
+      
+      # REST API Configuration
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_REST_LISTENERS: http://0.0.0.0:8083
+      
+      # Cluster Configuration
+      CONNECT_GROUP_ID: compose-connect-group  # Connect cluster group ID
+      
+      # Internal Topic Configuration (stored in Kafka)
+      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs      # Connector configurations
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets     # Connector offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status      # Connector status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
+      
+      # Serialization Configuration
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter  # Use Avro with Schema Registry
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      
+      # Performance Configuration
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000   # Flush offsets every 10 seconds
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      #   - Paths where connector plugins are installed
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8083/connectors || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # ksqlDB Server
+  # ---------------------------------------------------------------------------
+  # ksqlDB is a database for building stream processing applications on Kafka.
+  # It provides a SQL-like interface for querying, transforming, and aggregating
+  # Kafka streams in real-time.
+  #
+  # Access:
+  #   - REST API: http://localhost:8088
+  #   - Info endpoint: http://localhost:8088/info
+  #
+  # Dependencies:
+  #   - Requires all 3 Kafka brokers to be healthy
+  #   - Requires Schema Registry to be healthy
+  #
+  # Features:
+  #   - Stream processing with SQL syntax
+  #   - Materialized views and tables
+  #   - Integration with Kafka Connect
+  #   - Real-time analytics and transformations
+  #
+  # Configuration:
+  #   - Auto-creates topics for streams and tables
+  #   - All topics replicated 3x
+  #   - Monitoring interceptors enabled
+  # ---------------------------------------------------------------------------
+  ksqldb-server:
+    image: confluentinc/cp-ksqldb-server:latest
+    container_name: brokr-ksqldb-server
+    hostname: ksqldb-server
+    depends_on:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy              # Required for schema management
+    ports:
+      - "8088:8088"                            # ksqlDB REST API port
+    environment:
+      KSQL_CONFIG_DIR: "/etc/ksql"
+      
+      # Kafka Configuration
+      KSQL_BOOTSTRAP_SERVERS: "kafka-broker-1:29092,kafka-broker-2:29092,kafka-broker-3:29092"
+      KSQL_HOST_NAME: ksqldb-server
+      KSQL_LISTENERS: "http://0.0.0.0:8088"
+      
+      # Schema Registry Integration
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      
+      # Kafka Connect Integration
+      KSQL_KSQL_CONNECT_URL: "http://kafka-connect:8083"
+      
+      # Performance Configuration
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0        # Disable caching for real-time processing
+      
+      # Topic Configuration
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 3
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'    # Auto-create processing topics
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'   # Auto-create stream topics
+      
+      # Monitoring
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8088/info || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s                         # Allow 30s for initial startup
+
+  # ---------------------------------------------------------------------------
+  # Brokr Platform Application
+  # ---------------------------------------------------------------------------
+  # The main Brokr Platform application - a comprehensive Kafka management
+  # platform with web UI and GraphQL API.
+  #
+  # Access:
+  #   - Web UI: http://localhost:8080
+  #   - GraphQL API: http://localhost:8080/graphql
+  #   - Health Check: http://localhost:8080/actuator/health
+  #
+  # DEFAULT LOGIN CREDENTIALS:
+  #   - Super Admin:    admin@brokr.io / admin123
+  #   - Org Admin:      orgadmin@brokr.io / orgadmin123
+  #   - Developer:     developer@brokr.io / developer123
+  #
+  # Features:
+  #   - Multi-cluster Kafka management
+  #   - Topic and consumer group management
+  #   - Message browsing and replay
+  #   - Schema Registry integration
+  #   - Kafka Connect management
+  #   - ksqlDB integration
+  #   - User management with roles and permissions
+  #   - API key management
+  #   - Audit logging
+  #   - Multi-factor authentication (MFA)
+  #
+  # Dependencies:
+  #   - Requires PostgreSQL to be healthy (for application data)
+  #   - Does NOT require local Kafka services (connects to external clusters)
+  #
+  # Configuration:
+  #   - Database: PostgreSQL (configured via environment variables)
+  #   - Security: JWT-based authentication
+  #   - MFA: TOTP-based with backup codes
+  #   - API Keys: For programmatic access
+  #   - Message Replay: Configurable limits and batching
+  # ---------------------------------------------------------------------------
+  brokr-backend:
+    image: nightslayer/brokr-platform:2.0.0
+    container_name: brokr-backend
+    ports:
+      - "8080:8080"                            # Brokr Platform web UI and API
+    depends_on:
+      postgres:
+        condition: service_healthy              # Wait for database to be ready
+      # NOTE: Kafka services are NOT required - Brokr platform connects to
+      #       external Kafka clusters via bootstrap servers configured by
+      #       admins in the UI. Kafka services above are only for local testing.
+    environment:
+      # -----------------------------------------------------------------------
+      # Database Configuration
+      # -----------------------------------------------------------------------
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brokr
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate  # Validate schema, don't auto-create
+      SPRING_FLYWAY_ENABLED: "true"             # Enable Flyway for schema migrations
+
+      # -----------------------------------------------------------------------
+      # JWT Configuration
+      # -----------------------------------------------------------------------
+      # JWT tokens are used for authentication. The secret should be changed
+      # in production and kept secure.
+      JWT_SECRET: XB0922J6WcWbXAgtFvmmebkfQUVMcjOqX4oag/xEHNY5E1MTFLQ2KSbqL52fmoGLHYCkkkJfzmGBB4vn6yYHlA==
+      JWT_EXPIRATION: 86400                     # Token expiration in seconds (24 hours)
+
+      # -----------------------------------------------------------------------
+      # Security Configuration
+      # -----------------------------------------------------------------------
+      BCRYPT_STRENGTH: 10                       # Password hashing strength (1-31, higher = slower but more secure)
+
+      # -----------------------------------------------------------------------
+      # MFA (Multi-Factor Authentication) Configuration
+      # -----------------------------------------------------------------------
+      MFA_ENCRYPTION_KEY: toIUKBWfqdYUG+2COEOSzH88vXYmqTfJPpkwthZOwxA=
+      #   - Encryption key for MFA secrets (change in production!)
+      MFA_TOTP_ISSUER: Brokr Platform           # TOTP issuer name (shown in authenticator apps)
+      MFA_BACKUP_CODES_COUNT: 10                # Number of backup codes to generate
+      MFA_BACKUP_CODES_LENGTH: 8                # Length of each backup code
+      MFA_RATE_LIMIT_MAX_ATTEMPTS: 5            # Max failed MFA attempts before lockout
+      MFA_RATE_LIMIT_WINDOW_MINUTES: 15         # Time window for rate limiting
+      MFA_RATE_LIMIT_LOCKOUT_MINUTES: 30        # Lockout duration after max attempts
+
+      # -----------------------------------------------------------------------
+      # Message Replay Configuration
+      # -----------------------------------------------------------------------
+      # Controls how messages can be replayed from Kafka topics
+      MESSAGE_REPLAY_MAX_MESSAGES: 10000000     # Maximum messages per replay job
+      MESSAGE_REPLAY_MAX_CONCURRENT: 5          # Maximum concurrent replay jobs
+      MESSAGE_REPLAY_PROGRESS_INTERVAL: 1000    # Progress update interval (ms)
+      MESSAGE_REPLAY_TIMEOUT_MINUTES: 1440       # Job timeout (24 hours)
+      MESSAGE_REPLAY_STREAMING_BATCH: 10000     # Batch size for streaming replay
+      MESSAGE_REPLAY_RATE_LIMIT: 0             # Rate limit (0 = unlimited)
+
+      # -----------------------------------------------------------------------
+      # API Key Configuration
+      # -----------------------------------------------------------------------
+      # API keys allow programmatic access to the Brokr Platform API
+      API_KEY_PREFIX: brokr_                    # Prefix for all API keys
+      API_KEY_SECRET_LENGTH: 32                 # Length of API key secret
+      API_KEY_DEFAULT_EXPIRATION_DAYS: 365      # Default expiration (1 year)
+      API_KEY_ROTATION_GRACE_PERIOD_DAYS: 7     # Grace period during key rotation
+      
+      # Rate Limiting (requests per time period)
+      API_KEY_RATE_LIMIT_PER_SECOND: 10
+      API_KEY_RATE_LIMIT_PER_MINUTE: 100
+      API_KEY_RATE_LIMIT_PER_HOUR: 1000
+      API_KEY_RATE_LIMIT_PER_DAY: 10000
+      
+      # Usage Tracking
+      API_KEY_USAGE_TRACKING_ENABLED: "true"     # Track API key usage
+      API_KEY_USAGE_BATCH_SIZE: 100             # Batch size for usage logs
+      API_KEY_USAGE_BATCH_INTERVAL: 5           # Batch interval (seconds)
+      API_KEY_USAGE_RETENTION_DAYS: 90          # How long to keep usage logs
+      
+      # Security Features
+      API_KEY_BRUTE_FORCE_PROTECTION_ENABLED: "true"  # Enable brute force protection
+      API_KEY_BRUTE_FORCE_MAX_ATTEMPTS: 5       # Max failed attempts before lockout
+      API_KEY_BRUTE_FORCE_LOCKOUT_MINUTES: 15   # Lockout duration
+      API_KEY_SUSPICIOUS_ACTIVITY_ENABLED: "true"  # Detect suspicious activity
+      API_KEY_SUSPICIOUS_SPIKE_THRESHOLD: 10     # Request spike threshold
+      API_KEY_SUSPICIOUS_NEW_IP_ALERT: "true"   # Alert on new IP addresses
+
+      # -----------------------------------------------------------------------
+      # Logging Configuration
+      # -----------------------------------------------------------------------
+      # Controls log levels for different components
+      LOGGING_LEVEL_ROOT: INFO                  # Default log level
+      LOGGING_LEVEL_IO_BROKR: INFO              # Brokr Platform logs
+      LOGGING_LEVEL_IO_BROKR_KAFKA_SERVICE_KAFKACONSUMERSERVICE: INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_GRAPHQL: INFO  # GraphQL logs
+      LOGGING_LEVEL_ORG_APACHE_KAFKA: WARN      # Kafka client logs (reduce noise)
+    networks:
+      - brokr-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s                         # Allow 60s for application startup
+
+# =============================================================================
+# Networks
+# =============================================================================
+# All services communicate over a shared Docker bridge network.
+# Services can reach each other by container name (e.g., postgres, kafka-broker-1).
+# =============================================================================
+networks:
+  brokr-network:
+    driver: bridge                              # Standard Docker bridge network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+# Persistent data storage for all services. Data persists across container
+# restarts and removals. To completely reset:
+#   docker-compose down -v  (removes containers AND volumes)
+#
+# Volume Locations:
+#   - postgres_data: PostgreSQL database files
+#   - kafka_data_1/2/3: Kafka broker data (topics, partitions, logs)
+#
+# To backup data:
+#   - PostgreSQL: Use pg_dump or backup the volume
+#   - Kafka: Copy the volume directories
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local                               # Local Docker volume
+  kafka_data_1:
+    driver: local
+  kafka_data_2:
+    driver: local
+  kafka_data_3:
+    driver: local
+

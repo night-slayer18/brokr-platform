@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS mfa_devices (
 CREATE INDEX IF NOT EXISTS idx_mfa_devices_user_id ON mfa_devices(user_id);
 CREATE INDEX IF NOT EXISTS idx_mfa_devices_user_type_active ON mfa_devices(user_id, type, is_active);
 
+-- Composite index for verified active devices
+CREATE INDEX IF NOT EXISTS idx_mfa_device_verified_active ON mfa_devices(user_id, is_verified, is_active);
+
 -- Trigger to update updated_at
 CREATE TRIGGER update_mfa_devices_updated_at
     BEFORE UPDATE ON mfa_devices

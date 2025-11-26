@@ -253,8 +253,9 @@ services:
 
   # Brokr Platform Application
   brokr-backend:
-    image: nightslayer/brokr-platform:2.0.0
-    container_name: brokr-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     depends_on:

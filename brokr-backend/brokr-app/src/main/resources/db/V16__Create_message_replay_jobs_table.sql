@@ -70,6 +70,20 @@ CREATE INDEX idx_replay_jobs_scheduled ON message_replay_jobs(next_scheduled_run
 CREATE INDEX idx_replay_jobs_retry ON message_replay_jobs(status, retry_count, max_retries, completed_at) 
     WHERE status = 'FAILED' AND retry_count < max_retries;
 
+-- Index for finding jobs by source topic (for conflict detection)
+CREATE INDEX IF NOT EXISTS idx_replay_source_topic ON message_replay_jobs(source_topic);
+
+-- Index for finding jobs by target topic
+CREATE INDEX IF NOT EXISTS idx_replay_target_topic ON message_replay_jobs(target_topic);
+
+-- Partial index for running replay jobs only
+CREATE INDEX IF NOT EXISTS idx_replay_running_only ON message_replay_jobs(started_at) 
+    WHERE status = 'RUNNING';
+
+-- Partial index for pending replay jobs (for scheduler)
+CREATE INDEX IF NOT EXISTS idx_replay_pending_scheduled ON message_replay_jobs(next_scheduled_run) 
+    WHERE status = 'PENDING' AND next_scheduled_run IS NOT NULL;
+
 -- =====================================================
 -- Replay Job History Table (Optional - for detailed audit trail)
 -- Tracks progress snapshots for long-running replays
