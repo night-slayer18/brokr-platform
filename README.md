@@ -807,17 +807,18 @@ npm test
 
 ## License
 
-**Brokr Platform** is dual-licensed:
+Brokr Platform is **dual-licensed**:
 
-1. **Community Edition**: Licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
-    * Free to use, modify, and distribute.
-    * **Requires open-sourcing** of your own code if you use it to provide a service (SaaS).
-    * See [LICENSE](LICENSE) for details.
+- **Open-source license**: GNU Affero General Public License v3.0 (AGPLv3).  
+  See the [`LICENSE`](LICENSE) file for full details.
+- **Commercial license**: Available for organizations that want to:
+  - use Brokr Platform in proprietary products or SaaS, or
+  - avoid the copyleft obligations of AGPLv3.
 
-2. **Commercial Edition**: Available for enterprises who want to use the software without AGPLv3 restrictions.
-    * Allows proprietary use in closed-source applications.
-    * Includes warranty and support.
-    * See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details.
+For commercial licensing and support, contact:  
+📩 [samanuai.a@gmail.com](mailto:samanuai.a@gmail.com)
+
+See [`COMMERCIAL_LICENSE.md`](COMMERCIAL_LICENSE.md) for more information.
 
 ### Contributing
 
