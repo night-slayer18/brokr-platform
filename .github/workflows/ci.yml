@@ -92,8 +92,8 @@ jobs:
           exit 1
 
       - name: Build, test, and package with Maven
-        run: mvn -B install -Dspring.profiles.active=dev
-
+        run: mvn -B install
+        
       - name: Stop backing services
         if: always()
         run: docker compose down
