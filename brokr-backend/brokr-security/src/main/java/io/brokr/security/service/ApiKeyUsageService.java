@@ -330,6 +330,20 @@ public class ApiKeyUsageService {
         // Matching exactly how other metrics handle timestamps
         LocalDateTime startLocal = LocalDateTime.ofInstant(startTime, java.time.ZoneId.systemDefault());
         LocalDateTime endLocal = LocalDateTime.ofInstant(endTime, java.time.ZoneId.systemDefault());
+
+        // Validation: Ensure end is after start
+        if (endTime.isBefore(startTime)) {
+            throw new IllegalArgumentException("End time must be after start time");
+        }
+
+        // Validation: Enforce maximum date range to prevent full-table scans
+        // Limit to 30 days to prevent abuse and database overload
+        java.time.Duration duration = java.time.Duration.between(startTime, endTime);
+        if (duration.toDays() > 30) {
+            throw new IllegalArgumentException(
+                "Date range cannot exceed 30 days. Requested range: " + duration.toDays() + " days"
+            );
+        }
         
         // Execute queries in parallel where possible (they're independent)
         // Note: Some queries can be combined, but status code counts and time series require separate queries
