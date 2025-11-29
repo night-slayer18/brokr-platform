@@ -622,6 +622,7 @@ input OrganizationInput {
     name: String!
     description: String
     isActive: Boolean!
+    initialEnvironments: [EnvironmentInput!]
 }
 
 input OrganizationMfaPolicyInput {
@@ -634,7 +635,7 @@ input EnvironmentInput {
     name: String!
     type: EnvironmentType!
     description: String
-    organizationId: String!
+    organizationId: String
     isActive: Boolean!
 }
 

@@ -718,11 +718,19 @@ export interface DeleteUserMutation {
 }
 
 // Organization input types
+export interface EnvironmentInput {
+    name: string;
+    type: 'NON_PROD_HOTFIX' | 'NON_PROD_MINOR' | 'NON_PROD_MAJOR' | 'PROD';
+    description?: string;
+    isActive: boolean;
+}
+
 export interface OrganizationInput {
     id?: string;
     name: string;
     description?: string;
     isActive: boolean;
+    initialEnvironments?: EnvironmentInput[];
 }
 
 // User input types

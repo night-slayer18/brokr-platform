@@ -22,6 +22,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.brokr.core.model.Environment;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -108,6 +110,8 @@ public class OrganizationApiService {
         return orgDto;
     }
 
+
+
     @Transactional
     public Organization createOrganization(OrganizationInput input) {
         if (organizationRepository.existsByName(input.getName())) {
@@ -124,7 +128,29 @@ public class OrganizationApiService {
                 .isActive(isActive)
                 .build();
 
-        return organizationRepository.save(OrganizationEntity.fromDomain(org)).toDomain();
+        OrganizationEntity savedOrgEntity = organizationRepository.save(OrganizationEntity.fromDomain(org));
+        
+        List<Environment> createdEnvironments = new ArrayList<>();
+        
+        if (input.getInitialEnvironments() != null && !input.getInitialEnvironments().isEmpty()) {
+            List<EnvironmentEntity> envEntities = input.getInitialEnvironments().stream()
+                    .map(envInput -> EnvironmentEntity.builder()
+                            .id(UUID.randomUUID().toString())
+                            .name(envInput.getName())
+                            .type(envInput.getType())
+                            .description(envInput.getDescription())
+                            .isActive(true)
+                            .organization(savedOrgEntity)
+                            .build())
+                    .toList();
+            
+            environmentRepository.saveAll(envEntities);
+            createdEnvironments = envEntities.stream().map(EnvironmentEntity::toDomain).toList();
+        }
+        
+        Organization result = savedOrgEntity.toDomain();
+        result.setEnvironments(createdEnvironments);
+        return result;
     }
 
     @Transactional

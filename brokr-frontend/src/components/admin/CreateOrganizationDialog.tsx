@@ -8,6 +8,7 @@ import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Textarea} from '@/components/ui/textarea'
 import {Switch} from '@/components/ui/switch'
+import {Checkbox} from '@/components/ui/checkbox'
 import {toast} from 'sonner'
 import {CREATE_ORGANIZATION_MUTATION} from '@/graphql/mutations'
 import type {CreateOrganizationMutation} from '@/graphql/types'
@@ -19,6 +20,7 @@ const organizationSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional().or(z.literal('')),
     isActive: z.boolean(),
+    selectedEnvironmentTypes: z.array(z.string()).optional(),
 })
 
 type OrganizationFormData = z.infer<typeof organizationSchema>
@@ -28,10 +30,17 @@ interface CreateOrganizationDialogProps {
     onOpenChange: (open: boolean) => void
 }
 
+const STANDARD_ENVIRONMENTS = [
+    {id: 'PRODUCTION', name: 'Production', type: 'PROD'},
+    {id: 'NON_PROD_MAJOR', name: 'Major', type: 'NON_PROD_MAJOR'},
+    {id: 'NON_PROD_MINOR', name: 'Minor', type: 'NON_PROD_MINOR'},
+    {id: 'NON_PROD_HOTFIX', name: 'Hotfix', type: 'NON_PROD_HOTFIX'},
+] as const
+
 export function CreateOrganizationDialog({open, onOpenChange}: CreateOrganizationDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const queryClient = useQueryClient()
-    const {mutate: createOrganization} = useGraphQLMutation<CreateOrganizationMutation, {input: OrganizationFormData}>(
+    const {mutate: createOrganization} = useGraphQLMutation<CreateOrganizationMutation, {input: any}>(
         CREATE_ORGANIZATION_MUTATION,
         {
             onSuccess: () => {
@@ -60,15 +69,45 @@ export function CreateOrganizationDialog({open, onOpenChange}: CreateOrganizatio
             name: '',
             description: '',
             isActive: true,
+            selectedEnvironmentTypes: [],
         },
         mode: 'onChange',
     })
 
     const isActive = watch('isActive')
+    const selectedEnvironmentTypes = watch('selectedEnvironmentTypes') || []
+
+    const handleEnvironmentToggle = (typeId: string, checked: boolean) => {
+        const currentTypes = selectedEnvironmentTypes
+        if (checked) {
+            setValue('selectedEnvironmentTypes', [...currentTypes, typeId])
+        } else {
+            setValue('selectedEnvironmentTypes', currentTypes.filter(id => id !== typeId))
+        }
+    }
 
     const onSubmit = (data: OrganizationFormData) => {
         setIsSubmitting(true)
-        createOrganization({input: data})
+        
+        // Transform selected types to initialEnvironments
+        const initialEnvironments = data.selectedEnvironmentTypes?.map(typeId => {
+            const envDef = STANDARD_ENVIRONMENTS.find(e => e.id === typeId)
+            return {
+                name: envDef?.name || typeId,
+                type: envDef?.type || 'NON_PROD_MINOR',
+                isActive: true,
+                description: `${envDef?.name} environment`
+            }
+        }) || []
+
+        createOrganization({
+            input: {
+                name: data.name,
+                description: data.description,
+                isActive: data.isActive,
+                initialEnvironments
+            }
+        })
     }
 
     return (
@@ -78,36 +117,64 @@ export function CreateOrganizationDialog({open, onOpenChange}: CreateOrganizatio
                     <DialogTitle>Create Organization</DialogTitle>
                     <DialogDescription>Create a new organization to manage users and resources</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Name *</Label>
+                            <Input
+                                id="name"
+                                {...register('name')}
+                                placeholder="Organization name"
+                                disabled={isSubmitting}
+                            />
+                            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea
+                                id="description"
+                                {...register('description')}
+                                placeholder="Organization description"
+                                disabled={isSubmitting}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="isActive">Active</Label>
+                            <Switch
+                                id="isActive"
+                                checked={isActive}
+                                onCheckedChange={(checked) => setValue('isActive', checked)}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                    </div>
+
                     <div className="space-y-2">
-                        <Label htmlFor="name">Name *</Label>
-                        <Input
-                            id="name"
-                            {...register('name')}
-                            placeholder="Organization name"
-                            disabled={isSubmitting}
-                        />
-                        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                        <Label>Initial Environments</Label>
+                        <div className="border rounded-md p-4 space-y-2">
+                            {STANDARD_ENVIRONMENTS.map((env) => (
+                                <div key={env.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={`env-${env.id}`}
+                                        checked={selectedEnvironmentTypes.includes(env.id)}
+                                        onCheckedChange={(checked) => handleEnvironmentToggle(env.id, checked as boolean)}
+                                        disabled={isSubmitting}
+                                    />
+                                    <Label
+                                        htmlFor={`env-${env.id}`}
+                                        className="text-sm font-normal cursor-pointer flex-1"
+                                    >
+                                        {env.name}
+                                    </Label>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Select the environments to create for this organization.
+                        </p>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            {...register('description')}
-                            placeholder="Organization description"
-                            disabled={isSubmitting}
-                            rows={3}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="isActive">Active</Label>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={(checked) => setValue('isActive', checked)}
-                            disabled={isSubmitting}
-                        />
-                    </div>
+
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                             Cancel

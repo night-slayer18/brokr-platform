@@ -64,6 +64,9 @@ public class EnvironmentApiService {
     }
 
     public Environment createEnvironment(EnvironmentInput input) {
+        if (input.getOrganizationId() == null) {
+            throw new IllegalArgumentException("Organization ID is required");
+        }
         if (!organizationRepository.existsById(input.getOrganizationId())) {
             throw new ResourceNotFoundException("Organization not found with id: " + input.getOrganizationId());
         }

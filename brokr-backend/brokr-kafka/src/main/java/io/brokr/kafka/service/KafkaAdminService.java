@@ -30,7 +30,7 @@ public class KafkaAdminService {
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -90,7 +90,7 @@ public class KafkaAdminService {
      * This avoids fetching details for thousands of topics when only showing 10.
      */
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -146,7 +146,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -196,7 +196,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -299,7 +299,7 @@ public class KafkaAdminService {
      * @return Map of topic name to Topic with full details
      */
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -398,7 +398,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -424,7 +424,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -463,7 +463,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -487,7 +487,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -586,7 +586,7 @@ public class KafkaAdminService {
     }
 
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -802,7 +802,7 @@ public class KafkaAdminService {
      * @return true if successful
      */
     @Retryable(
-            value = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
