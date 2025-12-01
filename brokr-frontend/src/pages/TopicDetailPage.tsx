@@ -29,7 +29,22 @@ import {
 } from "@/components/ui/pagination";
 import {MessageDetailPanel} from "@/components/topics/MessageDetailPanel";
 import {ReplayJobForm} from "@/components/replay/ReplayJobForm";
+import React from "react";
 
+/**
+ * Truncates text to a maximum length with ellipsis.
+ * Defined outside component to prevent recreation on every render.
+ */
+const truncateText = (text: string | null | undefined, maxLength: number = 50): React.ReactNode => {
+    if (!text) return <span className="text-muted-foreground italic">null</span>;
+    if (text.length <= maxLength) return text;
+    return (
+        <span>
+            {text.substring(0, maxLength)}
+            <span className="text-muted-foreground">...</span>
+        </span>
+    );
+};
 
 export default function TopicDetailPage() {
     const {clusterId, topicName} = useParams<{ clusterId: string; topicName: string }>();
@@ -404,67 +419,53 @@ export default function TopicDetailPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {paginatedMessages.map((message: Message, index: number) => {
-                                                const truncateText = (text: string | null | undefined, maxLength: number = 50) => {
-                                                    if (!text) return <span
-                                                        className="text-muted-foreground italic">null</span>;
-                                                    if (text.length <= maxLength) return text;
-                                                    return (
-                                                        <span>
-                                                            {text.substring(0, maxLength)}
-                                                            <span className="text-muted-foreground">...</span>
+                                            {paginatedMessages.map((message: Message, index: number) => (
+                                                <TableRow
+                                                    key={`${message.partition}-${message.offset}-${index}`}
+                                                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                                    onClick={() => handleMessageClick(message)}
+                                                >
+                                                    <TableCell
+                                                        className="w-20 font-mono">{message.partition}</TableCell>
+                                                    <TableCell
+                                                        className="w-24 font-mono">{formatNumber(message.offset)}</TableCell>
+                                                    <TableCell className="w-32">
+                                                        <span title={formatDate(message.timestamp)}
+                                                              className="text-sm">
+                                                            {formatRelativeTime(message.timestamp)}
                                                         </span>
-                                                    );
-                                                };
-
-                                                return (
-                                                    <TableRow
-                                                        key={`${message.partition}-${message.offset}-${index}`}
-                                                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                                                        onClick={() => handleMessageClick(message)}
-                                                    >
-                                                        <TableCell
-                                                            className="w-20 font-mono">{message.partition}</TableCell>
-                                                        <TableCell
-                                                            className="w-24 font-mono">{formatNumber(message.offset)}</TableCell>
-                                                        <TableCell className="w-32">
-                                                            <span title={formatDate(message.timestamp)}
-                                                                  className="text-sm">
-                                                                {formatRelativeTime(message.timestamp)}
-                                                            </span>
-                                                        </TableCell>
-                                                        <TableCell className="w-48">
-                                                            <div className="flex items-center gap-2">
-                                                                <code
-                                                                    className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
-                                                                    {truncateText(message.key, 40)}
-                                                                </code>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2">
-                                                                <code
-                                                                    className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
-                                                                    {truncateText(message.value, 75)}
-                                                                </code>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="w-20">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="opacity-60 hover:opacity-100"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleMessageClick(message);
-                                                                }}
-                                                            >
-                                                                <Eye className="h-4 w-4"/>
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
+                                                    </TableCell>
+                                                    <TableCell className="w-48">
+                                                        <div className="flex items-center gap-2">
+                                                            <code
+                                                                className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
+                                                                {truncateText(message.key, 40)}
+                                                            </code>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <code
+                                                                className="text-xs bg-muted px-2 py-1 rounded border flex-1 truncate">
+                                                                {truncateText(message.value, 75)}
+                                                            </code>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="w-20">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="opacity-60 hover:opacity-100"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleMessageClick(message);
+                                                            }}
+                                                        >
+                                                            <Eye className="h-4 w-4"/>
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
                                         </TableBody>
                                     </Table>
                                     <div className="flex items-center justify-between mt-4">
