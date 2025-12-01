@@ -29,13 +29,13 @@ import {
 } from "@/components/ui/pagination";
 import {MessageDetailPanel} from "@/components/topics/MessageDetailPanel";
 import {ReplayJobForm} from "@/components/replay/ReplayJobForm";
-import React from "react";
+import type { ReactElement } from 'react';
 
 /**
  * Truncates text to a maximum length with ellipsis.
  * Defined outside component to prevent recreation on every render.
  */
-const truncateText = (text: string | null | undefined, maxLength: number = 50): React.ReactNode => {
+const truncateText = (text: string | null | undefined, maxLength: number = 50): string | ReactElement => {
     if (!text) return <span className="text-muted-foreground italic">null</span>;
     if (text.length <= maxLength) return text;
     return (

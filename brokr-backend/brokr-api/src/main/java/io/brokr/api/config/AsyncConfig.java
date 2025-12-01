@@ -112,11 +112,17 @@ public class AsyncConfig implements AsyncConfigurer {
         // Max pool: limit concurrent Kafka API calls to prevent broker overload
         executor.setMaxPoolSize(20);
         
-        // Small queue: prefer rejection over backlog for Kafka operations
-        executor.setQueueCapacity(50);
+        // Larger queue to buffer operations during peak load
+        // This prevents task rejection while still controlling parallelism
+        executor.setQueueCapacity(200);
         
         executor.setThreadNamePrefix("kafka-ops-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        
+        // Use DiscardOldestPolicy for Kafka operations:
+        // - Newer offset requests are more valuable than stale ones
+        // - This provides graceful degradation under load
+        // - Unlike CallerRunsPolicy, won't block web request threads
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardOldestPolicy());
         executor.setKeepAliveSeconds(60);
         executor.setAllowCoreThreadTimeOut(true);
         

@@ -30,6 +30,11 @@ public class KafkaAdminService {
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
     private final Executor kafkaOperationsExecutor;
     
+    /**
+     * Constructor with explicit injection instead of @RequiredArgsConstructor.
+     * This is required to use @Qualifier on the kafkaOperationsExecutor parameter,
+     * which Lombok's @RequiredArgsConstructor cannot handle.
+     */
     public KafkaAdminService(
             KafkaConnectionService kafkaConnectionService,
             TopicMetricsService topicMetricsService,
