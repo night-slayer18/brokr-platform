@@ -81,6 +81,7 @@ class OrganizationApiServiceTest {
         verify(organizationRepository).save(any(OrganizationEntity.class));
         
         // Verify Environment save
+        @SuppressWarnings("unchecked")
         ArgumentCaptor<List<EnvironmentEntity>> envCaptor = ArgumentCaptor.forClass(List.class);
         verify(environmentRepository).saveAll(envCaptor.capture());
         

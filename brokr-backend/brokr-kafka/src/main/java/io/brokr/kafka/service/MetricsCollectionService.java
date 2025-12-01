@@ -173,15 +173,6 @@ public class MetricsCollectionService {
         }
     }
     
-    /**
-     * Collect topic metrics for a cluster - OPTIMIZED batch operation
-     * PERFORMANCE FIX: Eliminated N+1 query problem
-     * 
-     * Old implementation: 3N Kafka API calls (3 per topic)
-     * New implementation: 3 Kafka API calls total (batch all topics)
-     * 
-     * For 1000 topics: 3000+ calls -> 3 calls (1000x improvement!)
-     */
     private List<TopicMetrics> collectTopicMetrics(KafkaCluster cluster) {
         try {
             // Batch fetch all topics (basic info)
@@ -196,8 +187,6 @@ public class MetricsCollectionService {
                     .map(Topic::getName)
                     .collect(Collectors.toList());
             
-            // PERFORMANCE FIX: Batch fetch detailed info for ALL topics at once
-            // This makes only 3 Kafka API calls instead of 3N
             Map<String, Topic> detailedTopics = kafkaAdminService.getTopicsBatch(cluster, topicNames);
             
             LocalDateTime now = LocalDateTime.now();
@@ -245,6 +234,7 @@ public class MetricsCollectionService {
      * @param timestamp The timestamp for this metrics collection
      * @return TopicMetrics object or null if calculation fails
      */
+    @SuppressWarnings("unchecked")
     private TopicMetrics calculateTopicMetrics(KafkaCluster cluster, Topic topic, LocalDateTime timestamp) {
         try {
             // Topic already has detailed partition info from batch fetch

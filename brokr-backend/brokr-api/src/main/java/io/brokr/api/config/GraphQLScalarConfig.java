@@ -67,6 +67,7 @@ public class GraphQLScalarConfig {
                 .name("Map")
                 .description("A custom scalar that represents a map/dictionary")
                 .coercing(new Coercing<Map<String, Object>, Map<String, Object>>() {
+                    @SuppressWarnings("unchecked")
                     @Override
                     public Map<String, Object> serialize(Object dataFetcherResult) throws CoercingSerializeException {
                         if (dataFetcherResult instanceof Map) {
@@ -75,6 +76,7 @@ public class GraphQLScalarConfig {
                         throw new CoercingSerializeException("Expected a Map value");
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     public Map<String, Object> parseValue(Object input) throws CoercingParseValueException {
                         if (input instanceof Map) {
@@ -83,6 +85,7 @@ public class GraphQLScalarConfig {
                         throw new CoercingParseValueException("Expected a Map value");
                     }
 
+                    @SuppressWarnings("unchecked")
                     @Override
                     public Map<String, Object> parseLiteral(Object input) throws CoercingParseLiteralException {
                         if (input instanceof Map) {

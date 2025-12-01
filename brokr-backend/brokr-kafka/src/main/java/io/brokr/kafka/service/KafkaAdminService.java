@@ -3,13 +3,13 @@ package io.brokr.kafka.service;
 import io.brokr.core.model.PartitionInfo;
 import io.brokr.core.model.TopicPartition;
 import io.brokr.core.model.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.errors.*;
 import org.apache.kafka.common.config.ConfigResource;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -17,10 +17,10 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class KafkaAdminService {
 
@@ -28,6 +28,25 @@ public class KafkaAdminService {
     private final TopicMetricsService topicMetricsService;
     private final TopicMetricsCache topicMetricsCache;
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
+    private final Executor kafkaOperationsExecutor;
+    
+    /**
+     * Constructor with explicit injection instead of @RequiredArgsConstructor.
+     * This is required to use @Qualifier on the kafkaOperationsExecutor parameter,
+     * which Lombok's @RequiredArgsConstructor cannot handle.
+     */
+    public KafkaAdminService(
+            KafkaConnectionService kafkaConnectionService,
+            TopicMetricsService topicMetricsService,
+            TopicMetricsCache topicMetricsCache,
+            ConsumerGroupMetricsService consumerGroupMetricsService,
+            @Qualifier("kafkaOperationsExecutor") Executor kafkaOperationsExecutor) {
+        this.kafkaConnectionService = kafkaConnectionService;
+        this.topicMetricsService = topicMetricsService;
+        this.topicMetricsCache = topicMetricsCache;
+        this.consumerGroupMetricsService = consumerGroupMetricsService;
+        this.kafkaOperationsExecutor = kafkaOperationsExecutor;
+    }
 
     @Retryable(
             retryFor = {ExecutionException.class, InterruptedException.class},
@@ -697,7 +716,7 @@ public class KafkaAdminService {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
 
-            // Step 1: Get offsets for all groups in parallel
+            // Step 1: Get offsets for all groups in parallel using dedicated executor
             List<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>> groupOffsetFutures =
                     groupIds.stream()
                             .<CompletableFuture<Map.Entry<String, Map<org.apache.kafka.common.TopicPartition, OffsetAndMetadata>>>>map(groupId -> 
@@ -711,7 +730,7 @@ public class KafkaAdminService {
                                         log.warn("Failed to get offsets for group {}: {}", groupId, e.getMessage());
                                         return Map.entry(groupId, new HashMap<>());
                                     }
-                                }))
+                                }, kafkaOperationsExecutor))
                             .collect(Collectors.toList());
 
             // Wait for all group offset requests to complete

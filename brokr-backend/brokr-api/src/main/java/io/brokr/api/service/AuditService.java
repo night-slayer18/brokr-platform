@@ -281,6 +281,7 @@ public class AuditService {
         return builder.build();
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> convertToMap(Object obj) {
         if (obj == null) {
             return new HashMap<>();
@@ -346,6 +347,7 @@ public class AuditService {
             
             // For maps (like properties), only include non-sensitive keys
             if (value instanceof Map) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> mapValue = (Map<String, Object>) value;
                 if (mapValue.isEmpty()) {
                     continue;

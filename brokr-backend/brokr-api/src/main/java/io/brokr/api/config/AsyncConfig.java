@@ -97,5 +97,39 @@ public class AsyncConfig implements AsyncConfigurer {
         
         return executor;
     }
+    
+    /**
+     * Dedicated thread pool for Kafka admin operations (consumer group offsets, topic descriptions).
+     * Controls parallelism for batch Kafka API calls to prevent overwhelming the broker.
+     */
+    @Bean(name = "kafkaOperationsExecutor")
+    public Executor kafkaOperationsExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        
+        // Core pool: sized for typical batch operations
+        executor.setCorePoolSize(5);
+        
+        // Max pool: limit concurrent Kafka API calls to prevent broker overload
+        executor.setMaxPoolSize(20);
+        
+        // Larger queue to buffer operations during peak load
+        // This prevents task rejection while still controlling parallelism
+        executor.setQueueCapacity(200);
+        
+        executor.setThreadNamePrefix("kafka-ops-");
+        
+        // Use DiscardOldestPolicy for Kafka operations:
+        // - Newer offset requests are more valuable than stale ones
+        // - This provides graceful degradation under load
+        // - Unlike CallerRunsPolicy, won't block web request threads
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardOldestPolicy());
+        executor.setKeepAliveSeconds(60);
+        executor.setAllowCoreThreadTimeOut(true);
+        
+        executor.initialize();
+        log.info("Kafka operations executor initialized: core={}, max={}, queue={}", 
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
+        
+        return executor;
+    }
 }
-
