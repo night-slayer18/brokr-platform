@@ -1,5 +1,6 @@
 package io.brokr.security.service;
 
+import io.brokr.core.exception.UnauthorizedException;
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
 import io.brokr.security.model.ApiKeyAuthenticationToken;
@@ -92,10 +93,9 @@ public class AuthorizationService {
         }
 
         // This should never happen - JwtAuthenticationFilter always sets BrokrUserDetails
-        throw new IllegalStateException(
-                String.format("Unexpected principal type in JWT authentication: %s. " +
-                        "Expected BrokrUserDetails. This indicates a bug in authentication setup.",
-                        principal != null ? principal.getClass().getName() : "null"));
+        // If principal is a String (e.g. "anonymousUser"), it means the user is not authenticated
+        // Throw UnauthorizedException so the frontend receives a 401/Unauthorized error and can redirect to login
+        throw new UnauthorizedException("Unauthorized: User is not authenticated. Please log in again.");
     }
     
     /**

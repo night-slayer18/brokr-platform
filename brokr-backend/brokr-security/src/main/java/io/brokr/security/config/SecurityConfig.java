@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Slf4j
 @Configuration
@@ -65,6 +66,15 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
+                // Custom entry point to return 401 instead of 403 for unauthenticated requests
+                // This ensures /auth/validate returns 401 when no JWT cookie is present
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+                        })
+                )
                 // API key filter runs FIRST (before JWT filter)
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // JWT filter runs second (after API key filter, before UsernamePasswordAuthenticationFilter)
@@ -77,6 +87,9 @@ public class SecurityConfig {
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
+        // CRITICAL: Always store UserDetails (BrokrUserDetails) as principal, not username string
+        // This ensures AuthorizationService.getCurrentUser() can safely cast to BrokrUserDetails
+        authProvider.setForcePrincipalAsString(false);
         return authProvider;
     }
 

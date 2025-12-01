@@ -141,8 +141,12 @@ export const graphqlClient = new Proxy({} as GraphQLClient, {
             return value.bind(client);
         }
         return value;
-    },
-});
+    }
+})
+
+// Global flag to prevent multiple simultaneous logout attempts
+// when multiple GraphQL queries fail with 401 at the same time
+let isLoggingOut = false
 
 // Helper function to execute GraphQL requests with error handling
 async function executeRequest<TData = unknown, TVariables = unknown>(
@@ -167,7 +171,12 @@ async function executeRequest<TData = unknown, TVariables = unknown>(
 
                     // Handle unauthorized errors (expired token or invalid session)
                     if (err.message?.includes('Unauthorized') || err.message?.includes('401') || err.message?.includes('authentication') || err.message?.includes('Forbidden')) {
-
+                        // Prevent multiple logout attempts
+                        if (isLoggingOut) {
+                            return // Already logging out, skip
+                        }
+                        
+                        isLoggingOut = true
                         const authStore = useAuthStore.getState();
                         
                         // Ensure logout completes before redirect
@@ -180,6 +189,9 @@ async function executeRequest<TData = unknown, TVariables = unknown>(
                             if (typeof window !== 'undefined') {
                                 window.location.href = '/login';
                             }
+                        }).finally(() => {
+                            // Reset flag after redirect (might not execute due to navigation)
+                            isLoggingOut = false
                         });
                         
                         throw new Error('Your session has expired. Please log in again.');
