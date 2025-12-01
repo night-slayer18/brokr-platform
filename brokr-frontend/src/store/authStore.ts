@@ -20,8 +20,9 @@ interface AuthState {
     user: User | null
     isAuthenticated: boolean
     login: (user: User) => void
-    logout: () => void
+    logout: () => Promise<void>
     updateUser: (user: User) => void
+    validateSession: () => Promise<boolean>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -51,6 +52,45 @@ export const useAuthStore = create<AuthState>()(
                 // Invalidate all queries to refetch with new user data
                 queryClient.invalidateQueries()
                 set({user})
+            },
+            /**
+             * Validates if the current session is still valid on the backend.
+             * This prevents the split-brain issue where localStorage shows user as logged in
+             * but the backend JWT cookie has expired.
+             * 
+             * Call this on app startup to detect expired sessions immediately.
+             */
+            validateSession: async () => {
+                const state = useAuthStore.getState()
+                
+                // If not authenticated in frontend state, no need to validate
+                if (!state.isAuthenticated || !state.user) {
+                    return false
+                }
+                
+                try {
+                    // Ping a lightweight endpoint to check if session is valid
+                    const response = await fetch('/auth/validate', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                    })
+                    
+                    if (!response.ok) {
+                        // Session invalid - clear state
+                        console.warn('Session validation failed, clearing auth state')
+                        set({user: null, isAuthenticated: false})
+                        queryClient.clear()
+                        return false
+                    }
+                    
+                    return true
+                } catch (error) {
+                    // Network error or session invalid - clear state to be safe
+                    console.error('Session validation error:', error)
+                    set({user: null, isAuthenticated: false})
+                    queryClient.clear()
+                    return false
+                }
             },
         }),
         {

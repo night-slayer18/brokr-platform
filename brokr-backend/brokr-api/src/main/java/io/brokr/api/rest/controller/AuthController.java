@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -82,6 +83,22 @@ public class AuthController {
         
         Map<String, String> result = new HashMap<>();
         result.put("message", "Logged out successfully");
+        return result;
+    }
+
+    /**
+     * Validates if the current JWT session is still valid.
+     * This is a lightweight endpoint used by the frontend to check token expiry on app load.
+     * Prevents split-brain issue where localStorage shows user as logged in but JWT has expired.
+     * 
+     * @return 200 OK if session valid, 401 Unauthorized if expired/invalid
+     */
+    @GetMapping("/validate")
+    public Map<String, Object> validateSession() {
+        // If this endpoint is reached, the JWT filter has already validated the token
+        // and set the authentication in SecurityContext. Just return success.
+        Map<String, Object> result = new HashMap<>();
+        result.put("valid", true);
         return result;
     }
 

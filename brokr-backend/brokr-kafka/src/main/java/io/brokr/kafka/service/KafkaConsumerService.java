@@ -381,7 +381,6 @@ public class KafkaConsumerService {
             java.util.function.Consumer<ReplayProgress> progressCallback,
             String jobId) {
         
-        long startTime = System.currentTimeMillis();
         Properties props = buildConsumerPropertiesForReplay(cluster, batchSize, jobId);
         
         long messagesProcessed = 0;

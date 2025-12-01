@@ -38,8 +38,11 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers("/auth/**").permitAll()
+                        // Public auth endpoints (login, logout, register)
+                        .requestMatchers("/auth/login", "/auth/logout", "/auth/register").permitAll()
+                        // Protected auth endpoints (require authentication)
+                        .requestMatchers("/auth/validate").authenticated()
+                        // Other public endpoints
                         .requestMatchers("/actuator/health").permitAll()
 
                         // GraphQL endpoints - rely on method-level security (@PreAuthorize)

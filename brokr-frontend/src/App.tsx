@@ -20,6 +20,8 @@ import KafkaConnectDetailPage from './pages/KafkaConnectDetailPage'
 import KafkaStreamsDetailPage from './pages/KafkaStreamsDetailPage'
 import KsqlDBDetailPage from './pages/KsqlDBDetailPage'
 import CreateClusterPage from './pages/CreateClusterPage'
+import { useEffect } from 'react'
+import { useAuthStore } from './store/authStore'
 
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
@@ -36,6 +38,10 @@ import ApiKeysPage from './pages/ApiKeysPage';
 import ApiKeyDetailPage from './pages/ApiKeyDetailPage';
 
 function App() {
+    const validateSession = useAuthStore(state => state.validateSession)
+    useEffect(() => {
+        validateSession()
+    }, [validateSession])
     return (
         <>
             <Routes>

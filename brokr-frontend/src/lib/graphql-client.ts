@@ -2,6 +2,7 @@ import {GraphQLClient} from 'graphql-request';
 import type {DocumentNode} from 'graphql';
 import {print} from 'graphql';
 import {extractErrorMessage} from './error-utils';
+import {useAuthStore} from '@/store/authStore';
 
 // Get GraphQL endpoint URL - handle both dev and production environments
 function getGraphQLEndpoint(): string {
@@ -164,13 +165,24 @@ async function executeRequest<TData = unknown, TVariables = unknown>(
                         `[GraphQL error]: Message: ${err.message}, Location: ${err.locations}, Path: ${err.path}`
                     );
 
-                    // Handle unauthorized errors
-                    if (err.message?.includes('Unauthorized') || err.message?.includes('401') || err.message?.includes('authentication')) {
-                        // Clear auth state and redirect to login
-                        if (typeof window !== 'undefined') {
-                            window.location.href = '/login';
-                        }
-                        throw new Error('Unauthorized. Please log in again.');
+                    // Handle unauthorized errors (expired token or invalid session)
+                    if (err.message?.includes('Unauthorized') || err.message?.includes('401') || err.message?.includes('authentication') || err.message?.includes('Forbidden')) {
+
+                        const authStore = useAuthStore.getState();
+                        
+                        // Ensure logout completes before redirect
+                        authStore.logout().then(() => {
+                            if (typeof window !== 'undefined') {
+                                window.location.href = '/login';
+                            }
+                        }).catch((logoutError) => {
+                            console.error('Logout failed during 401 handling:', logoutError);
+                            if (typeof window !== 'undefined') {
+                                window.location.href = '/login';
+                            }
+                        });
+                        
+                        throw new Error('Your session has expired. Please log in again.');
                     }
                 });
             }
