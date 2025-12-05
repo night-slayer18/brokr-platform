@@ -27,4 +27,12 @@ public class KafkaClusterInput {
     private String sslKeystoreLocation;
     private String sslKeystorePassword;
     private String sslKeyPassword;
+    
+    // JMX configuration for broker monitoring
+    private Boolean jmxEnabled;
+    private Integer jmxPort;
+    private Boolean jmxAuthentication;
+    private String jmxUsername;
+    private String jmxPassword;
+    private Boolean jmxSsl;
 }

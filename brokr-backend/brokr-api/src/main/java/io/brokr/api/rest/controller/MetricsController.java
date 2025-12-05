@@ -1,6 +1,7 @@
 package io.brokr.api.rest.controller;
 
 import io.brokr.api.service.MetricsApiService;
+import io.brokr.core.model.BrokerMetrics;
 import io.brokr.core.model.ClusterMetrics;
 import io.brokr.core.model.ConsumerGroupMetrics;
 import io.brokr.core.model.TopicMetrics;
@@ -53,5 +54,40 @@ public class MetricsController {
             @RequestParam(defaultValue = "1000") int limit) {
         return metricsApiService.getClusterMetrics(clusterId, startTime, endTime, limit);
     }
+    
+    /**
+     * Get broker metrics for all brokers in a cluster within a time range.
+     */
+    @GetMapping("/brokers/{clusterId}")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> getBrokerMetrics(
+            @PathVariable String clusterId,
+            @RequestParam long startTime,
+            @RequestParam long endTime,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return metricsApiService.getBrokerMetrics(clusterId, startTime, endTime, limit);
+    }
+    
+    /**
+     * Get broker metrics for a specific broker within a time range.
+     */
+    @GetMapping("/brokers/{clusterId}/{brokerId}")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> getBrokerMetricsByBroker(
+            @PathVariable String clusterId,
+            @PathVariable int brokerId,
+            @RequestParam long startTime,
+            @RequestParam long endTime,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return metricsApiService.getBrokerMetricsByBroker(clusterId, brokerId, startTime, endTime, limit);
+    }
+    
+    /**
+     * Get the latest broker metrics for all brokers in a cluster.
+     */
+    @GetMapping("/brokers/{clusterId}/latest")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> getLatestBrokerMetrics(@PathVariable String clusterId) {
+        return metricsApiService.getLatestBrokerMetrics(clusterId);
+    }
 }
-

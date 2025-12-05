@@ -606,3 +606,9 @@ export const CONFIGURE_API_KEY_RATE_LIMITS_MUTATION = gql`
         }
     }
 `
+
+export const TEST_JMX_CONNECTION_MUTATION = gql`
+    mutation TestJmxConnection($clusterId: ID!) {
+        testJmxConnection(clusterId: $clusterId)
+    }
+`

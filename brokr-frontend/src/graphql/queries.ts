@@ -1001,3 +1001,84 @@ export const GET_API_KEY_RATE_LIMITS = gql`
         }
     }
 `
+
+export const GET_BROKER_METRICS = gql`
+    query GetBrokerMetrics($clusterId: ID!, $timeRange: MetricsTimeRangeInput!, $limit: Int) {
+        brokerMetrics(clusterId: $clusterId, timeRange: $timeRange, limit: $limit) {
+            id
+            clusterId
+            brokerId
+            cpuUsagePercent
+            memoryUsedBytes
+            memoryMaxBytes
+            diskUsedBytes
+            diskTotalBytes
+            bytesInPerSecond
+            bytesOutPerSecond
+            messagesInPerSecond
+            requestsPerSecond
+            leaderPartitionCount
+            replicaPartitionCount
+            underReplicatedPartitions
+            offlinePartitions
+            isController
+            isHealthy
+            lastError
+            timestamp
+        }
+    }
+`
+
+export const GET_LATEST_BROKER_METRICS = gql`
+    query GetLatestBrokerMetrics($clusterId: ID!) {
+        latestBrokerMetrics(clusterId: $clusterId) {
+            id
+            clusterId
+            brokerId
+            cpuUsagePercent
+            memoryUsedBytes
+            memoryMaxBytes
+            diskUsedBytes
+            diskTotalBytes
+            bytesInPerSecond
+            bytesOutPerSecond
+            messagesInPerSecond
+            requestsPerSecond
+            leaderPartitionCount
+            replicaPartitionCount
+            underReplicatedPartitions
+            offlinePartitions
+            isController
+            isHealthy
+            lastError
+            timestamp
+        }
+    }
+`
+
+export const GET_BROKER_METRICS_BY_BROKER = gql`
+    query GetBrokerMetricsByBroker($clusterId: ID!, $brokerId: Int!, $timeRange: MetricsTimeRangeInput!, $limit: Int) {
+        brokerMetricsByBroker(clusterId: $clusterId, brokerId: $brokerId, timeRange: $timeRange, limit: $limit) {
+            id
+            clusterId
+            brokerId
+            cpuUsagePercent
+            memoryUsedBytes
+            memoryMaxBytes
+            diskUsedBytes
+            diskTotalBytes
+            bytesInPerSecond
+            bytesOutPerSecond
+            messagesInPerSecond
+            requestsPerSecond
+            leaderPartitionCount
+            replicaPartitionCount
+            underReplicatedPartitions
+            offlinePartitions
+            isController
+            isHealthy
+            lastError
+            timestamp
+        }
+    }
+`

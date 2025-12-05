@@ -136,6 +136,11 @@ type KafkaCluster {
     lastConnectionError: String
     lastConnectionCheck: Long!
     brokers: [BrokerNode!]
+
+    # JMX Configuration for broker monitoring
+    jmxEnabled: Boolean!
+    jmxPort: Int
+    jmxSsl: Boolean
 }
 
 type BrokerNode {
@@ -143,6 +148,33 @@ type BrokerNode {
     host: String!
     port: Int!
     rack: String
+}
+
+type BrokerMetrics {
+    id: ID!
+    clusterId: ID!
+    brokerId: Int!
+    # Resource metrics (from JMX - null if not available)
+    cpuUsagePercent: Float
+    memoryUsedBytes: Long
+    memoryMaxBytes: Long
+    diskUsedBytes: Long
+    diskTotalBytes: Long
+    # Throughput metrics (from JMX)
+    bytesInPerSecond: Long
+    bytesOutPerSecond: Long
+    messagesInPerSecond: Long
+    requestsPerSecond: Long
+    # Partition metrics (from Admin API)
+    leaderPartitionCount: Int
+    replicaPartitionCount: Int
+    underReplicatedPartitions: Int
+    offlinePartitions: Int
+    # Health status
+    isController: Boolean
+    isHealthy: Boolean
+    lastError: String
+    timestamp: Long!
 }
 
 type Topic {
@@ -658,6 +690,13 @@ input KafkaClusterInput {
     sslKeystoreLocation: String
     sslKeystorePassword: String
     sslKeyPassword: String
+    # JMX Configuration for broker monitoring
+    jmxEnabled: Boolean
+    jmxPort: Int
+    jmxAuthentication: Boolean
+    jmxUsername: String
+    jmxPassword: String
+    jmxSsl: Boolean
 }
 
 input TopicInput {
@@ -1011,6 +1050,11 @@ type Query {
     consumerGroupMetrics(clusterId: ID!, consumerGroupId: String!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [ConsumerGroupMetrics!]!
     clusterMetrics(clusterId: ID!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [ClusterMetrics!]!
     
+    # Broker Metrics queries
+    brokerMetrics(clusterId: ID!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [BrokerMetrics!]!
+    brokerMetricsByBroker(clusterId: ID!, brokerId: Int!, timeRange: MetricsTimeRangeInput!, limit: Int = 1000): [BrokerMetrics!]!
+    latestBrokerMetrics(clusterId: ID!): [BrokerMetrics!]!
+    
     # ksqlDB Query History
     ksqlQueryHistory(ksqlDBId: ID!, filter: KsqlQueryFilter, pagination: KsqlQueryPagination): KsqlQueryHistoryPage!
     ksqlQueryHistoryById(id: ID!): KsqlQueryHistory
@@ -1075,6 +1119,7 @@ type Mutation {
     updateCluster(id: ID!, input: KafkaClusterInput!): KafkaCluster!
     deleteCluster(id: ID!): Boolean!
     testClusterConnection(id: ID!): Boolean!
+    testJmxConnection(clusterId: ID!): Boolean!
 
     # Topic mutations
     createTopic(clusterId: ID!, input: TopicInput!): Topic!

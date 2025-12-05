@@ -38,6 +38,14 @@ public class KafkaCluster {
     private String lastConnectionError;
     private long lastConnectionCheck;
 
+    // JMX Configuration for broker monitoring
+    private boolean jmxEnabled;
+    private Integer jmxPort;
+    private boolean jmxAuthentication;
+    private String jmxUsername;
+    private String jmxPassword;
+    private boolean jmxSsl;
+
     // Associated components
     private List<SchemaRegistry> schemaRegistries;
     private List<KafkaConnect> kafkaConnects;

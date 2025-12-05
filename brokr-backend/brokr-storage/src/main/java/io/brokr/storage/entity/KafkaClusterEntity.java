@@ -83,6 +83,25 @@ public class KafkaClusterEntity {
     @Column(name = "last_connection_check")
     private long lastConnectionCheck;
 
+    // JMX Configuration for broker monitoring
+    @Column(name = "jmx_enabled")
+    private boolean jmxEnabled;
+
+    @Column(name = "jmx_port")
+    private Integer jmxPort;
+
+    @Column(name = "jmx_authentication")
+    private boolean jmxAuthentication;
+
+    @Column(name = "jmx_username")
+    private String jmxUsername;
+
+    @Column(name = "jmx_password")
+    private String jmxPassword;
+
+    @Column(name = "jmx_ssl")
+    private boolean jmxSsl;
+
     public KafkaCluster toDomain() {
         return KafkaCluster.builder()
                 .id(id)
@@ -105,6 +124,12 @@ public class KafkaClusterEntity {
                 .isReachable(isReachable)
                 .lastConnectionError(lastConnectionError)
                 .lastConnectionCheck(lastConnectionCheck)
+                .jmxEnabled(jmxEnabled)
+                .jmxPort(jmxPort)
+                .jmxAuthentication(jmxAuthentication)
+                .jmxUsername(jmxUsername)
+                .jmxPassword(jmxPassword)
+                .jmxSsl(jmxSsl)
                 .build();
     }
 
@@ -130,6 +155,12 @@ public class KafkaClusterEntity {
                 .isReachable(cluster.isReachable())
                 .lastConnectionError(cluster.getLastConnectionError())
                 .lastConnectionCheck(cluster.getLastConnectionCheck())
+                .jmxEnabled(cluster.isJmxEnabled())
+                .jmxPort(cluster.getJmxPort())
+                .jmxAuthentication(cluster.isJmxAuthentication())
+                .jmxUsername(cluster.getJmxUsername())
+                .jmxPassword(cluster.getJmxPassword())
+                .jmxSsl(cluster.isJmxSsl())
                 .build();
     }
 }

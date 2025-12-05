@@ -20,12 +20,15 @@ public class MetricsCollectionService {
     private static final int METRICS_COLLECTION_TIMEOUT_SECONDS = 300; // 5 minutes per cluster
     private static final int MAX_TOPICS_PER_BATCH = 1000; // Process topics in batches for very large clusters
     private static final int MAX_CONSUMER_GROUPS_PER_BATCH = 500; // Process consumer groups in batches
+    private static final int MAX_BROKERS_PER_BATCH = 50; // Process brokers in batches to avoid JMX connection overload
     
     private final KafkaClusterRepository clusterRepository;
     private final KafkaAdminService kafkaAdminService;
     private final TopicMetricsService topicMetricsService;
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
     private final ClusterMetricsService clusterMetricsService;
+    private final BrokerMetricsService brokerMetricsService;
+    private final JmxConnectionService jmxConnectionService;
     private final Executor metricsExecutor;
     private final TopicMetricsCache topicMetricsCache;
     
@@ -35,6 +38,8 @@ public class MetricsCollectionService {
             TopicMetricsService topicMetricsService,
             ConsumerGroupMetricsService consumerGroupMetricsService,
             ClusterMetricsService clusterMetricsService,
+            BrokerMetricsService brokerMetricsService,
+            JmxConnectionService jmxConnectionService,
             @Qualifier("metricsCollectionExecutor") Executor metricsExecutor,
             TopicMetricsCache topicMetricsCache) {
         this.clusterRepository = clusterRepository;
@@ -42,6 +47,8 @@ public class MetricsCollectionService {
         this.topicMetricsService = topicMetricsService;
         this.consumerGroupMetricsService = consumerGroupMetricsService;
         this.clusterMetricsService = clusterMetricsService;
+        this.brokerMetricsService = brokerMetricsService;
+        this.jmxConnectionService = jmxConnectionService;
         this.metricsExecutor = metricsExecutor;
         this.topicMetricsCache = topicMetricsCache;
     }
@@ -99,21 +106,25 @@ public class MetricsCollectionService {
         try {
             log.debug("Collecting metrics for cluster: {}", cluster.getName());
             
-            // Collect topic and consumer group metrics in parallel
+            // Collect topic, consumer group, and broker metrics in parallel
             CompletableFuture<List<TopicMetrics>> topicMetricsFuture = 
                     CompletableFuture.supplyAsync(() -> collectTopicMetrics(cluster), metricsExecutor);
             
             CompletableFuture<List<ConsumerGroupMetrics>> consumerGroupMetricsFuture = 
                     CompletableFuture.supplyAsync(() -> collectConsumerGroupMetrics(cluster), metricsExecutor);
             
-            // Wait for topic and consumer group metrics to complete first
+            CompletableFuture<List<BrokerMetrics>> brokerMetricsFuture = 
+                    CompletableFuture.supplyAsync(() -> collectBrokerMetrics(cluster), metricsExecutor);
+            
+            // Wait for all metrics to complete
             try {
-                CompletableFuture.allOf(topicMetricsFuture, consumerGroupMetricsFuture)
+                CompletableFuture.allOf(topicMetricsFuture, consumerGroupMetricsFuture, brokerMetricsFuture)
                         .get(METRICS_COLLECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 
-                // Get topic and consumer group metrics
+                // Get all metrics
                 List<TopicMetrics> topicMetrics = topicMetricsFuture.get();
                 List<ConsumerGroupMetrics> consumerGroupMetrics = consumerGroupMetricsFuture.get();
+                List<BrokerMetrics> brokerMetrics = brokerMetricsFuture.get();
                 
                 // Calculate cluster metrics AFTER topic metrics are collected (to aggregate throughput)
                 ClusterMetrics clusterMetrics = collectClusterMetrics(cluster, topicMetrics);
@@ -156,12 +167,19 @@ public class MetricsCollectionService {
                     clusterMetricsService.saveMetrics(clusterMetrics);
                     log.debug("Saved cluster metrics for cluster: {}", cluster.getName());
                 }
+                
+                // Save broker metrics
+                if (!brokerMetrics.isEmpty()) {
+                    brokerMetricsService.saveAllMetrics(brokerMetrics);
+                    log.debug("Saved {} broker metrics for cluster: {}", brokerMetrics.size(), cluster.getName());
+                }
             } catch (TimeoutException e) {
                 log.error("Metrics collection timeout for cluster: {} after {} seconds", 
                         cluster.getName(), METRICS_COLLECTION_TIMEOUT_SECONDS);
                 // Cancel futures to free resources
                 topicMetricsFuture.cancel(true);
                 consumerGroupMetricsFuture.cancel(true);
+                brokerMetricsFuture.cancel(true);
             } catch (Exception e) {
                 log.error("Failed to save metrics for cluster: {}", cluster.getName(), e);
             }
@@ -473,5 +491,104 @@ public class MetricsCollectionService {
         }
     }
     
+    /**
+     * Collect broker-level metrics for a cluster.
+     * Uses Admin API for partition metrics and JMX for resource metrics if enabled.
+     */
+    private List<BrokerMetrics> collectBrokerMetrics(KafkaCluster cluster) {
+        try {
+            // Get all brokers from Admin API
+            List<BrokerNode> brokers = kafkaAdminService.getClusterNodes(cluster);
+            
+            if (brokers == null || brokers.isEmpty()) {
+                return Collections.emptyList();
+            }
+            
+            // Get partition distribution info from Admin API (single batch call)
+            Map<Integer, BrokerPartitionInfo> partitionInfo = kafkaAdminService.getBrokerPartitionInfo(cluster);
+            
+            // Get controller ID
+            int controllerId = kafkaAdminService.getControllerId(cluster);
+            
+            LocalDateTime now = LocalDateTime.now();
+            List<BrokerMetrics> metricsList = new ArrayList<>();
+            
+            // Process brokers in batches to avoid overwhelming JMX connections
+            for (int batchStart = 0; batchStart < brokers.size(); batchStart += MAX_BROKERS_PER_BATCH) {
+                int batchEnd = Math.min(batchStart + MAX_BROKERS_PER_BATCH, brokers.size());
+                List<BrokerNode> batch = brokers.subList(batchStart, batchEnd);
+                
+                for (BrokerNode broker : batch) {
+                    try {
+                        BrokerMetrics.BrokerMetricsBuilder metricsBuilder = BrokerMetrics.builder()
+                                .id(UUID.randomUUID().toString())
+                                .clusterId(cluster.getId())
+                                .brokerId(broker.getId())
+                                .timestamp(now);
+                        
+                        // Set partition metrics from Admin API (always available)
+                        BrokerPartitionInfo bpi = partitionInfo.get(broker.getId());
+                        if (bpi != null) {
+                            metricsBuilder.leaderPartitionCount(bpi.getLeaderCount());
+                            metricsBuilder.replicaPartitionCount(bpi.getReplicaCount());
+                            metricsBuilder.underReplicatedPartitions(bpi.getUnderReplicatedCount());
+                            metricsBuilder.offlinePartitions(bpi.getOfflineCount());
+                        } else {
+                            metricsBuilder.leaderPartitionCount(0);
+                            metricsBuilder.replicaPartitionCount(0);
+                            metricsBuilder.underReplicatedPartitions(0);
+                            metricsBuilder.offlinePartitions(0);
+                        }
+                        
+                        // Set controller status
+                        metricsBuilder.isController(broker.getId() == controllerId);
+                        
+                        // Collect JMX metrics if enabled
+                        if (cluster.isJmxEnabled() && cluster.getJmxPort() != null) {
+                            BrokerJmxMetrics jmxMetrics = 
+                                    jmxConnectionService.collectMetrics(cluster, broker.getHost(), cluster.getJmxPort());
+                            
+                            if (jmxMetrics != null) {
+                                metricsBuilder.cpuUsagePercent(jmxMetrics.getCpuUsagePercent());
+                                metricsBuilder.memoryUsedBytes(jmxMetrics.getMemoryUsedBytes());
+                                metricsBuilder.memoryMaxBytes(jmxMetrics.getMemoryMaxBytes());
+                                metricsBuilder.diskUsedBytes(jmxMetrics.getDiskUsedBytes());
+                                metricsBuilder.diskTotalBytes(jmxMetrics.getDiskTotalBytes());
+                                metricsBuilder.bytesInPerSecond(jmxMetrics.getBytesInPerSecond());
+                                metricsBuilder.bytesOutPerSecond(jmxMetrics.getBytesOutPerSecond());
+                                metricsBuilder.messagesInPerSecond(jmxMetrics.getMessagesInPerSecond());
+                                metricsBuilder.requestsPerSecond(jmxMetrics.getRequestsPerSecond());
+                                metricsBuilder.isHealthy(true);
+                            } else {
+                                // JMX collection failed but broker might still be healthy
+                                metricsBuilder.isHealthy(true);
+                                metricsBuilder.lastError("JMX metrics unavailable");
+                            }
+                        } else {
+                            // JMX not enabled, broker health based on reachability
+                            metricsBuilder.isHealthy(true);
+                        }
+                        
+                        metricsList.add(metricsBuilder.build());
+                    } catch (Exception e) {
+                        log.warn("Failed to collect metrics for broker {} in cluster: {}", 
+                                broker.getId(), cluster.getName(), e);
+                        // Continue with other brokers
+                    }
+                }
+                
+                // Log batch progress for large clusters
+                if (brokers.size() > MAX_BROKERS_PER_BATCH) {
+                    log.debug("Processed broker batch {}-{}/{} for cluster: {}", 
+                            batchStart, batchEnd, brokers.size(), cluster.getName());
+                }
+            }
+            
+            log.debug("Collected metrics for {} brokers in cluster: {}", metricsList.size(), cluster.getName());
+            return metricsList;
+        } catch (Exception e) {
+            log.error("Failed to collect broker metrics for cluster: {}", cluster.getName(), e);
+            return Collections.emptyList();
+        }
+    }
 }
-

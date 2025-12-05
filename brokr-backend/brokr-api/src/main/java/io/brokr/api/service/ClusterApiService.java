@@ -4,9 +4,12 @@ import io.brokr.api.input.KafkaClusterInput;
 import io.brokr.core.exception.ResourceNotFoundException;
 import io.brokr.core.exception.ValidationException;
 import io.brokr.core.model.AuditResourceType;
+import io.brokr.core.model.BrokerNode;
 import io.brokr.core.model.KafkaCluster;
 import io.brokr.core.model.Role;
 import io.brokr.core.model.User;
+import io.brokr.kafka.service.JmxConnectionService;
+import io.brokr.kafka.service.KafkaAdminService;
 import io.brokr.kafka.service.KafkaConnectionService;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.service.ClusterDataService;
@@ -32,6 +35,8 @@ public class ClusterApiService {
     private final ClusterDataService clusterDataService;
     private final AuthorizationService authorizationService;
     private final AuditService auditService;
+    private final JmxConnectionService jmxConnectionService;
+    private final KafkaAdminService kafkaAdminService;
 
     @Transactional(readOnly = true)
     public List<KafkaCluster> listAuthorizedClusters(String organizationId, String environmentId) {
@@ -91,6 +96,13 @@ public class ClusterApiService {
                 .sslKeystoreLocation(input.getSslKeystoreLocation())
                 .sslKeystorePassword(input.getSslKeystorePassword())
                 .sslKeyPassword(input.getSslKeyPassword())
+                // JMX configuration
+                .jmxEnabled(input.getJmxEnabled() != null ? input.getJmxEnabled() : false)
+                .jmxPort(input.getJmxPort())
+                .jmxAuthentication(input.getJmxAuthentication() != null ? input.getJmxAuthentication() : false)
+                .jmxUsername(input.getJmxUsername())
+                .jmxPassword(input.getJmxPassword())
+                .jmxSsl(input.getJmxSsl() != null ? input.getJmxSsl() : false)
                 .build();
 
         boolean isReachable = kafkaConnectionService.testConnection(cluster);
@@ -135,6 +147,13 @@ public class ClusterApiService {
         entity.setSslKeystoreLocation(input.getSslKeystoreLocation());
         entity.setSslKeystorePassword(input.getSslKeystorePassword());
         entity.setSslKeyPassword(input.getSslKeyPassword());
+        // JMX configuration
+        entity.setJmxEnabled(input.getJmxEnabled() != null ? input.getJmxEnabled() : entity.isJmxEnabled());
+        entity.setJmxPort(input.getJmxPort() != null ? input.getJmxPort() : entity.getJmxPort());
+        entity.setJmxAuthentication(input.getJmxAuthentication() != null ? input.getJmxAuthentication() : entity.isJmxAuthentication());
+        entity.setJmxUsername(input.getJmxUsername() != null ? input.getJmxUsername() : entity.getJmxUsername());
+        entity.setJmxPassword(input.getJmxPassword() != null ? input.getJmxPassword() : entity.getJmxPassword());
+        entity.setJmxSsl(input.getJmxSsl() != null ? input.getJmxSsl() : entity.isJmxSsl());
 
         KafkaCluster oldCluster = entity.toDomain();
         KafkaCluster cluster = entity.toDomain();
@@ -200,5 +219,46 @@ public class ClusterApiService {
         }
         
         return reachable;
+    }
+    
+    /**
+     * Test JMX connection to all brokers in a cluster.
+     * Returns true if at least one broker is reachable via JMX.
+     */
+    @Transactional(readOnly = true)
+    public boolean testJmxConnection(String clusterId) {
+        KafkaCluster cluster = clusterRepository.findById(clusterId)
+                .map(KafkaClusterEntity::toDomain)
+                .orElseThrow(() -> new ResourceNotFoundException("Cluster not found with id: " + clusterId));
+        
+        if (!cluster.isJmxEnabled() || cluster.getJmxPort() == null) {
+            log.warn("JMX is not enabled for cluster: {}", cluster.getName());
+            return false;
+        }
+        
+        // Get brokers first
+        List<BrokerNode> brokers = kafkaAdminService.getClusterNodes(cluster);
+        if (brokers == null || brokers.isEmpty()) {
+            log.warn("No brokers found for cluster: {}", cluster.getName());
+            return false;
+        }
+        
+        // Test JMX connection to each broker
+        int successCount = 0;
+        for (BrokerNode broker : brokers) {
+            boolean connected = jmxConnectionService.testConnection(cluster, broker.getHost(), cluster.getJmxPort());
+            if (connected) {
+                successCount++;
+                log.info("JMX connection successful to broker {} ({}) in cluster: {}", 
+                        broker.getId(), broker.getHost(), cluster.getName());
+            } else {
+                log.warn("JMX connection failed to broker {} ({}) in cluster: {}", 
+                        broker.getId(), broker.getHost(), cluster.getName());
+            }
+        }
+        
+        log.info("JMX test complete for cluster {}: {}/{} brokers reachable", 
+                cluster.getName(), successCount, brokers.size());
+        return successCount > 0;
     }
 }

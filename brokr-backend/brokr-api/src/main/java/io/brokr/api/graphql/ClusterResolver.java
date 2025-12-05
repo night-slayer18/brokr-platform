@@ -157,4 +157,10 @@ public class ClusterResolver {
     public boolean testClusterConnection(@Argument String id) {
         return clusterApiService.testClusterConnection(id);
     }
+    
+    @MutationMapping
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public boolean testJmxConnection(@Argument String clusterId) {
+        return clusterApiService.testJmxConnection(clusterId);
+    }
 }

@@ -66,6 +66,9 @@ spring:
       - consumerGroupMetrics
       - clusterMetrics
       - rateLimitConfigs
+      - brokerMetrics
+      - brokerMetricsByBroker
+      - latestBrokerMetrics
 
 
 jwt:

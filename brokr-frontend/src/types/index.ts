@@ -40,6 +40,13 @@ export interface KafkaCluster {
     securityProtocol?: 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL'
     saslMechanism?: string
     saslUsername?: string
+    // JMX Configuration
+    jmxEnabled?: boolean
+    jmxPort?: number | null
+    jmxAuthentication?: boolean
+    jmxUsername?: string | null
+    jmxPassword?: string | null
+    jmxSsl?: boolean
     organization: {
         id: string
         name: string
@@ -60,6 +67,33 @@ export interface BrokerNode {
     host: string
     port: number
     rack?: string | null
+}
+
+export interface BrokerMetrics {
+    id: string
+    clusterId: string
+    brokerId: number
+    timestamp: number
+    // Resource metrics (JMX)
+    cpuUsagePercent?: number | null
+    memoryUsedBytes?: number | null
+    memoryMaxBytes?: number | null
+    diskUsedBytes?: number | null
+    diskTotalBytes?: number | null
+    // Throughput metrics
+    bytesInPerSecond?: number | null
+    bytesOutPerSecond?: number | null
+    messagesInPerSecond?: number | null
+    requestsPerSecond?: number | null
+    // Partition metrics
+    leaderPartitionCount?: number | null
+    replicaPartitionCount?: number | null
+    underReplicatedPartitions?: number | null
+    offlinePartitions?: number | null
+    // Status
+    isController?: boolean | null
+    isHealthy?: boolean | null
+    lastError?: string | null
 }
 
 export interface Topic {

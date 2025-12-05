@@ -504,6 +504,96 @@ public class KafkaAdminService {
             throw new RuntimeException("Failed to describe cluster", e);
         }
     }
+    
+    /**
+     * Get the controller broker ID for the cluster.
+     */
+    @Retryable(
+            retryFor = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
+    public int getControllerId(KafkaCluster cluster) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+            DescribeClusterResult result = adminClient.describeCluster();
+            Node controller = result.controller().get();
+            return controller != null ? controller.id() : -1;
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get controller ID for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            return -1; // Return -1 on error (no controller)
+        }
+    }
+    
+    /**
+     * Get partition distribution across brokers.
+     * Returns a map of broker ID to partition counts (leader, replica, under-replicated, offline).
+     * Single batch call for all topics - no N+1 queries.
+     */
+    @Retryable(
+            retryFor = {ExecutionException.class, InterruptedException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
+    )
+    public Map<Integer, BrokerPartitionInfo> getBrokerPartitionInfo(KafkaCluster cluster) {
+        try {
+            AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
+            
+            // Get all topics in one call
+            ListTopicsResult topicsResult = adminClient.listTopics();
+            Set<String> topicNames = topicsResult.names().get();
+            
+            if (topicNames.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            
+            // Describe all topics in one batch call
+            DescribeTopicsResult describeResult = adminClient.describeTopics(topicNames);
+            Map<String, TopicDescription> descriptions = describeResult.allTopicNames().get();
+            
+            // Aggregate partition info by broker
+            Map<Integer, BrokerPartitionInfo> brokerInfo = new HashMap<>();
+            
+            for (TopicDescription description : descriptions.values()) {
+                for (var partition : description.partitions()) {
+                    int leaderId = partition.leader().id();
+                    
+                    // Count leaders
+                    BrokerPartitionInfo leaderInfo = brokerInfo.computeIfAbsent(leaderId, id -> new BrokerPartitionInfo());
+                    leaderInfo.setLeaderCount(leaderInfo.getLeaderCount() + 1);
+                    
+                    // Count replicas
+                    for (Node replica : partition.replicas()) {
+                        BrokerPartitionInfo replicaInfo = brokerInfo.computeIfAbsent(replica.id(), id -> new BrokerPartitionInfo());
+                        replicaInfo.setReplicaCount(replicaInfo.getReplicaCount() + 1);
+                        
+                        // Check for under-replicated
+                        boolean isInSync = partition.isr().stream()
+                                .anyMatch(isr -> isr.id() == replica.id());
+                        if (!isInSync) {
+                            replicaInfo.setUnderReplicatedCount(replicaInfo.getUnderReplicatedCount() + 1);
+                        }
+                    }
+                    
+                    // Check for offline partitions (leader == -1 or no leader)
+                    if (leaderId < 0) {
+                        for (Node replica : partition.replicas()) {
+                            BrokerPartitionInfo offlineInfo = brokerInfo.computeIfAbsent(replica.id(), id -> new BrokerPartitionInfo());
+                            offlineInfo.setOfflineCount(offlineInfo.getOfflineCount() + 1);
+                        }
+                    }
+                }
+            }
+            
+            return brokerInfo;
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get broker partition info for cluster: {}", cluster.getName(), e);
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            return Collections.emptyMap();
+        }
+    }
+
 
     @Retryable(
             retryFor = {ExecutionException.class, InterruptedException.class},

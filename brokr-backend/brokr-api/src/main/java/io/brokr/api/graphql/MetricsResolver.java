@@ -65,6 +65,42 @@ public class MetricsResolver {
         return metricsApiService.getClusterMetrics(clusterId, startTime, endTime, queryLimit);
     }
     
+    // Broker Metrics queries
+    @QueryMapping
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> brokerMetrics(
+            @Argument String clusterId,
+            @Argument Map<String, Object> timeRange,
+            @Argument Integer limit) {
+        
+        int queryLimit = (limit != null && limit > 0) ? limit : 1000;
+        long startTime = ((Number) timeRange.get("startTime")).longValue();
+        long endTime = ((Number) timeRange.get("endTime")).longValue();
+        
+        return metricsApiService.getBrokerMetrics(clusterId, startTime, endTime, queryLimit);
+    }
+    
+    @QueryMapping
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> brokerMetricsByBroker(
+            @Argument String clusterId,
+            @Argument Integer brokerId,
+            @Argument Map<String, Object> timeRange,
+            @Argument Integer limit) {
+        
+        int queryLimit = (limit != null && limit > 0) ? limit : 1000;
+        long startTime = ((Number) timeRange.get("startTime")).longValue();
+        long endTime = ((Number) timeRange.get("endTime")).longValue();
+        
+        return metricsApiService.getBrokerMetricsByBroker(clusterId, brokerId, startTime, endTime, queryLimit);
+    }
+    
+    @QueryMapping
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    public List<BrokerMetrics> latestBrokerMetrics(@Argument String clusterId) {
+        return metricsApiService.getLatestBrokerMetrics(clusterId);
+    }
+    
     // Schema mappings for timestamp conversion
     @SchemaMapping(typeName = "TopicMetrics", field = "timestamp")
     public Long timestamp(TopicMetrics metrics) {
@@ -89,5 +125,12 @@ public class MetricsResolver {
         }
         return metrics.getTimestamp().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
+    
+    @SchemaMapping(typeName = "BrokerMetrics", field = "timestamp")
+    public Long timestamp(BrokerMetrics metrics) {
+        if (metrics.getTimestamp() == null) {
+            return null;
+        }
+        return metrics.getTimestamp().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
 }
-

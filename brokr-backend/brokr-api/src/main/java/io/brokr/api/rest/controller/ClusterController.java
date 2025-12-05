@@ -66,4 +66,15 @@ public class ClusterController {
         boolean isReachable = clusterApiService.testClusterConnection(id);
         return ResponseEntity.ok(isReachable);
     }
+    
+    /**
+     * Test JMX connection to brokers in a cluster.
+     * Returns true if at least one broker is reachable via JMX.
+     */
+    @PostMapping("/{id}/test-jmx-connection")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#id)")
+    public ResponseEntity<Boolean> testJmxConnection(@PathVariable String id) {
+        boolean isReachable = clusterApiService.testJmxConnection(id);
+        return ResponseEntity.ok(isReachable);
+    }
 }

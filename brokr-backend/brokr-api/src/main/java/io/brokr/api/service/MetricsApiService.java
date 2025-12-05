@@ -22,6 +22,7 @@ public class MetricsApiService {
     private final TopicMetricsService topicMetricsService;
     private final ConsumerGroupMetricsService consumerGroupMetricsService;
     private final ClusterMetricsService clusterMetricsService;
+    private final BrokerMetricsService brokerMetricsService;
     private final AuthorizationService authorizationService;
     
     /**
@@ -86,5 +87,54 @@ public class MetricsApiService {
         
         return clusterMetricsService.getMetrics(clusterId, start, end, limit);
     }
+    
+    /**
+     * Get broker metrics for all brokers in a cluster
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = "brokerMetrics", key = "#clusterId + ':' + #startTime + ':' + #endTime + ':' + #limit",
+               unless = "#result == null || #result.isEmpty()")
+    public List<BrokerMetrics> getBrokerMetrics(String clusterId,
+                                                 long startTime, long endTime, int limit) {
+        if (!authorizationService.hasAccessToCluster(clusterId)) {
+            throw new SecurityException("Access denied to cluster: " + clusterId);
+        }
+        
+        LocalDateTime start = LocalDateTime.ofInstant(Instant.ofEpochMilli(startTime), ZoneId.systemDefault());
+        LocalDateTime end = LocalDateTime.ofInstant(Instant.ofEpochMilli(endTime), ZoneId.systemDefault());
+        
+        return brokerMetricsService.getMetrics(clusterId, start, end, limit);
+    }
+    
+    /**
+     * Get broker metrics for a specific broker
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = "brokerMetricsByBroker", key = "#clusterId + ':' + #brokerId + ':' + #startTime + ':' + #endTime + ':' + #limit",
+               unless = "#result == null || #result.isEmpty()")
+    public List<BrokerMetrics> getBrokerMetricsByBroker(String clusterId, int brokerId,
+                                                         long startTime, long endTime, int limit) {
+        if (!authorizationService.hasAccessToCluster(clusterId)) {
+            throw new SecurityException("Access denied to cluster: " + clusterId);
+        }
+        
+        LocalDateTime start = LocalDateTime.ofInstant(Instant.ofEpochMilli(startTime), ZoneId.systemDefault());
+        LocalDateTime end = LocalDateTime.ofInstant(Instant.ofEpochMilli(endTime), ZoneId.systemDefault());
+        
+        return brokerMetricsService.getMetricsByBroker(clusterId, brokerId, start, end, limit);
+    }
+    
+    /**
+     * Get latest broker metrics for all brokers in a cluster
+     */
+    @Transactional(readOnly = true)
+    public List<BrokerMetrics> getLatestBrokerMetrics(String clusterId) {
+        if (!authorizationService.hasAccessToCluster(clusterId)) {
+            throw new SecurityException("Access denied to cluster: " + clusterId);
+        }
+        
+        return brokerMetricsService.getLatestMetrics(clusterId);
+    }
 }
+
 

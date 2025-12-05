@@ -28,6 +28,7 @@ import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import { ClusterLayout } from './components/layout/ClusterLayout';
 import ClusterOverviewPage from './pages/ClusterOverviewPage';
 import BrokersPage from './pages/BrokersPage';
+import BrokerDetailPage from './pages/BrokerDetailPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import OrganizationsPage from './pages/admin/OrganizationsPage';
 import OrganizationDetailPage from './pages/admin/OrganizationDetailPage';
@@ -73,6 +74,7 @@ function App() {
                 >
                     <Route index element={<ClusterOverviewPage />} />
                     <Route path="brokers" element={<BrokersPage />} />
+                    <Route path="brokers/:brokerId" element={<BrokerDetailPage />} />
                     <Route path="topics" element={<TopicsPage />} />
                     <Route path="topics/:topicName" element={<TopicDetailPage />} />
                     <Route path="consumer-groups" element={<ConsumerGroupsPage />} />

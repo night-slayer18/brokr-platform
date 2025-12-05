@@ -40,6 +40,13 @@ const kafkaClusterSchema = z.object({
     sslKeystoreLocation: z.string().optional(),
     sslKeystorePassword: z.string().optional(),
     sslKeyPassword: z.string().optional(),
+    // JMX Configuration
+    jmxEnabled: z.boolean().optional(),
+    jmxPort: z.string().optional(),
+    jmxAuthentication: z.boolean().optional(),
+    jmxUsername: z.string().optional(),
+    jmxPassword: z.string().optional(),
+    jmxSsl: z.boolean().optional(),
     organizationId: z.string().min(1, 'Organization is required'),
     environmentId: z.string().min(1, 'Environment is required'),
 });
@@ -67,6 +74,10 @@ export default function CreateClusterPage() {
             description: '',
             isActive: true,
             securityProtocol: 'PLAINTEXT',
+            jmxEnabled: false,
+            jmxPort: '',
+            jmxAuthentication: false,
+            jmxSsl: false,
             organizationId: user?.organizationId || '',
             environmentId: '',
         },
@@ -74,6 +85,8 @@ export default function CreateClusterPage() {
 
     const selectedOrganizationId = watch('organizationId');
     const securityProtocol = watch('securityProtocol');
+    const jmxEnabled = watch('jmxEnabled');
+    const jmxAuthentication = watch('jmxAuthentication');
 
     const queryClient = useQueryClient();
     
@@ -124,11 +137,13 @@ export default function CreateClusterPage() {
 
 
     const onSubmit = async (formData: KafkaClusterFormData) => {
+        const input = {
+            ...formData,
+            jmxPort: formData.jmxPort ? parseInt(formData.jmxPort, 10) : undefined,
+        };
         createCluster(
             {
-                input: {
-                    ...formData,
-                },
+                input,
             },
             {
                 onSuccess: () => {
@@ -349,6 +364,98 @@ export default function CreateClusterPage() {
                                     {errors.sslKeyPassword &&
                                         <p className="text-sm text-destructive">{errors.sslKeyPassword.message}</p>}
                                 </div>
+                            </div>
+                        )}
+
+                        <CardTitle className="mt-8">JMX Monitoring Settings</CardTitle>
+                        <CardDescription>Configure JMX for broker-level monitoring metrics (CPU, memory, disk, throughput).</CardDescription>
+
+                        <div className="flex items-center space-x-2 mt-4">
+                            <Controller
+                                name="jmxEnabled"
+                                control={control}
+                                render={({field}) => (
+                                    <Switch
+                                        id="jmxEnabled"
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        disabled={loading}
+                                    />
+                                )}
+                            />
+                            <Label htmlFor="jmxEnabled">Enable JMX Monitoring</Label>
+                        </div>
+
+                        {jmxEnabled && (
+                            <div className="space-y-4 mt-4 p-4 rounded-lg bg-muted/50 border">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="jmxPort">JMX Port</Label>
+                                        <Input 
+                                            id="jmxPort" 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            {...register('jmxPort')} 
+                                            disabled={loading}
+                                            placeholder="9999"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                    <Controller
+                                        name="jmxSsl"
+                                        control={control}
+                                        render={({field}) => (
+                                            <Switch
+                                                id="jmxSsl"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                                disabled={loading}
+                                            />
+                                        )}
+                                    />
+                                    <Label htmlFor="jmxSsl">Use SSL for JMX</Label>
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                    <Controller
+                                        name="jmxAuthentication"
+                                        control={control}
+                                        render={({field}) => (
+                                            <Switch
+                                                id="jmxAuthentication"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                                disabled={loading}
+                                            />
+                                        )}
+                                    />
+                                    <Label htmlFor="jmxAuthentication">JMX Authentication Required</Label>
+                                </div>
+
+                                {jmxAuthentication && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="jmxUsername">JMX Username</Label>
+                                            <Input 
+                                                id="jmxUsername" 
+                                                {...register('jmxUsername')} 
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="jmxPassword">JMX Password</Label>
+                                            <Input 
+                                                id="jmxPassword" 
+                                                type="password" 
+                                                {...register('jmxPassword')} 
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

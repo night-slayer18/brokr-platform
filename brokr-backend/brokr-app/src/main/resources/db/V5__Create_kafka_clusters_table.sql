@@ -20,6 +20,13 @@ CREATE TABLE kafka_clusters (
                                 is_reachable BOOLEAN NOT NULL DEFAULT false,
                                 last_connection_error TEXT,
                                 last_connection_check BIGINT NOT NULL DEFAULT 0,
+                                -- JMX configuration for broker monitoring
+                                jmx_enabled BOOLEAN NOT NULL DEFAULT false,
+                                jmx_port INTEGER,
+                                jmx_authentication BOOLEAN NOT NULL DEFAULT false,
+                                jmx_username VARCHAR(255),
+                                jmx_password VARCHAR(255),
+                                jmx_ssl BOOLEAN NOT NULL DEFAULT false,
                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 UNIQUE (name, organization_id),
