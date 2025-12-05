@@ -102,6 +102,10 @@ public class KafkaConnectionService {
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
         props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 5000);
         props.put(AdminClientConfig.RETRIES_CONFIG, 1);
+        // Reduce metadata age to 5s to detect controller changes faster (default 5 mins)
+        // This ensures we get fresh metadata on each request
+        props.put(AdminClientConfig.METADATA_MAX_AGE_CONFIG, 5000);
+
 
         // Apply security configuration
         if (cluster.getSecurityProtocol() != null) {

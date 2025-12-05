@@ -42,6 +42,7 @@ services:
   kafka-broker-1:
     image: confluentinc/cp-kafka:8.1.0
     container_name: brokr-kafka-1
+    hostname: kafka-broker-1
     ports:
       - "9092:9092"
       - "9999:9999"  # JMX port for broker monitoring
@@ -72,19 +73,20 @@ services:
       - brokr-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
+      test: [ "CMD-SHELL", "KAFKA_JMX_OPTS= KAFKA_JMX_PORT= kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
 
   # Kafka Broker 2
   kafka-broker-2:
     image: confluentinc/cp-kafka:8.1.0
     container_name: brokr-kafka-2
+    hostname: kafka-broker-2
     ports:
       - "9093:9093"
-      - "9998:9998"  # JMX port for broker monitoring
+      - "9998:9999"  # JMX port for broker monitoring (External: 9998, Internal: 9999)
     environment:
       KAFKA_NODE_ID: 2
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -103,28 +105,30 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 2
       CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'
       # JMX Configuration for broker monitoring
-      KAFKA_JMX_PORT: 9998
+      # JMX Configuration for broker monitoring
+      KAFKA_JMX_PORT: 9999
       KAFKA_JMX_HOSTNAME: kafka-broker-2
-      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=9998 -Dcom.sun.management.jmxremote.rmi.port=9998 -Djava.rmi.server.hostname=kafka-broker-2'
+      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=9999 -Dcom.sun.management.jmxremote.rmi.port=9999 -Djava.rmi.server.hostname=kafka-broker-2'
     volumes:
       - kafka_data_2:/var/lib/kafka/data
     networks:
       - brokr-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9093 || exit 1" ]
+      test: [ "CMD-SHELL", "KAFKA_JMX_OPTS= KAFKA_JMX_PORT= kafka-broker-api-versions --bootstrap-server localhost:9093 || exit 1" ]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
 
   # Kafka Broker 3
   kafka-broker-3:
     image: confluentinc/cp-kafka:8.1.0
     container_name: brokr-kafka-3
+    hostname: kafka-broker-3
     ports:
       - "9094:9094"
-      - "9997:9997"  # JMX port for broker monitoring
+      - "9997:9999"  # JMX port for broker monitoring (External: 9997, Internal: 9999)
     environment:
       KAFKA_NODE_ID: 3
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -143,20 +147,21 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 2
       CLUSTER_ID: '0K1NOVcqSoeQgUQc97lpzg'
       # JMX Configuration for broker monitoring
-      KAFKA_JMX_PORT: 9997
+      # JMX Configuration for broker monitoring
+      KAFKA_JMX_PORT: 9999
       KAFKA_JMX_HOSTNAME: kafka-broker-3
-      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=9997 -Dcom.sun.management.jmxremote.rmi.port=9997 -Djava.rmi.server.hostname=kafka-broker-3'
+      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=9999 -Dcom.sun.management.jmxremote.rmi.port=9999 -Djava.rmi.server.hostname=kafka-broker-3'
     volumes:
       - kafka_data_3:/var/lib/kafka/data
     networks:
       - brokr-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9094 || exit 1" ]
+      test: [ "CMD-SHELL", "KAFKA_JMX_OPTS= KAFKA_JMX_PORT= kafka-broker-api-versions --bootstrap-server localhost:9094 || exit 1" ]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
 
   # Schema Registry
   schema-registry:

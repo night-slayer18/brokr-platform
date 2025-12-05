@@ -18,6 +18,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @Service
@@ -507,9 +509,11 @@ public class KafkaAdminService {
     
     /**
      * Get the controller broker ID for the cluster.
+     * Note: In KRaft mode, the controller info from AdminClient may be slightly stale
+     * due to metadata caching. The metadata.max.age.ms setting controls freshness.
      */
     @Retryable(
-            retryFor = {ExecutionException.class, InterruptedException.class},
+            retryFor = {ExecutionException.class, InterruptedException.class, TimeoutException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000)
     )
@@ -517,8 +521,16 @@ public class KafkaAdminService {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
             DescribeClusterResult result = adminClient.describeCluster();
-            Node controller = result.controller().get();
-            return controller != null ? controller.id() : -1;
+            // Use timeout to ensure we get response from the cluster
+            Node controller = result.controller().get(10, TimeUnit.SECONDS);
+            int controllerId = controller != null ? controller.id() : -1;
+            log.info("Controller ID for cluster {}: {} (from node: {})", 
+                    cluster.getName(), controllerId, controller != null ? controller.host() : "null");
+            return controllerId;
+        } catch (TimeoutException e) {
+            log.warn("Timeout getting controller ID for cluster: {}", cluster.getName());
+            kafkaConnectionService.removeAdminClient(cluster.getId());
+            return -1;
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to get controller ID for cluster: {}", cluster.getName(), e);
             kafkaConnectionService.removeAdminClient(cluster.getId());
