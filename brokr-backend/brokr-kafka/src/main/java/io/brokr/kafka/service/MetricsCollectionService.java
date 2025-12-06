@@ -507,7 +507,7 @@ public class MetricsCollectionService {
             // Get partition distribution info from Admin API (single batch call)
             Map<Integer, BrokerPartitionInfo> partitionInfo = kafkaAdminService.getBrokerPartitionInfo(cluster);
             
-            // Get controller ID
+            // Get controller ID (uses describeMetadataQuorum for accurate Raft leader)
             int controllerId = kafkaAdminService.getControllerId(cluster);
             
             LocalDateTime now = LocalDateTime.now();

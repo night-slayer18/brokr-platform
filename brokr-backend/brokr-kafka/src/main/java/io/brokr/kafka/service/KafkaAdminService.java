@@ -507,8 +507,9 @@ public class KafkaAdminService {
     
     /**
      * Get the controller broker ID for the cluster.
-     * Note: In KRaft mode, the controller info from AdminClient may be slightly stale
-     * due to metadata caching. The metadata.max.age.ms setting controls freshness.
+     * Note: In KRaft mode, describeCluster().controller() returns random broker IDs (by design).
+     * We use describeMetadataQuorum() instead to get the actual Raft quorum leader.
+     * This is what the kafka-metadata-quorum.sh CLI uses internally.
      */
     @Retryable(
             retryFor = {ExecutionException.class, InterruptedException.class, TimeoutException.class},
@@ -518,12 +519,15 @@ public class KafkaAdminService {
     public int getControllerId(KafkaCluster cluster) {
         try {
             AdminClient adminClient = kafkaConnectionService.getOrCreateAdminClient(cluster);
-            DescribeClusterResult result = adminClient.describeCluster();
-            // Use timeout to ensure we get response from the cluster
-            Node controller = result.controller().get(10, TimeUnit.SECONDS);
-            int controllerId = controller != null ? controller.id() : -1;
-            log.debug("Controller ID for cluster {}: {} (from node: {})", 
-                    cluster.getName(), controllerId, controller != null ? controller.host() : "null");
+            
+            // Use describeMetadataQuorum() for accurate controller ID in KRaft mode
+            // describeCluster().controller() returns random broker IDs (not the actual Raft leader)
+            DescribeMetadataQuorumResult quorumResult = adminClient.describeMetadataQuorum();
+            QuorumInfo quorumInfo = quorumResult.quorumInfo().get(10, TimeUnit.SECONDS);
+            int controllerId = quorumInfo.leaderId();
+            
+            log.debug("Controller ID for cluster {}: {} (from metadata quorum, epoch: {})", 
+                    cluster.getName(), controllerId, quorumInfo.leaderEpoch());
             return controllerId;
         } catch (TimeoutException e) {
             log.warn("Timeout getting controller ID for cluster: {}", cluster.getName());
