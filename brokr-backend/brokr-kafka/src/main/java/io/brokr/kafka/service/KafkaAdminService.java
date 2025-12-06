@@ -1,7 +1,5 @@
 package io.brokr.kafka.service;
 
-import io.brokr.core.model.PartitionInfo;
-import io.brokr.core.model.TopicPartition;
 import io.brokr.core.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.*;
@@ -524,7 +522,7 @@ public class KafkaAdminService {
             // Use timeout to ensure we get response from the cluster
             Node controller = result.controller().get(10, TimeUnit.SECONDS);
             int controllerId = controller != null ? controller.id() : -1;
-            log.info("Controller ID for cluster {}: {} (from node: {})", 
+            log.debug("Controller ID for cluster {}: {} (from node: {})", 
                     cluster.getName(), controllerId, controller != null ? controller.host() : "null");
             return controllerId;
         } catch (TimeoutException e) {
