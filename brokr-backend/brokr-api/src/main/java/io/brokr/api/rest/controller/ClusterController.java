@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/clusters")
+@RequestMapping("/api/v1/brokr/clusters")
 @RequiredArgsConstructor
 public class ClusterController {
 

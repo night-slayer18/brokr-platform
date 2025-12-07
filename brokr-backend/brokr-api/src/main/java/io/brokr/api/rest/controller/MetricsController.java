@@ -16,14 +16,14 @@ import java.util.List;
  * Thin wrapper around MetricsApiService - no service changes needed.
  */
 @RestController
-@RequestMapping("/api/v1/metrics")
+@RequestMapping("/api/v1/brokr/metrics")
 @RequiredArgsConstructor
 public class MetricsController {
     
     private final MetricsApiService metricsApiService;
     
     @GetMapping("/topics/{clusterId}/{topicName}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<TopicMetrics> getTopicMetrics(
             @PathVariable String clusterId,
             @PathVariable String topicName,
@@ -34,7 +34,7 @@ public class MetricsController {
     }
     
     @GetMapping("/consumer-groups/{clusterId}/{groupId}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<ConsumerGroupMetrics> getConsumerGroupMetrics(
             @PathVariable String clusterId,
             @PathVariable String consumerGroupId,
@@ -46,7 +46,7 @@ public class MetricsController {
     }
     
     @GetMapping("/clusters/{clusterId}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<ClusterMetrics> getClusterMetrics(
             @PathVariable String clusterId,
             @RequestParam long startTime,
@@ -59,7 +59,7 @@ public class MetricsController {
      * Get broker metrics for all brokers in a cluster within a time range.
      */
     @GetMapping("/brokers/{clusterId}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> getBrokerMetrics(
             @PathVariable String clusterId,
             @RequestParam long startTime,
@@ -72,7 +72,7 @@ public class MetricsController {
      * Get broker metrics for a specific broker within a time range.
      */
     @GetMapping("/brokers/{clusterId}/{brokerId}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> getBrokerMetricsByBroker(
             @PathVariable String clusterId,
             @PathVariable int brokerId,
@@ -86,7 +86,7 @@ public class MetricsController {
      * Get the latest broker metrics for all brokers in a cluster.
      */
     @GetMapping("/brokers/{clusterId}/latest")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> getLatestBrokerMetrics(@PathVariable String clusterId) {
         return metricsApiService.getLatestBrokerMetrics(clusterId);
     }

@@ -17,14 +17,14 @@ import java.util.List;
  * Thin wrapper around MessageReplayApiService - no service changes needed.
  */
 @RestController
-@RequestMapping("/api/v1/replay")
+@RequestMapping("/api/v1/brokr/replay")
 @RequiredArgsConstructor
 public class ReplayController {
     
     private final MessageReplayApiService replayApiService;
     
     @GetMapping("/jobs")
-    @PreAuthorize("#clusterId == null or @authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.canReadReplayJobs() and (#clusterId == null or @authorizationService.hasAccessToCluster(#clusterId))")
     public List<MessageReplayJob> getReplayJobs(
             @RequestParam(required = false) String clusterId,
             @RequestParam(required = false) ReplayJobStatus status,
@@ -49,14 +49,14 @@ public class ReplayController {
     }
     
     @PostMapping("/jobs")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
+    @PreAuthorize("@authorizationService.canManageReplayJobs() and @authorizationService.hasAccessToCluster(#input.clusterId)")
     public ResponseEntity<MessageReplayJob> replayMessages(@RequestBody MessageReplayInput input) {
         MessageReplayJob job = replayApiService.replayMessages(input);
         return new ResponseEntity<>(job, HttpStatus.CREATED);
     }
     
     @PostMapping("/jobs/schedule")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
+    @PreAuthorize("@authorizationService.canManageReplayJobs() and @authorizationService.hasAccessToCluster(#input.clusterId)")
     public ResponseEntity<MessageReplayJob> scheduleReplay(@RequestBody MessageReplayInput input) {
         MessageReplayJob job = replayApiService.scheduleReplay(input);
         return new ResponseEntity<>(job, HttpStatus.CREATED);

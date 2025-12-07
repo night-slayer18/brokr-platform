@@ -34,7 +34,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/api-keys")
+@RequestMapping("/api/v1/brokr/api-keys")
 @RequiredArgsConstructor
 public class ApiKeyController {
     

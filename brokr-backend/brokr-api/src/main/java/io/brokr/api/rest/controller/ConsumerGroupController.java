@@ -13,14 +13,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/clusters/{clusterId}/consumer-groups")
+@RequestMapping("/api/v1/brokr/clusters/{clusterId}/consumer-groups")
 @RequiredArgsConstructor
 public class ConsumerGroupController {
 
     private final ConsumerGroupApiService consumerGroupApiService;
 
     @GetMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadConsumerGroups()")
     public List<ConsumerGroupDto> getConsumerGroups(@PathVariable String clusterId) {
         return consumerGroupApiService.listConsumerGroups(clusterId).stream()
                 .map(ConsumerGroupDto::fromDomain)
@@ -28,13 +28,13 @@ public class ConsumerGroupController {
     }
 
     @GetMapping("/{groupId}")
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadConsumerGroups()")
     public ConsumerGroupDto getConsumerGroup(@PathVariable String clusterId, @PathVariable String groupId) {
         return ConsumerGroupDto.fromDomain(consumerGroupApiService.getConsumerGroup(clusterId, groupId));
     }
 
     @PostMapping("/{groupId}/reset-offset")
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageConsumerGroups() and @authorizationService.hasAccessToCluster(#clusterId)")
     public ResponseEntity<Boolean> resetOffset(
             @PathVariable String clusterId,
             @PathVariable String groupId,

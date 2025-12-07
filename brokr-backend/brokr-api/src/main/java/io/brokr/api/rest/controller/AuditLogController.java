@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
  * Thin wrapper around AuditLogApiService - no service changes needed.
  */
 @RestController
-@RequestMapping("/api/v1/audit-logs")
+@RequestMapping("/api/v1/brokr/audit-logs")
 @RequiredArgsConstructor
 public class AuditLogController {
     

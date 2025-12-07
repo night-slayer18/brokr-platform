@@ -26,7 +26,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/mfa")
+@RequestMapping("/api/v1/brokr/mfa")
 @RequiredArgsConstructor
 public class MfaController {
     

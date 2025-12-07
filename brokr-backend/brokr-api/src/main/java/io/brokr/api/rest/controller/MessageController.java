@@ -17,7 +17,7 @@ import java.util.List;
  * Thin wrapper around KafkaConsumerService - no service changes needed.
  */
 @RestController
-@RequestMapping("/api/v1/clusters/{clusterId}/messages")
+@RequestMapping("/api/v1/brokr/clusters/{clusterId}/messages")
 @RequiredArgsConstructor
 public class MessageController {
     
@@ -25,7 +25,7 @@ public class MessageController {
     private final KafkaConsumerService kafkaConsumerService;
     
     @PostMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadTopics()")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMessages()")
     public List<Message> getMessages(
             @PathVariable String clusterId,
             @RequestBody MessageInput input) {
