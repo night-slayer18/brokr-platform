@@ -109,6 +109,8 @@ existing Kafka deployments, whether they're on-premises, in the cloud, or hybrid
 ### 📊 Kafka Cluster Management
 
 - Register and manage multiple Kafka clusters
+- **Native KRaft Support**: Seamlessly works with modern KRaft (Zookeeper-less) clusters
+- **Broker Health Monitoring**: Real-time CPU, Memory, and Disk usage via JMX
 - Connection health monitoring with automatic status checks
 - Support for various security protocols:
     - PLAINTEXT
@@ -195,7 +197,7 @@ existing Kafka deployments, whether they're on-premises, in the cloud, or hybrid
 - **Cluster Metrics**:
     - Cluster-wide throughput aggregation
     - Total data transfer across all topics
-    - Resource utilization (topics, partitions, brokers)
+    - Broker resource utilization (CPU, Heap Memory, Disk) via JMX
     - Health status tracking
 - **Features**:
     - Interactive charts with time range selection (1h, 6h, 24h, 7d, 30d, today)
