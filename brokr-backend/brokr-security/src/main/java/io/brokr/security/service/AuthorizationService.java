@@ -208,6 +208,9 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToSchemaRegistry(String schemaRegistryId) {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("schema-registry:read", "schema-registry:write");
+        
         User user = getCurrentUser();
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
@@ -228,6 +231,9 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToKafkaConnect(String kafkaConnectId) {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("kafka-connect:read", "kafka-connect:write");
+        
         User user = getCurrentUser();
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
@@ -248,6 +254,9 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToKafkaStreamsApp(String kafkaStreamsApplicationId) {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("kafka-streams:read", "kafka-streams:write");
+        
         User user = getCurrentUser();
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
@@ -268,6 +277,9 @@ public class AuthorizationService {
     }
 
     public boolean hasAccessToKsqlDB(String ksqlDBId) {
+        // Check API key scopes if authenticated via API key
+        checkApiKeyScope("ksqldb:read", "ksqldb:write");
+        
         User user = getCurrentUser();
         if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
@@ -342,6 +354,56 @@ public class AuthorizationService {
         
         // For JWT, any authenticated user can read topics
         return true;
+    }
+    
+    /**
+     * Check if user can read consumer groups (for API keys with consumer-groups:read scope).
+     */
+    public boolean canReadConsumerGroups() {
+        checkApiKeyScope("consumer-groups:read");
+        return true;
+    }
+    
+    /**
+     * Check if user can manage consumer groups (reset offsets, etc).
+     */
+    public boolean canManageConsumerGroups() {
+        checkApiKeyScope("consumer-groups:write");
+        User user = getCurrentUser();
+        return user.getRole() == Role.ADMIN || user.getRole() == Role.SUPER_ADMIN;
+    }
+    
+    /**
+     * Check if user can read messages from topics.
+     */
+    public boolean canReadMessages() {
+        checkApiKeyScope("messages:read");
+        return true;
+    }
+    
+    /**
+     * Check if user can access metrics.
+     */
+    public boolean canReadMetrics() {
+        checkApiKeyScope("metrics:read");
+        return true;
+    }
+    
+    /**
+     * Check if user can read replay jobs.
+     */
+    public boolean canReadReplayJobs() {
+        checkApiKeyScope("replay:read");
+        return true;
+    }
+    
+    /**
+     * Check if user can manage replay jobs (create, cancel, retry, delete).
+     */
+    public boolean canManageReplayJobs() {
+        checkApiKeyScope("replay:write");
+        User user = getCurrentUser();
+        return user.getRole() == Role.ADMIN || user.getRole() == Role.SUPER_ADMIN;
     }
 
     public boolean canManageUsers() {

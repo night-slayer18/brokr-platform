@@ -27,7 +27,7 @@ public class ReplayResolver {
     private final MessageReplayApiService replayApiService;
 
     @QueryMapping
-    @PreAuthorize("#clusterId == null or @authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.canReadReplayJobs() and (#clusterId == null or @authorizationService.hasAccessToCluster(#clusterId))")
     public List<MessageReplayJob> replayJobs(
             @Argument String clusterId,
             @Argument ReplayJobStatus status,
@@ -42,11 +42,13 @@ public class ReplayResolver {
     }
 
     @QueryMapping
+    @PreAuthorize("@authorizationService.canReadReplayJobs()")
     public MessageReplayJob replayJob(@Argument String id) {
         return replayApiService.getReplayJob(id);
     }
 
     @QueryMapping
+    @PreAuthorize("@authorizationService.canReadReplayJobs()")
     public List<MessageReplayJobHistoryEntity> replayHistory(
             @Argument String jobId,
             @Argument Integer page,
@@ -59,32 +61,35 @@ public class ReplayResolver {
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
+    @PreAuthorize("@authorizationService.canManageReplayJobs() and @authorizationService.hasAccessToCluster(#input.clusterId)")
     @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.MESSAGE_REPLAY, resourceNameParam = "input.sourceTopic", logResult = true)
     public MessageReplayJob replayMessages(@Argument MessageReplayInput input) {
         return replayApiService.replayMessages(input);
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#input.clusterId)")
+    @PreAuthorize("@authorizationService.canManageReplayJobs() and @authorizationService.hasAccessToCluster(#input.clusterId)")
     @AuditLoggable(action = AuditActionType.CREATE, resourceType = AuditResourceType.MESSAGE_REPLAY, resourceNameParam = "input.sourceTopic", logResult = true)
     public MessageReplayJob scheduleReplay(@Argument MessageReplayInput input) {
         return replayApiService.scheduleReplay(input);
     }
 
     @MutationMapping
+    @PreAuthorize("@authorizationService.canManageReplayJobs()")
     @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.MESSAGE_REPLAY, resourceIdParam = "id")
     public boolean cancelReplay(@Argument String id) {
         return replayApiService.cancelReplay(id);
     }
 
     @MutationMapping
+    @PreAuthorize("@authorizationService.canManageReplayJobs()")
     @AuditLoggable(action = AuditActionType.UPDATE, resourceType = AuditResourceType.MESSAGE_REPLAY, resourceIdParam = "id")
     public boolean retryReplay(@Argument String id) {
         return replayApiService.retryReplay(id);
     }
 
     @MutationMapping
+    @PreAuthorize("@authorizationService.canManageReplayJobs()")
     @AuditLoggable(action = AuditActionType.DELETE, resourceType = AuditResourceType.MESSAGE_REPLAY, resourceIdParam = "id")
     public boolean deleteReplay(@Argument String id) {
         return replayApiService.deleteReplay(id);

@@ -438,6 +438,7 @@ public class KafkaConsumerService {
             }
             
             // Manually assign partitions (avoids consumer group coordination)
+            consumer.unsubscribe(); // CRITICAL: Clear any previous subscription (from fallback above) before manual assignment
             consumer.assign(topicPartitions);
             
             // Get end offsets for all partitions to detect when we've reached the end

@@ -22,7 +22,7 @@ public class MetricsResolver {
     private final MetricsApiService metricsApiService;
     
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<TopicMetrics> topicMetrics(
             @Argument String clusterId,
             @Argument String topicName,
@@ -37,7 +37,7 @@ public class MetricsResolver {
     }
     
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<ConsumerGroupMetrics> consumerGroupMetrics(
             @Argument String clusterId,
             @Argument String consumerGroupId,
@@ -52,7 +52,7 @@ public class MetricsResolver {
     }
     
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<ClusterMetrics> clusterMetrics(
             @Argument String clusterId,
             @Argument Map<String, Object> timeRange,
@@ -67,7 +67,7 @@ public class MetricsResolver {
     
     // Broker Metrics queries
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> brokerMetrics(
             @Argument String clusterId,
             @Argument Map<String, Object> timeRange,
@@ -81,7 +81,7 @@ public class MetricsResolver {
     }
     
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> brokerMetricsByBroker(
             @Argument String clusterId,
             @Argument Integer brokerId,
@@ -96,7 +96,7 @@ public class MetricsResolver {
     }
     
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMetrics()")
     public List<BrokerMetrics> latestBrokerMetrics(@Argument String clusterId) {
         return metricsApiService.getLatestBrokerMetrics(clusterId);
     }

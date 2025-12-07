@@ -32,7 +32,7 @@ public class TopicResolver {
     private final KafkaConsumerService kafkaConsumerService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadTopics()")
     public TopicPage topics(
             @Argument String clusterId,
             @Argument Integer page,
@@ -56,13 +56,13 @@ public class TopicResolver {
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadTopics()")
     public Topic topic(@Argument String clusterId, @Argument String name) {
         return topicApiService.getTopic(clusterId, name);
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadMessages()")
     public List<Message> messages(@Argument String clusterId, @Argument MessageInput input) {
         KafkaCluster cluster = clusterRepository.findById(clusterId)
                 .map(KafkaClusterEntity::toDomain)

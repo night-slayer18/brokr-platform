@@ -22,19 +22,19 @@ public class ConsumerGroupResolver {
     private final ConsumerGroupApiService consumerGroupApiService;
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadConsumerGroups()")
     public List<ConsumerGroup> consumerGroups(@Argument String clusterId) {
         return consumerGroupApiService.listConsumerGroups(clusterId);
     }
 
     @QueryMapping
-    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.hasAccessToCluster(#clusterId) and @authorizationService.canReadConsumerGroups()")
     public ConsumerGroup consumerGroup(@Argument String clusterId, @Argument String groupId) {
         return consumerGroupApiService.getConsumerGroup(clusterId, groupId);
     }
 
     @MutationMapping
-    @PreAuthorize("@authorizationService.canManageTopics() and @authorizationService.hasAccessToCluster(#clusterId)")
+    @PreAuthorize("@authorizationService.canManageConsumerGroups() and @authorizationService.hasAccessToCluster(#clusterId)")
     @AuditLoggable(action = AuditActionType.CONFIGURATION_CHANGE, resourceType = AuditResourceType.CONSUMER_GROUP, resourceIdParam = "groupId", resourceNameParam = "groupId", logResult = true)
     public boolean resetConsumerGroupOffset(@Argument String clusterId, @Argument String groupId,
                                             @Argument String topic, @Argument int partition, @Argument long offset) {
