@@ -6,9 +6,10 @@ import io.brokr.security.service.AuthenticationService;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.security.service.JwtService;
 import io.brokr.security.service.MfaService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -124,12 +125,14 @@ public class MfaResolver {
             // Update cookie with full token
             HttpServletResponse response = getResponse();
             if (response != null) {
-                Cookie cookie = new Cookie("brokr_token", fullToken);
-                cookie.setHttpOnly(true);
-                cookie.setSecure(isSecureRequest());
-                cookie.setPath("/");
-                cookie.setMaxAge(86400); // 24 hours
-                response.addCookie(cookie);
+                ResponseCookie cookie = ResponseCookie.from("brokr_token", fullToken)
+                        .httpOnly(true)
+                        .secure(isSecureRequest())
+                        .path("/")
+                        .maxAge(86400)
+                        .sameSite("Strict")
+                        .build();
+                response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
             }
             
             Map<String, Object> responseMap = new HashMap<>();

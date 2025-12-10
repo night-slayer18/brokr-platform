@@ -12,7 +12,6 @@ import {LOGIN_MUTATION} from '@/graphql/mutations'
 import {useAuthStore} from '@/store/authStore'
 import {Loader2} from 'lucide-react'
 import {useGraphQLMutation} from '@/hooks/useGraphQLMutation'
-import {extractErrorMessage} from '@/lib/error-utils'
 import type {LoginMutation} from '@/graphql/types'
 import {MfaVerificationForm} from './MfaVerificationForm'
 
@@ -61,10 +60,7 @@ export function LoginForm() {
                         toast.error('Login failed - invalid response')
                     }
                 },
-                onError: (error: Error) => {
-                    const errorMessage = extractErrorMessage(error)
-                    toast.error(errorMessage || 'Login failed. Please check your credentials and try again.')
-                },
+
             }
         )
     }

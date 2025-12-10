@@ -7,9 +7,10 @@ import io.brokr.core.dto.UserDto;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthenticationService;
 import io.brokr.security.service.JwtService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -57,14 +58,16 @@ public class AuthResolver {
         String token = (String) authResult.get("token");
         
         if (response != null && token != null) {
-            // Set HttpOnly cookie with token
-            Cookie cookie = new Cookie("brokr_token", token);
-            cookie.setHttpOnly(true);
-            cookie.setSecure(isSecureRequest()); // Automatically set based on HTTPS
-            cookie.setPath("/");
-            // Set appropriate expiration: 5 minutes for challenge token, 24 hours for full JWT or grace period token
-            cookie.setMaxAge(mfaRequired ? 300 : 86400);
-            response.addCookie(cookie);
+            // Set HttpOnly cookie with token using ResponseCookie for SameSite support
+            ResponseCookie cookie = ResponseCookie.from("brokr_token", token)
+                    .httpOnly(true)
+                    .secure(isSecureRequest())
+                    .path("/")
+                    .maxAge(mfaRequired ? 300 : 86400)
+                    .sameSite("Strict")
+                    .build();
+            
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
         
         // Build response according to AuthResponse type
@@ -121,14 +124,17 @@ public class AuthResolver {
             HttpServletResponse response = getResponse();
             
             if (response != null) {
-                // Set HttpOnly cookie with full JWT token
+                // Set HttpOnly cookie with full JWT token using ResponseCookie
                 String token = (String) authResult.get("token");
-                Cookie cookie = new Cookie("brokr_token", token);
-                cookie.setHttpOnly(true);
-                cookie.setSecure(isSecureRequest());
-                cookie.setPath("/");
-                cookie.setMaxAge(86400); // 24 hours
-                response.addCookie(cookie);
+                ResponseCookie cookie = ResponseCookie.from("brokr_token", token)
+                        .httpOnly(true)
+                        .secure(isSecureRequest())
+                        .path("/")
+                        .maxAge(86400) // 24 hours
+                        .sameSite("Strict")
+                        .build();
+                
+                response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
             }
             
             Map<String, Object> responseBody = new HashMap<>();
@@ -170,14 +176,17 @@ public class AuthResolver {
         HttpServletResponse response = getResponse();
         
         if (response != null) {
-            // Set HttpOnly cookie with JWT token
+            // Set HttpOnly cookie with JWT token using ResponseCookie
             String token = (String) authResult.get("token");
-            Cookie cookie = new Cookie("brokr_token", token);
-            cookie.setHttpOnly(true);
-            cookie.setSecure(isSecureRequest()); // Automatically set based on HTTPS
-            cookie.setPath("/");
-            cookie.setMaxAge(86400); // 24 hours
-            response.addCookie(cookie);
+            ResponseCookie cookie = ResponseCookie.from("brokr_token", token)
+                    .httpOnly(true)
+                    .secure(isSecureRequest())
+                    .path("/")
+                    .maxAge(86400) // 24 hours
+                    .sameSite("Strict")
+                    .build();
+            
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         }
         
         // Remove token from response body

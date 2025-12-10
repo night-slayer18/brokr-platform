@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.graphql.execution.DataFetcherExceptionResolverAdapter;
 import org.springframework.graphql.execution.ErrorType;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 import graphql.schema.DataFetchingEnvironment;
 
@@ -74,6 +75,15 @@ public class GraphQLExceptionResolver extends DataFetcherExceptionResolverAdapte
             return GraphqlErrorBuilder.newError()
                     .errorType(ErrorType.BAD_REQUEST)
                     .message("A database constraint was violated. This may be due to a duplicate name or other invalid data.")
+                    .path(env.getExecutionStepInfo().getPath())
+                    .build();
+        }
+
+        if (ex instanceof BadCredentialsException) {
+            log.debug("Bad credentials: {}", ex.getMessage());
+            return GraphqlErrorBuilder.newError()
+                    .errorType(ErrorType.UNAUTHORIZED)
+                    .message("Invalid username or password")
                     .path(env.getExecutionStepInfo().getPath())
                     .build();
         }

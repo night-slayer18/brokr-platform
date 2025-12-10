@@ -6,9 +6,10 @@ import io.brokr.api.service.AuditService;
 import io.brokr.core.dto.UserDto;
 import io.brokr.core.model.User;
 import io.brokr.security.service.AuthenticationService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,16 +35,19 @@ public class AuthController {
             Map<String, Object> authResult = authenticationService.authenticate(input.getUsername(), input.getPassword());
             
             // Set HttpOnly cookie with JWT token (secure against XSS)
+            // Set HttpOnly cookie with JWT token (secure against XSS)
             String token = (String) authResult.get("token");
-            Cookie cookie = new Cookie("brokr_token", token);
-            cookie.setHttpOnly(true);
-            // Set Secure flag based on whether request is HTTPS (production) or HTTP (dev)
-            cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
-            cookie.setPath("/");
-            cookie.setMaxAge(86400); // 24 hours (matches JWT expiration)
+            ResponseCookie cookie = ResponseCookie.from("brokr_token", token)
+                    .httpOnly(true)
+                    .secure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")))
+                    .path("/")
+                    .maxAge(86400) // 24 hours (matches JWT expiration)
+                    .sameSite("Strict")
+                    .build();
+            
             // Don't set domain - let it default to the request's domain
             // This allows cookies to work with Vite proxy (localhost:3000) and production
-            response.addCookie(cookie);
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
             
             // Log successful login
             UserDto user = (UserDto) authResult.get("user");
@@ -65,12 +69,16 @@ public class AuthController {
     @PostMapping("/logout")
     public Map<String, String> logout(HttpServletRequest request, HttpServletResponse response) {
         // Clear the cookie
-        Cookie cookie = new Cookie("brokr_token", "");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
-        cookie.setPath("/");
-        cookie.setMaxAge(0); // Delete the cookie
-        response.addCookie(cookie);
+        // Clear the cookie
+        ResponseCookie cookie = ResponseCookie.from("brokr_token", "")
+                .httpOnly(true)
+                .secure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")))
+                .path("/")
+                .maxAge(0) // Delete the cookie
+                .sameSite("Strict")
+                .build();
+                
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         
         // Log logout (try to get user info, but don't fail if not available)
         try {
@@ -121,13 +129,17 @@ public class AuthController {
         Map<String, Object> authResult = authenticationService.register(user);
         
         // Set HttpOnly cookie with JWT token
+        // Set HttpOnly cookie with JWT token
         String token = (String) authResult.get("token");
-        Cookie cookie = new Cookie("brokr_token", token);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")));
-        cookie.setPath("/");
-        cookie.setMaxAge(86400); // 24 hours
-        response.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie.from("brokr_token", token)
+                .httpOnly(true)
+                .secure(request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto")))
+                .path("/")
+                .maxAge(86400) // 24 hours
+                .sameSite("Strict")
+                .build();
+        
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         
         // Remove token from response body
         Map<String, Object> responseBody = new HashMap<>();
