@@ -730,10 +730,10 @@ export const GET_AUDIT_LOGS = gql`
                 severity
                 isSensitive
             }
-            totalElements
-            totalPages
             currentPage
             pageSize
+            hasNext
+            hasPrevious
         }
     }
 `
@@ -796,10 +796,10 @@ export const GET_AUDIT_LOGS_BY_USER = gql`
                 severity
                 isSensitive
             }
-            totalElements
-            totalPages
             currentPage
             pageSize
+            hasNext
+            hasPrevious
         }
     }
 `
@@ -832,10 +832,10 @@ export const GET_AUDIT_LOGS_BY_RESOURCE = gql`
                 severity
                 isSensitive
             }
-            totalElements
-            totalPages
             currentPage
             pageSize
+            hasNext
+            hasPrevious
         }
     }
 `

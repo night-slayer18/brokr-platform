@@ -5,8 +5,8 @@ import io.brokr.core.model.AuditResourceType;
 import io.brokr.core.model.AuditSeverity;
 import io.brokr.core.model.AuditStatus;
 import io.brokr.storage.entity.AuditLogEntity;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> {
     
     // Find by user and time range
-    Page<AuditLogEntity> findByUserIdAndTimestampBetween(
+    Slice<AuditLogEntity> findByUserIdAndTimestampBetween(
             String userId, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -26,14 +26,14 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by resource
-    Page<AuditLogEntity> findByResourceTypeAndResourceId(
+    Slice<AuditLogEntity> findByResourceTypeAndResourceId(
             AuditResourceType resourceType, 
             String resourceId, 
             Pageable pageable
     );
     
     // Find by resource and time range
-    Page<AuditLogEntity> findByResourceTypeAndResourceIdAndTimestampBetween(
+    Slice<AuditLogEntity> findByResourceTypeAndResourceIdAndTimestampBetween(
             AuditResourceType resourceType, 
             String resourceId, 
             LocalDateTime startTime, 
@@ -42,7 +42,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by organization and time range
-    Page<AuditLogEntity> findByOrganizationIdAndTimestampBetween(
+    Slice<AuditLogEntity> findByOrganizationIdAndTimestampBetween(
             String organizationId, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -50,7 +50,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by cluster and time range
-    Page<AuditLogEntity> findByClusterIdAndTimestampBetween(
+    Slice<AuditLogEntity> findByClusterIdAndTimestampBetween(
             String clusterId, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -58,7 +58,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by action type and time range
-    Page<AuditLogEntity> findByActionTypeAndTimestampBetween(
+    Slice<AuditLogEntity> findByActionTypeAndTimestampBetween(
             AuditActionType actionType, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -66,7 +66,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by status and time range
-    Page<AuditLogEntity> findByStatusAndTimestampBetween(
+    Slice<AuditLogEntity> findByStatusAndTimestampBetween(
             AuditStatus status, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -74,7 +74,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by severity and time range
-    Page<AuditLogEntity> findBySeverityAndTimestampBetween(
+    Slice<AuditLogEntity> findBySeverityAndTimestampBetween(
             AuditSeverity severity, 
             LocalDateTime startTime, 
             LocalDateTime endTime, 
@@ -82,7 +82,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
     );
     
     // Find by time range
-    Page<AuditLogEntity> findByTimestampBetween(
+    Slice<AuditLogEntity> findByTimestampBetween(
             LocalDateTime startTime, 
             LocalDateTime endTime, 
             Pageable pageable
@@ -136,7 +136,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Long> 
            "  (a.user_email IS NOT NULL AND LOWER(a.user_email) LIKE LOWER('%' || :searchText || '%')) OR " +
            "  (a.user_id IS NOT NULL AND LOWER(a.user_id) LIKE LOWER('%' || :searchText || '%')))",
            nativeQuery = true)
-    Page<AuditLogEntity> findWithFilters(
+    Slice<AuditLogEntity> findWithFilters(
             @Param("userId") String userId,
             @Param("actionType") String actionType,
             @Param("resourceType") String resourceType,
