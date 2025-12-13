@@ -812,10 +812,10 @@ export interface AuditLog {
 
 export interface AuditLogPage {
     content: AuditLog[]
-    totalElements: number
-    totalPages: number
     currentPage: number
     pageSize: number
+    hasNext: boolean
+    hasPrevious: boolean
 }
 
 export interface ActionTypeCount {

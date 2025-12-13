@@ -575,10 +575,10 @@ input AuditLogPagination {
 
 type AuditLogPage {
     content: [AuditLog!]!
-    totalElements: Long!
-    totalPages: Int!
     currentPage: Int!
     pageSize: Int!
+    hasNext: Boolean!
+    hasPrevious: Boolean!
 }
 
 type UserPage {

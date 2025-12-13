@@ -62,7 +62,7 @@ function getStatusColor(status: AuditStatus) {
 
 export default function AuditLogsPage() {
     const [page, setPage] = useState(0)
-    const [pageSize] = useState(50)
+    const [pageSize] = useState(10)
     const [filters, setFilters] = useState({
         actionType: 'ALL',
         resourceType: 'ALL',
@@ -81,6 +81,7 @@ export default function AuditLogsPage() {
     if (filters.severity && filters.severity !== 'ALL') filterInput.severity = filters.severity as AuditSeverity
     if (filters.searchText) filterInput.searchText = filters.searchText
 
+
     const {data, isLoading, error} = useGraphQLQuery<GetAuditLogsQuery, GetAuditLogsVariables>(
         GET_AUDIT_LOGS,
         {
@@ -91,6 +92,9 @@ export default function AuditLogsPage() {
                 sortBy: 'timestamp',
                 sortDirection: 'DESC',
             },
+        },
+        {
+            placeholderData: (previousData) => previousData, // Keep previous data while fetching new page
         }
     )
 
@@ -127,8 +131,8 @@ export default function AuditLogsPage() {
     }
 
     const auditLogs = data?.auditLogs?.content || []
-    const totalPages = data?.auditLogs?.totalPages || 0
-    const totalElements = data?.auditLogs?.totalElements || 0
+    const hasNext = data?.auditLogs?.hasNext || false
+    const hasPrevious = data?.auditLogs?.hasPrevious || false
 
     return (
         <div className="space-y-6">
@@ -292,9 +296,6 @@ export default function AuditLogsPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle>Audit Logs</CardTitle>
-                            <CardDescription>
-                                Showing {auditLogs.length} of {totalElements} events
-                            </CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -382,22 +383,22 @@ export default function AuditLogsPage() {
                             {/* Pagination */}
                             <div className="flex items-center justify-between mt-4">
                                 <div className="text-sm text-muted-foreground">
-                                    Page {page + 1} of {totalPages}
+                                    Page {page + 1}
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setPage(Math.max(0, page - 1))}
-                                        disabled={page === 0}
+                                        disabled={!hasPrevious}
                                     >
                                         Previous
                                     </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                                        disabled={page >= totalPages - 1}
+                                        onClick={() => setPage(page + 1)}
+                                        disabled={!hasNext}
                                     >
                                         Next
                                     </Button>

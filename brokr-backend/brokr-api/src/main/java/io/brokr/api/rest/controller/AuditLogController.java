@@ -1,10 +1,13 @@
 package io.brokr.api.rest.controller;
 
 import io.brokr.api.service.AuditLogApiService;
+import io.brokr.core.dto.AuditLogFilter;
+import io.brokr.core.dto.AuditLogPagination;
+import io.brokr.core.dto.AuditLogStatistics;
 import io.brokr.core.model.AuditLog;
 import io.brokr.core.model.AuditResourceType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +24,7 @@ public class AuditLogController {
     
     @GetMapping
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public Page<AuditLog> getAuditLogs(
+    public Slice<AuditLog> getAuditLogs(
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String actionType,
             @RequestParam(required = false) String resourceType,
@@ -34,12 +37,12 @@ public class AuditLogController {
             @RequestParam(required = false) Long endTime,
             @RequestParam(required = false) String searchText,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "timestamp") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection) {
         
         // Build filter
-        AuditLogApiService.AuditLogFilter filter = new AuditLogApiService.AuditLogFilter();
+        AuditLogFilter filter = new AuditLogFilter();
         filter.setUserId(userId);
         if (actionType != null) {
             filter.setActionType(io.brokr.core.model.AuditActionType.valueOf(actionType));
@@ -61,7 +64,7 @@ public class AuditLogController {
         filter.setSearchText(searchText);
         
         // Build pagination
-        AuditLogApiService.AuditLogPagination pagination = new AuditLogApiService.AuditLogPagination();
+        AuditLogPagination pagination = new AuditLogPagination();
         pagination.setPage(page);
         pagination.setSize(size);
         pagination.setSortBy(sortBy);
@@ -78,12 +81,12 @@ public class AuditLogController {
     
     @GetMapping("/users/{userId}")
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public Page<AuditLog> getAuditLogsByUser(
+    public Slice<AuditLog> getAuditLogsByUser(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         
-        AuditLogApiService.AuditLogPagination pagination = new AuditLogApiService.AuditLogPagination();
+        AuditLogPagination pagination = new AuditLogPagination();
         pagination.setPage(page);
         pagination.setSize(size);
         
@@ -92,13 +95,13 @@ public class AuditLogController {
     
     @GetMapping("/resources/{resourceType}/{resourceId}")
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public Page<AuditLog> getAuditLogsByResource(
+    public Slice<AuditLog> getAuditLogsByResource(
             @PathVariable String resourceType,
             @PathVariable String resourceId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         
-        AuditLogApiService.AuditLogPagination pagination = new AuditLogApiService.AuditLogPagination();
+        AuditLogPagination pagination = new AuditLogPagination();
         pagination.setPage(page);
         pagination.setSize(size);
         
@@ -108,7 +111,7 @@ public class AuditLogController {
     
     @GetMapping("/statistics")
     @PreAuthorize("@authorizationService.canManageUsers()")
-    public AuditLogApiService.AuditLogStatistics getAuditLogStatistics(
+    public AuditLogStatistics getAuditLogStatistics(
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String actionType,
             @RequestParam(required = false) String resourceType,
@@ -117,7 +120,7 @@ public class AuditLogController {
             @RequestParam(required = false) Long startTime,
             @RequestParam(required = false) Long endTime) {
         
-        AuditLogApiService.AuditLogFilter filter = new AuditLogApiService.AuditLogFilter();
+        AuditLogFilter filter = new AuditLogFilter();
         filter.setUserId(userId);
         if (actionType != null) {
             filter.setActionType(io.brokr.core.model.AuditActionType.valueOf(actionType));

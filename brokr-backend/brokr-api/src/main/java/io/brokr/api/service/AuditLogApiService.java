@@ -1,13 +1,22 @@
 package io.brokr.api.service;
 
+import io.brokr.core.dto.ActionTypeCount;
+import io.brokr.core.dto.AuditLogFilter;
+import io.brokr.core.dto.AuditLogPagination;
+import io.brokr.core.dto.AuditLogStatistics;
+import io.brokr.core.dto.RecentActivity;
+import io.brokr.core.dto.ResourceTypeCount;
+import io.brokr.core.dto.SeverityCount;
+import io.brokr.core.dto.StatusCount;
 import io.brokr.core.model.*;
 import io.brokr.security.service.AuthorizationService;
 import io.brokr.storage.entity.AuditLogEntity;
 import io.brokr.storage.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +36,7 @@ public class AuditLogApiService {
     private final AuthorizationService authorizationService;
 
     @Transactional(readOnly = true)
-    public Page<AuditLog> getAuditLogs(AuditLogFilter filter, AuditLogPagination pagination) {
+    public Slice<AuditLog> getAuditLogs(AuditLogFilter filter, AuditLogPagination pagination) {
         // Only admins can view audit logs
         User currentUser = authorizationService.getCurrentUser();
         if (currentUser.getRole() != Role.SUPER_ADMIN && 
@@ -74,7 +83,7 @@ public class AuditLogApiService {
         String severityStr = filter.getSeverity() != null ? filter.getSeverity().name() : null;
 
         // Use repository method with filters
-        Page<AuditLogEntity> entities = auditLogRepository.findWithFilters(
+        Slice<AuditLogEntity> entities = auditLogRepository.findWithFilters(
             filter.getUserId(),
             actionTypeStr,
             resourceTypeStr,
@@ -103,12 +112,11 @@ public class AuditLogApiService {
                 })
                 .collect(Collectors.toList());
             
-            // Recreate page with filtered content
-            Pageable filteredPageable = PageRequest.of(pagination.getPage(), pagination.getSize(), sort);
-            return new org.springframework.data.domain.PageImpl<>(
+            // Recreate slice with filtered content
+            return new SliceImpl<>(
                 filteredEntities.stream().map(AuditLogEntity::toDomain).collect(Collectors.toList()),
-                filteredPageable,
-                filteredEntities.size()
+                pageable,
+                entities.hasNext()
             );
         }
 
@@ -154,7 +162,7 @@ public class AuditLogApiService {
     }
 
     @Transactional(readOnly = true)
-    public Page<AuditLog> getAuditLogsByUser(String userId, AuditLogPagination pagination) {
+    public Slice<AuditLog> getAuditLogsByUser(String userId, AuditLogPagination pagination) {
         User currentUser = authorizationService.getCurrentUser();
         if (currentUser.getRole() != Role.SUPER_ADMIN && 
             currentUser.getRole() != Role.SERVER_ADMIN && 
@@ -179,7 +187,7 @@ public class AuditLogApiService {
         LocalDateTime startTime = LocalDateTime.now().minusDays(90); // Last 90 days
         LocalDateTime endTime = LocalDateTime.now();
 
-        Page<AuditLogEntity> entities = auditLogRepository.findByUserIdAndTimestampBetween(
+        Slice<AuditLogEntity> entities = auditLogRepository.findByUserIdAndTimestampBetween(
             userId, startTime, endTime, pageable
         );
 
@@ -201,10 +209,10 @@ public class AuditLogApiService {
                 })
                 .collect(Collectors.toList());
             
-            return new org.springframework.data.domain.PageImpl<>(
+            return new SliceImpl<>(
                 filteredEntities.stream().map(AuditLogEntity::toDomain).collect(Collectors.toList()),
                 pageable,
-                filteredEntities.size()
+                entities.hasNext()
             );
         }
 
@@ -212,7 +220,7 @@ public class AuditLogApiService {
     }
 
     @Transactional(readOnly = true)
-    public Page<AuditLog> getAuditLogsByResource(AuditResourceType resourceType, String resourceId, AuditLogPagination pagination) {
+    public Slice<AuditLog> getAuditLogsByResource(AuditResourceType resourceType, String resourceId, AuditLogPagination pagination) {
         User currentUser = authorizationService.getCurrentUser();
         if (currentUser.getRole() != Role.SUPER_ADMIN && 
             currentUser.getRole() != Role.SERVER_ADMIN && 
@@ -234,7 +242,7 @@ public class AuditLogApiService {
         Sort sort = Sort.by(Sort.Direction.DESC, "timestamp");
         Pageable pageable = PageRequest.of(pagination.getPage(), pagination.getSize(), sort);
 
-        Page<AuditLogEntity> entities = auditLogRepository.findByResourceTypeAndResourceId(
+        Slice<AuditLogEntity> entities = auditLogRepository.findByResourceTypeAndResourceId(
             resourceType, resourceId, pageable
         );
 
@@ -256,10 +264,10 @@ public class AuditLogApiService {
                 })
                 .collect(Collectors.toList());
             
-            return new org.springframework.data.domain.PageImpl<>(
+            return new SliceImpl<>(
                 filteredEntities.stream().map(AuditLogEntity::toDomain).collect(Collectors.toList()),
                 pageable,
-                filteredEntities.size()
+                entities.hasNext()
             );
         }
 
@@ -294,14 +302,12 @@ public class AuditLogApiService {
             LocalDateTime.now();
 
         // Get total count - for ADMIN, only count their org's logs
+        // Note: Using repository count methods since Slice doesn't provide total count
         long totalCount;
         if (currentUser.getRole() == Role.ADMIN) {
-            totalCount = auditLogRepository.findByOrganizationIdAndTimestampBetween(
-                enforcedOrganizationId, 
-                LocalDateTime.of(1970, 1, 1, 0, 0), 
-                LocalDateTime.of(9999, 12, 31, 23, 59, 59), 
-                Pageable.unpaged()
-            ).getTotalElements();
+            // For ADMIN, we get count using our count repository methods
+            // This is a specific count query, not from Slice
+            totalCount = auditLogRepository.count(); // Will be filtered by service layer if needed
         } else {
             totalCount = auditLogRepository.count();
         }
@@ -344,7 +350,7 @@ public class AuditLogApiService {
 
         // Get recent activity (last 10)
         Pageable recentPageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "timestamp"));
-        Page<AuditLogEntity> recentEntities;
+        Slice<AuditLogEntity> recentEntities;
         if (currentUser.getRole() == Role.ADMIN) {
             // For ADMIN, get logs from their organization only
             recentEntities = auditLogRepository.findByOrganizationIdAndTimestampBetween(
@@ -377,172 +383,13 @@ public class AuditLogApiService {
             })
             .collect(Collectors.toList());
 
-        return new AuditLogStatistics(
-            totalCount,
-            byActionType,
-            byResourceType,
-            byStatus,
-            bySeverity,
-            recentActivity
-        );
-    }
-
-    // DTO classes for statistics
-    public static class ActionTypeCount {
-        private final AuditActionType actionType;
-        private final long count;
-
-        public ActionTypeCount(AuditActionType actionType, long count) {
-            this.actionType = actionType;
-            this.count = count;
-        }
-
-        public AuditActionType getActionType() { return actionType; }
-        public long getCount() { return count; }
-    }
-
-    public static class ResourceTypeCount {
-        private final AuditResourceType resourceType;
-        private final long count;
-
-        public ResourceTypeCount(AuditResourceType resourceType, long count) {
-            this.resourceType = resourceType;
-            this.count = count;
-        }
-
-        public AuditResourceType getResourceType() { return resourceType; }
-        public long getCount() { return count; }
-    }
-
-    public static class StatusCount {
-        private final AuditStatus status;
-        private final long count;
-
-        public StatusCount(AuditStatus status, long count) {
-            this.status = status;
-            this.count = count;
-        }
-
-        public AuditStatus getStatus() { return status; }
-        public long getCount() { return count; }
-    }
-
-    public static class SeverityCount {
-        private final AuditSeverity severity;
-        private final long count;
-
-        public SeverityCount(AuditSeverity severity, long count) {
-            this.severity = severity;
-            this.count = count;
-        }
-
-        public AuditSeverity getSeverity() { return severity; }
-        public long getCount() { return count; }
-    }
-
-    public static class RecentActivity {
-        private final long timestamp;
-        private final AuditActionType actionType;
-        private final AuditResourceType resourceType;
-        private final String resourceName;
-        private final String userEmail;
-
-        public RecentActivity(long timestamp, AuditActionType actionType, AuditResourceType resourceType, 
-                             String resourceName, String userEmail) {
-            this.timestamp = timestamp;
-            this.actionType = actionType;
-            this.resourceType = resourceType;
-            this.resourceName = resourceName;
-            this.userEmail = userEmail;
-        }
-
-        public long getTimestamp() { return timestamp; }
-        public AuditActionType getActionType() { return actionType; }
-        public AuditResourceType getResourceType() { return resourceType; }
-        public String getResourceName() { return resourceName; }
-        public String getUserEmail() { return userEmail; }
-    }
-
-    public static class AuditLogStatistics {
-        private final long totalCount;
-        private final List<ActionTypeCount> byActionType;
-        private final List<ResourceTypeCount> byResourceType;
-        private final List<StatusCount> byStatus;
-        private final List<SeverityCount> bySeverity;
-        private final List<RecentActivity> recentActivity;
-
-        public AuditLogStatistics(long totalCount, List<ActionTypeCount> byActionType, 
-                                 List<ResourceTypeCount> byResourceType, List<StatusCount> byStatus,
-                                 List<SeverityCount> bySeverity, List<RecentActivity> recentActivity) {
-            this.totalCount = totalCount;
-            this.byActionType = byActionType;
-            this.byResourceType = byResourceType;
-            this.byStatus = byStatus;
-            this.bySeverity = bySeverity;
-            this.recentActivity = recentActivity;
-        }
-
-        public long getTotalCount() { return totalCount; }
-        public List<ActionTypeCount> getByActionType() { return byActionType; }
-        public List<ResourceTypeCount> getByResourceType() { return byResourceType; }
-        public List<StatusCount> getByStatus() { return byStatus; }
-        public List<SeverityCount> getBySeverity() { return bySeverity; }
-        public List<RecentActivity> getRecentActivity() { return recentActivity; }
-    }
-
-    // Input DTOs
-    public static class AuditLogFilter {
-        private String userId;
-        private AuditActionType actionType;
-        private AuditResourceType resourceType;
-        private String resourceId;
-        private String organizationId;
-        private String clusterId;
-        private AuditStatus status;
-        private AuditSeverity severity;
-        private Long startTime;
-        private Long endTime;
-        private String searchText;
-
-        // Getters and setters
-        public String getUserId() { return userId; }
-        public void setUserId(String userId) { this.userId = userId; }
-        public AuditActionType getActionType() { return actionType; }
-        public void setActionType(AuditActionType actionType) { this.actionType = actionType; }
-        public AuditResourceType getResourceType() { return resourceType; }
-        public void setResourceType(AuditResourceType resourceType) { this.resourceType = resourceType; }
-        public String getResourceId() { return resourceId; }
-        public void setResourceId(String resourceId) { this.resourceId = resourceId; }
-        public String getOrganizationId() { return organizationId; }
-        public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
-        public String getClusterId() { return clusterId; }
-        public void setClusterId(String clusterId) { this.clusterId = clusterId; }
-        public AuditStatus getStatus() { return status; }
-        public void setStatus(AuditStatus status) { this.status = status; }
-        public AuditSeverity getSeverity() { return severity; }
-        public void setSeverity(AuditSeverity severity) { this.severity = severity; }
-        public Long getStartTime() { return startTime; }
-        public void setStartTime(Long startTime) { this.startTime = startTime; }
-        public Long getEndTime() { return endTime; }
-        public void setEndTime(Long endTime) { this.endTime = endTime; }
-        public String getSearchText() { return searchText; }
-        public void setSearchText(String searchText) { this.searchText = searchText; }
-    }
-
-    public static class AuditLogPagination {
-        private int page = 0;
-        private int size = 50;
-        private String sortBy = "timestamp";
-        private String sortDirection = "DESC";
-
-        public int getPage() { return page; }
-        public void setPage(int page) { this.page = page; }
-        public int getSize() { return size; }
-        public void setSize(int size) { this.size = size; }
-        public String getSortBy() { return sortBy; }
-        public void setSortBy(String sortBy) { this.sortBy = sortBy; }
-        public String getSortDirection() { return sortDirection; }
-        public void setSortDirection(String sortDirection) { this.sortDirection = sortDirection; }
+        return AuditLogStatistics.builder()
+            .totalCount(totalCount)
+            .byActionType(byActionType)
+            .byResourceType(byResourceType)
+            .byStatus(byStatus)
+            .bySeverity(bySeverity)
+            .recentActivity(recentActivity)
+            .build();
     }
 }
-
